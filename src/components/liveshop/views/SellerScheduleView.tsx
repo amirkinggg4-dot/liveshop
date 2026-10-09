@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, ImagePlus, Info } from "lucide-react";
+import { ArrowDown, ArrowUp, Clock, ImagePlus, Info, Pin } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useAppStore } from "@/store/app-store";
 import { useSellerStore } from "@/store/seller-store";
-import { faNum } from "@/lib/format";
+import { faNum, toman } from "@/lib/format";
 import { CATEGORIES } from "@/lib/data/categories";
+import { ITEMS_SH1, stockLabelFa } from "@/lib/data/items";
 import type { Cover } from "@/lib/data/types";
 import type { SellerScheduledShow } from "@/lib/data/seller";
 import {
@@ -16,6 +17,8 @@ import {
   GradientCover,
   SectionTitle,
 } from "@/components/liveshop/shared";
+import { AUCTION_ENABLED } from "@/lib/config";
+import { cn } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────
    زمان‌بندی شو — فاز ۲ (اطلس تصویر ۲۴)
@@ -74,6 +77,21 @@ export default function SellerScheduleView() {
   const [giveaway, setGiveaway] = useState(false);
   const [cohost, setCohost] = useState(false);
   const [pinComment, setPinComment] = useState(false);
+
+  /* ── v1.4 — ترتیب کالاها در شو: کالای اول به‌صورت خودکار پین‌شده است ── */
+  const [itemOrder, setItemOrder] = useState<string[]>(() =>
+    ITEMS_SH1.filter((i) => i.status !== "sold").map((i) => i.id)
+  );
+
+  const moveItem = (idx: number, dir: -1 | 1) => {
+    setItemOrder((order) => {
+      const next = [...order];
+      const target = idx + dir;
+      if (target < 0 || target >= next.length) return order;
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  };
 
   const selectedCover = coverIdx == null ? null : COVER_PRESETS[coverIdx];
 
@@ -210,19 +228,21 @@ export default function SellerScheduleView() {
           aria-label="تنظیمات شو"
           className="bg-ls-card border border-white/5 rounded-2xl p-4 space-y-3.5"
         >
-          <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold">پیش‌بید</p>
-              <p className="text-[11px] text-white/45 mt-0.5 leading-4">
-                فالوورها قبل از شروع روی آیتم‌ها بید ثبت می‌کنند
-              </p>
+          {AUCTION_ENABLED && (
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">پیش‌بید</p>
+                <p className="text-[11px] text-white/45 mt-0.5 leading-4">
+                  فالوورها قبل از شروع روی آیتم‌ها بید ثبت می‌کنند
+                </p>
+              </div>
+              <Switch
+                checked={prebid}
+                onCheckedChange={setPrebid}
+                aria-label="فعال‌بودن پیش‌بید"
+              />
             </div>
-            <Switch
-              checked={prebid}
-              onCheckedChange={setPrebid}
-              aria-label="فعال‌بودن پیش‌بید"
-            />
-          </div>
+          )}
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">گیواوی در شروع</p>
@@ -272,9 +292,78 @@ export default function SellerScheduleView() {
           />
           <p>
             فالوورها ۳۰ دقیقه قبل یادآوری می‌گیرند؛ شوهای زمان‌بندی‌شده روی
-            پروفایل شما نمایش داده می‌شوند و پیش‌بید می‌پذیرند.
+            پروفایل شما نمایش داده می‌شوند
+            {AUCTION_ENABLED ? " و پیش‌بید می‌پذیرند." : " و همهٔ کالاها با قیمت ثابت فروخته می‌شوند."}
           </p>
         </div>
+
+        {/* ═══ v1.4 — ترتیب کالاها در شو: کالای اول پین‌شده می‌شود ═══ */}
+        <section
+          aria-label="ترتیب کالاها در شو"
+          className="bg-ls-card border border-white/5 rounded-2xl p-4 space-y-3"
+        >
+          <div>
+            <p className="text-sm font-extrabold">ترتیب کالاها در شو</p>
+            <p className="text-[11px] text-white/45 mt-0.5 leading-4">
+              کالای اول لیست، لحظهٔ شروع لایو به‌صورت خودکار «در حال نمایش» پین
+              می‌شود. با فلش‌ها جابه‌جا کن.
+            </p>
+          </div>
+          <ol className="space-y-2" aria-label="ترتیب کالاهای شو">
+            {itemOrder.map((id, idx) => {
+              const item = ITEMS_SH1.find((i) => i.id === id);
+              if (!item) return null;
+              return (
+                <li
+                  key={id}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-xl border p-2.5",
+                    idx === 0
+                      ? "border-ls-green/50 bg-ls-green/5"
+                      : "border-white/5 bg-ls-card-2"
+                  )}
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-ls-card text-[10px] font-black text-white/70 tabular-nums">
+                    {faNum(idx + 1)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-bold">
+                      {item.emoji} {item.title}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-white/45 tabular-nums">
+                      {toman(item.price, false)} · {stockLabelFa(item.stock)}
+                    </span>
+                  </span>
+                  {idx === 0 ? (
+                    <span className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-ls-green px-2 py-1 text-[10px] font-black text-[#04281e]">
+                      <Pin className="h-3 w-3" aria-hidden />
+                      پین‌شده
+                    </span>
+                  ) : (
+                    <span className="flex shrink-0 flex-col gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => moveItem(idx, -1)}
+                        aria-label={`انتقال ${item.title} به بالا`}
+                        className="flex h-6 w-6 items-center justify-center rounded-md border border-white/15 text-white/70 hover:bg-white/5 transition-colors"
+                      >
+                        <ArrowUp className="h-3 w-3" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveItem(idx, 1)}
+                        aria-label={`انتقال ${item.title} به پایین`}
+                        className="flex h-6 w-6 items-center justify-center rounded-md border border-white/15 text-white/70 hover:bg-white/5 transition-colors"
+                      >
+                        <ArrowDown className="h-3 w-3" aria-hidden />
+                      </button>
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
 
         {/* ثبت */}
         <button
@@ -314,7 +403,7 @@ export default function SellerScheduleView() {
                   <p className="text-[11px] text-white/45">
                     {faNum(s.itemsCount)} آیتم
                   </p>
-                  {s.prebid && (
+                  {AUCTION_ENABLED && s.prebid && (
                     <span className="inline-flex rounded-full bg-ls-purple/10 px-2 py-0.5 text-[10px] font-bold text-ls-purple-soft">
                       پیش‌بید فعال
                     </span>

@@ -24,6 +24,7 @@ import { useInboxStore, selectUnreadCount } from "@/store/inbox-store";
 import { useRewardsStore } from "@/store/rewards-store";
 import { faNum, toFa, toman } from "@/lib/format";
 import { Avatar } from "@/components/liveshop/shared";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 function MenuRow({
   icon: Icon,
@@ -142,9 +143,9 @@ export default function ProfileView() {
         {/* فاز ۳ (P1) — فعالیت‌ها، صندوق ورودی، باشگاه ریواردز (فقط اضافه‌شده) */}
         <MenuRow
           icon={Gavel}
-          title="فعالیت‌ها و بیدها"
+          title={AUCTION_ENABLED ? "فعالیت‌ها و بیدها" : "فعالیت‌ها"}
           trailing={
-            activeBidsCount > 0 ? (
+            AUCTION_ENABLED && activeBidsCount > 0 ? (
               <span className="rounded-full bg-ls-purple/20 border border-ls-purple/40 px-2 py-0.5 text-[10px] font-bold text-ls-purple-soft tabular-nums">
                 {faNum(activeBidsCount)} بید فعال
               </span>

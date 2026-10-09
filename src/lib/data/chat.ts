@@ -73,7 +73,7 @@ export const CHAT_SH1: ChatMessage[] = [
     author: "ماشین‌باز",
     emoji: "🚗",
     color: "#6C5CFF",
-    text: "بید ۴٬۶۰۰٬۰۰۰ ثبت شد؟ رفرش کنم؟",
+    text: "سایز ۴۱ دَنک هنوز مونده؟ می‌خوام همین الان بخرم",
     kind: "normal",
     time: "۲۱:۱۱",
   },

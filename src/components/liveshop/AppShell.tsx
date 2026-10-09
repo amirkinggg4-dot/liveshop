@@ -111,7 +111,7 @@ export default function AppShell() {
               </span>
               <div className="leading-tight">
                 <p className="font-black text-sm">LiveShop</p>
-                <p className="text-[10px] text-white/55">خرید زنده، مزایدهٔ لحظه‌ای</p>
+                <p className="text-[10px] text-white/55">خرید زنده با قیمت ثابت</p>
               </div>
             </div>
             <button

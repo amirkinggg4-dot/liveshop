@@ -34,9 +34,11 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { toFa, faNum, toman, faClock } from "@/lib/format";
+import { AUCTION_ENABLED } from "@/lib/config";
 import { useAppStore } from "@/store/app-store";
 import { useLiveStore, bidderLabel, BOTS } from "@/store/live-store";
 import { getShow, getSeller, LIVE_SHOWS, UPCOMING_SHOWS } from "@/lib/data/shows";
+import { stockLabelFa } from "@/lib/data/items";
 import { SHOW_VIDEO, ITEM_PHOTO, SELLER_PHOTO } from "@/lib/data/media";
 import type { ChatMessage, Show } from "@/lib/data/types";
 import {
@@ -57,6 +59,7 @@ import BidSheet from "@/components/liveshop/bid-sheet";
 import ShopTab from "@/components/liveshop/shop-tab";
 import GiveawayModal from "@/components/liveshop/giveaway-modal";
 import Confetti from "@/components/liveshop/confetti";
+import QuickCheckoutSheet from "@/components/liveshop/quick-checkout-sheet";
 import SellerLiveDashboard from "@/components/liveshop/seller-live-dashboard";
 
 /** فروشندهٔ «من» در دمو — دکمهٔ آمار در ریل فقط برای صاحب شو نمایش داده می‌شود */
@@ -533,23 +536,28 @@ function WinnerBanner({ winnerId }: { winnerId: string }) {
   );
 }
 
-/* ═══════════════════════ ProductDock — کارت پایین واحد (متصل به موتور مزایده) ═══════════════════════ */
+/* ═══════════════════════ ProductDock — کارت پایین واحد (v1.4: قیمت ثابت) ═══════════════════════
+   AUCTION_ENABLED=false → کارت قیمت ثابت: عکس/نام/موجودی/قیمت درشت/دکمهٔ «خرید …»
+   AUCTION_ENABLED=true  → همان کارت مزایدهٔ قبلی (ثبت بید + خرید فوری + تایمر) */
 
 function ProductDock({ showId, show }: { showId: string; show: Show }) {
   const openItem = useAppStore((s) => s.openItem);
   const push = useAppStore((s) => s.push);
 
   const items = useLiveStore((s) => s.items);
+  const pinnedItemId = useLiveStore((s) => s.pinnedItemId);
+  const pinnedAt = useLiveStore((s) => s.pinnedAt);
   const activeItemId = useLiveStore((s) => s.activeItemId);
   const currentBid = useLiveStore((s) => s.currentBid);
   const timerSec = useLiveStore((s) => s.timerSec);
   const phase = useLiveStore((s) => s.phase);
   const lastExtendAt = useLiveStore((s) => s.lastExtendAt);
 
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [bidOpen, setBidOpen] = useState(false);
   const [bidNonce, setBidNonce] = useState(0);
 
-  /* v1.3.2 — پالس قیمت هنگام تغییر بید (remount با key → انیمیشن ls-bid-pop) */
+  /* v1.3.2 — پالس قیمت هنگام تغییر بید (فقط حالت مزایده) */
   const [bidPulse, setBidPulse] = useState(0);
   const prevBidRef = useRef(currentBid);
   useEffect(() => {
@@ -559,7 +567,11 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
     }
   }, [currentBid]);
 
-  const item = items.find((i) => i.id === activeItemId) ?? null;
+  /* v1.4 — کارت پایین همیشه «کالای در حال نمایش» (پین‌شده) را نشان می‌دهد */
+  const item =
+    items.find((i) => i.id === pinnedItemId) ??
+    items.find((i) => i.id === activeItemId) ??
+    null;
 
   const openBidSheet = () => {
     setBidNonce((n) => n + 1); // remount → استپر با currentBid تازه مقداردهی می‌شود
@@ -575,12 +587,12 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
   const cardCls =
     "rounded-2xl border border-white/10 bg-black/60 p-3 shadow-2xl backdrop-blur-xl";
 
-  /* حالت خاص — در انتظار آیتم بعدی */
+  /* حالت خاص — در انتظار کالای بعدی */
   if (phase === "awaiting_next" || !item) {
     return (
       <div className={cn(cardCls, "py-4 text-center")}>
-        <p className="text-sm font-bold text-white/60">در انتظار آیتم بعدی ⏳</p>
-        <p className="mt-1 text-xs text-white/40">مزایده به‌زودی ادامه پیدا می‌کند</p>
+        <p className="text-sm font-bold text-white/60">در انتظار کالای بعدی ⏳</p>
+        <p className="mt-1 text-xs text-white/40">فروشنده به‌زودی کالای بعدی را پین می‌کند</p>
       </div>
     );
   }
@@ -590,187 +602,305 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
   const meta = [item.brand, item.size ? `سایز ${item.size}` : null]
     .filter(Boolean)
     .join(" · ");
-  const stockLabel =
-    item.status === "sold"
-      ? "فروخته شد"
-      : item.status === "up_next"
-        ? "به‌زودی"
-        : `${faNum(1)} موجود`;
 
-  return (
-    <div className={cardCls}>
-      {/* ردیف ۱ — عکس گرد ۶۴px (با نشان کوچک تگ گوشهٔ عکس) + نام/موجودی/شرح | قیمت درشت + تایمر */}
-      <div className="flex items-center gap-3">
-        <div className="relative shrink-0">
-          <button
-            onClick={goToProduct}
-            aria-label={`مشاهدهٔ محصول: ${item.title}`}
-            className="relative block h-16 w-16 overflow-hidden rounded-full ring-2 ring-white/20 hover:ring-ls-purple/60 transition-all"
-          >
-            {photo ? (
-              <Image
-                src={photo}
-                alt={`تصویر کالا: ${item.title}`}
-                fill
-                sizes="64px"
-                className="object-cover"
-              />
-            ) : (
-              <GradientCover
-                cover={item.cover}
-                className="h-full w-full"
-                emojiClassName="text-2xl"
-              />
-            )}
-          </button>
-          {/* v1.3.2 — تگ‌ها از کارت حذف شدند؛ یک نشان کوچک روی گوشهٔ عکس */}
-          {show.tags[0] && (
-            <span
-              className="absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-ls-purple px-1.5 py-px text-[8px] font-black text-white shadow-md"
-              aria-hidden
+  /* ═════════ حالت مزایده (AUCTION_ENABLED=true) — کد حفظ‌شدهٔ فاز ۱/۳ ═════════ */
+  if (AUCTION_ENABLED) {
+    const stockLabel =
+      item.status === "sold"
+        ? "فروخته شد"
+        : item.status === "up_next"
+          ? "به‌زودی"
+          : `${faNum(1)} موجود`;
+
+    return (
+      <div className={cardCls}>
+        {/* ردیف ۱ — عکس گرد ۶۴px (با نشان کوچک تگ گوشهٔ عکس) + نام/موجودی/شرح | قیمت درشت + تایمر */}
+        <div className="flex items-center gap-3">
+          <div className="relative shrink-0">
+            <button
+              onClick={goToProduct}
+              aria-label={`مشاهدهٔ محصول: ${item.title}`}
+              className="relative block h-16 w-16 overflow-hidden rounded-full ring-2 ring-white/20 hover:ring-ls-purple/60 transition-all"
             >
-              {show.tags[0]}
-            </span>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-extrabold text-white">{item.title}</p>
-          <span
-            className={cn(
-              "mt-1 inline-block text-[11px] font-bold",
-              item.status === "sold" ? "text-white/55" : "text-ls-green"
+              {photo ? (
+                <Image
+                  src={photo}
+                  alt={`تصویر کالا: ${item.title}`}
+                  fill
+                  sizes="64px"
+                  className="object-cover"
+                />
+              ) : (
+                <GradientCover
+                  cover={item.cover}
+                  className="h-full w-full"
+                  emojiClassName="text-2xl"
+                />
+              )}
+            </button>
+            {show.tags[0] && (
+              <span
+                className="absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-ls-purple px-1.5 py-px text-[8px] font-black text-white shadow-md"
+                aria-hidden
+              >
+                {show.tags[0]}
+              </span>
             )}
-          >
-            {stockLabel}
-          </span>
-          <p className="mt-1 truncate text-[10px] text-white/60">
-            {meta} · ارسال {toman(item.shippingPrice)}
-          </p>
-        </div>
+          </div>
 
-        <div className="flex shrink-0 flex-col items-end">
-          <span className="text-[9px] font-bold text-white/55">
-            {item.status === "auction" ? "بید فعلی" : "قیمت"}
-          </span>
-          <Price
-            key={item.status === "auction" ? bidPulse : "static"}
-            amount={
-              item.status === "auction"
-                ? currentBid
-                : item.buyNowPrice ?? item.soldPrice ?? item.startPrice
-            }
-            className={cn(
-              "text-[19px] leading-6 text-ls-purple-soft",
-              item.status === "auction" &&
-                "inline-block origin-bottom-right animate-ls-bid-pop"
-            )}
-          />
-          {item.status === "auction" && (
-            /* v1.3.2 — تایمر درشت (≥۱۸px بولد): زیر ۱۰ ثانیه قرمز پالس‌دار، زیر ۵ ثانیه بزرگ‌تر */
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-extrabold text-white">{item.title}</p>
             <span
               className={cn(
-                "mt-1 inline-flex items-center gap-1 font-black leading-none tabular-nums transition-all",
-                timerSec <= 10
-                  ? cn(
-                      "text-[#FF3B5C] animate-ls-timer-alert",
-                      timerSec <= 5 ? "text-[21px]" : "text-[18px]"
-                    )
-                  : "text-[18px] text-white/85"
+                "mt-1 inline-block text-[11px] font-bold",
+                item.status === "sold" ? "text-white/55" : "text-ls-green"
               )}
-              aria-label={`زمان باقی‌ماندهٔ مزایده: ${faClock(timerSec)}`}
             >
-              <Clock className="h-4 w-4" aria-hidden />
-              {faClock(timerSec)}
+              {stockLabel}
             </span>
-          )}
-        </div>
-      </div>
+            <p className="mt-1 truncate text-[10px] text-white/60">
+              {meta} · ارسال {toman(item.shippingPrice)}
+            </p>
+          </div>
 
-      {/* فلش تمدید تایمر — ضدکلاهبرداری زمانی */}
-      {item.status === "auction" && extendFlash && (
-        <div key={lastExtendAt} className="animate-ls-fade-up mt-2 flex justify-end">
-          <span className="rounded-full border border-ls-pink/40 bg-ls-pink/15 px-2.5 py-0.5 text-[10px] font-bold text-ls-pink">
-            +۱۰ ثانیه تمدید شد ⏱
-          </span>
+          <div className="flex shrink-0 flex-col items-end">
+            <span className="text-[9px] font-bold text-white/55">
+              {item.status === "auction" ? "بید فعلی" : "قیمت"}
+            </span>
+            <Price
+              key={item.status === "auction" ? bidPulse : "static"}
+              amount={
+                item.status === "auction"
+                  ? currentBid
+                  : item.buyNowPrice ?? item.soldPrice ?? item.startPrice
+              }
+              className={cn(
+                "text-[19px] leading-6 text-ls-purple-soft",
+                item.status === "auction" &&
+                  "inline-block origin-bottom-right animate-ls-bid-pop"
+              )}
+            />
+            {item.status === "auction" && (
+              <span
+                className={cn(
+                  "mt-1 inline-flex items-center gap-1 font-black leading-none tabular-nums transition-all",
+                  timerSec <= 10
+                    ? cn(
+                        "text-[#FF3B5C] animate-ls-timer-alert",
+                        timerSec <= 5 ? "text-[21px]" : "text-[18px]"
+                      )
+                    : "text-[18px] text-white/85"
+                )}
+                aria-label={`زمان باقی‌ماندهٔ مزایده: ${faClock(timerSec)}`}
+              >
+                <Clock className="h-4 w-4" aria-hidden />
+                {faClock(timerSec)}
+              </span>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* ردیف ۲ — بر اساس وضعیت آیتم */}
-      {item.status === "auction" && (
-        <div className="mt-2.5 flex items-stretch gap-2">
-          <button
-            onClick={(e) => {
-              stop(e);
-              openBidSheet();
-            }}
-            className="flex h-12 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-ls-purple text-[15px] font-black text-white shadow-[0_0_18px_rgba(108,92,255,.45)] hover:bg-ls-purple-deep active:scale-[.98] transition-all"
-            aria-label={`ثبت بید به مبلغ ${toman(currentBid + item.step)}`}
-          >
-            <span className="truncate">ثبت بید {toman(currentBid + item.step)}</span>
-            <ChevronsLeft className="h-5 w-5" aria-hidden />
-          </button>
-          {item.buyNowPrice != null && (
+        {/* فلش تمدید تایمر — ضدکلاهبرداری زمانی */}
+        {item.status === "auction" && extendFlash && (
+          <div key={lastExtendAt} className="animate-ls-fade-up mt-2 flex justify-end">
+            <span className="rounded-full border border-ls-pink/40 bg-ls-pink/15 px-2.5 py-0.5 text-[10px] font-bold text-ls-pink">
+              +۱۰ ثانیه تمدید شد ⏱
+            </span>
+          </div>
+        )}
+
+        {/* ردیف ۲ — بر اساس وضعیت آیتم */}
+        {item.status === "auction" && (
+          <div className="mt-2.5 flex items-stretch gap-2">
+            <button
+              onClick={(e) => {
+                stop(e);
+                openBidSheet();
+              }}
+              className="flex h-12 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-ls-purple text-[15px] font-black text-white shadow-[0_0_18px_rgba(108,92,255,.45)] hover:bg-ls-purple-deep active:scale-[.98] transition-all"
+              aria-label={`ثبت بید به مبلغ ${toman(currentBid + item.step)}`}
+            >
+              <span className="truncate">ثبت بید {toman(currentBid + item.step)}</span>
+              <ChevronsLeft className="h-5 w-5" aria-hidden />
+            </button>
+            {item.buyNowPrice != null && (
+              <button
+                onClick={(e) => {
+                  stop(e);
+                  push("checkout", item.id);
+                }}
+                className="h-12 shrink-0 whitespace-nowrap rounded-xl border border-ls-green/60 bg-ls-green/10 px-3 text-[11px] font-extrabold text-ls-green hover:bg-ls-green/20 active:scale-[.98] transition-all"
+                aria-label="خرید فوری"
+              >
+                خرید فوری
+              </button>
+            )}
+          </div>
+        )}
+
+        {item.status === "buy_now" && (
+          <div className="mt-2.5">
             <button
               onClick={(e) => {
                 stop(e);
                 push("checkout", item.id);
               }}
-              /* v1.3.2 — خرید فوری: دکمهٔ ثانویهٔ باریک‌تر، جدا از دکمهٔ بید */
-              className="h-12 shrink-0 whitespace-nowrap rounded-xl border border-ls-green/60 bg-ls-green/10 px-3 text-[11px] font-extrabold text-ls-green hover:bg-ls-green/20 active:scale-[.98] transition-all"
+              className="h-12 w-full rounded-xl bg-ls-green text-sm font-black text-[#04281e] shadow-[0_0_16px_rgba(0,200,150,.3)] hover:brightness-110 active:scale-[.99] transition-all"
               aria-label="خرید فوری"
             >
-              خرید فوری
+              خرید فوری — {toman(item.buyNowPrice ?? item.startPrice)}
+            </button>
+          </div>
+        )}
+
+        {item.status === "sold" && (
+          <div className="mt-2.5">
+            <button
+              disabled
+              className="h-12 w-full rounded-xl bg-white/10 text-sm font-bold text-white/45 cursor-not-allowed"
+              aria-label="فروخته شد"
+            >
+              فروخته شد — {toman(item.soldPrice ?? item.startPrice)}
+            </button>
+          </div>
+        )}
+
+        {item.status === "up_next" && (
+          <div className="mt-2.5 flex items-center gap-2">
+            <StatusChip status="up_next" />
+            <button
+              onClick={(e) => {
+                stop(e);
+                toast("یادآوری فعال شد 🔔");
+              }}
+              className="ms-auto rounded-xl border border-white/15 px-4 py-2 text-sm font-bold text-white/80 hover:bg-white/5 active:scale-[.98] transition-all"
+              aria-label="یادآوری آیتم بعدی"
+            >
+              یادآوری
+            </button>
+          </div>
+        )}
+
+        {/* شیت مزایده — از پایین روی ویدیو باز می‌شود */}
+        <BidSheet key={bidNonce} open={bidOpen} onOpenChange={setBidOpen} />
+      </div>
+    );
+  }
+
+  /* ═════════ v1.4 — حالت قیمت ثابت: عکس · نام · موجودی · قیمت درشت · دکمهٔ خرید ═════════ */
+  const soldOut = item.stock <= 0;
+  const lowStock = item.stock > 0 && item.stock < 3;
+  /* برچسب موجودی — گزینه‌دار: جمع موجودی سایزها؛ ساده: موجودی کل */
+  const stockTotal = item.variants?.length
+    ? item.variants.reduce((s, v) => s + v.stock, 0)
+    : item.stock;
+  const sizeRange =
+    item.variants && item.variants.length > 0
+      ? `سایز ${item.variants[0].label} تا ${item.variants[item.variants.length - 1].label}`
+      : item.size
+        ? `سایز ${item.size}`
+        : null;
+
+  return (
+    <div className={cardCls}>
+      {/* v1.4 — پیل «کالای در حال نمایش» + انیمیشن کوتاه تعویض کالا */}
+      <div className="mb-2 flex items-center justify-between">
+        <span className="inline-flex items-center gap-1 rounded-full bg-ls-purple/25 px-2.5 py-1 text-[10px] font-extrabold text-ls-purple-soft">
+          <span className="h-1.5 w-1.5 rounded-full bg-ls-purple-soft animate-ls-pulse" aria-hidden />
+          کالای در حال نمایش
+        </span>
+        {show.tags[0] && (
+          <span
+            className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[9px] font-bold text-white/75"
+            aria-hidden
+          >
+            {show.tags[0]}
+          </span>
+        )}
+      </div>
+
+      <div key={`${item.id}-${pinnedAt}`} className="animate-ls-fade-up">
+        {/* ردیف ۱ — عکس ۶۴px + نام/موجودی/خط ریز | قیمت ثابت درشت */}
+        <div className="flex items-center gap-3">
+          <div className="relative shrink-0">
+            <button
+              onClick={goToProduct}
+              aria-label={`مشاهدهٔ محصول: ${item.title}`}
+              className="relative block h-16 w-16 overflow-hidden rounded-2xl ring-2 ring-white/20 hover:ring-ls-green/60 transition-all"
+            >
+              {photo ? (
+                <Image
+                  src={photo}
+                  alt={`تصویر کالا: ${item.title}`}
+                  fill
+                  sizes="64px"
+                  className="object-cover"
+                />
+              ) : (
+                <GradientCover
+                  cover={item.cover}
+                  className="h-full w-full"
+                  emojiClassName="text-2xl"
+                />
+              )}
+            </button>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-extrabold text-white">{item.title}</p>
+            {/* v1.4 — موجودی: «۳ عدد مانده» — زیر ۳ عدد رنگ هشدار، صفر = تمام شد */}
+            <span
+              className={cn(
+                "mt-1 inline-block text-[11px] font-bold",
+                soldOut ? "text-white/45" : lowStock ? "text-amber-300" : "text-ls-green"
+              )}
+              aria-live="polite"
+            >
+              {stockLabelFa(stockTotal)}
+            </span>
+            <p className="mt-1 truncate text-[10px] text-white/60">
+              {[sizeRange, `ارسال ${toman(item.shippingPrice)}`].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 flex-col items-end">
+            <span className="text-[9px] font-bold text-white/55">قیمت ثابت</span>
+            <Price amount={item.price} className="text-[19px] leading-6 text-ls-green" />
+          </div>
+        </div>
+
+        {/* ردیف ۲ — دکمهٔ بزرگ «خرید …» / «تمام شد» */}
+        <div className="mt-2.5">
+          {soldOut ? (
+            <button
+              disabled
+              className="h-12 w-full cursor-not-allowed rounded-xl bg-white/10 text-sm font-bold text-white/45"
+              aria-label="کالا تمام شد"
+            >
+              تمام شد
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                stop(e);
+                setCheckoutOpen(true);
+              }}
+              className="flex h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-ls-green text-[15px] font-black text-[#04281e] shadow-[0_0_18px_rgba(0,200,150,.4)] hover:brightness-110 active:scale-[.98] transition-all"
+              aria-label={`خرید ${item.title} به قیمت ${toman(item.price)}`}
+            >
+              <span>خرید {toman(item.price)}</span>
+              <ChevronsLeft className="h-5 w-5" aria-hidden />
             </button>
           )}
         </div>
-      )}
+      </div>
 
-      {item.status === "buy_now" && (
-        <div className="mt-2.5">
-          <button
-            onClick={(e) => {
-              stop(e);
-              push("checkout", item.id);
-            }}
-            className="h-12 w-full rounded-xl bg-ls-green text-sm font-black text-[#04281e] shadow-[0_0_16px_rgba(0,200,150,.3)] hover:brightness-110 active:scale-[.99] transition-all"
-            aria-label="خرید فوری"
-          >
-            خرید فوری — {toman(item.buyNowPrice ?? item.startPrice)}
-          </button>
-        </div>
-      )}
-
-      {item.status === "sold" && (
-        <div className="mt-2.5">
-          <button
-            disabled
-            className="h-12 w-full rounded-xl bg-white/10 text-sm font-bold text-white/45 cursor-not-allowed"
-            aria-label="فروخته شد"
-          >
-            فروخته شد — {toman(item.soldPrice ?? item.startPrice)}
-          </button>
-        </div>
-      )}
-
-      {item.status === "up_next" && (
-        <div className="mt-2.5 flex items-center gap-2">
-          <StatusChip status="up_next" />
-          <button
-            onClick={(e) => {
-              stop(e);
-              toast("یادآوری فعال شد 🔔");
-            }}
-            className="ms-auto rounded-xl border border-white/15 px-4 py-2 text-sm font-bold text-white/80 hover:bg-white/5 active:scale-[.98] transition-all"
-            aria-label="یادآوری آیتم بعدی"
-          >
-            یادآوری
-          </button>
-        </div>
-      )}
-
-      {/* شیت مزایده — از پایین روی ویدیو باز می‌شود */}
-      <BidSheet key={bidNonce} open={bidOpen} onOpenChange={setBidOpen} />
+      {/* v1.4 — شیت خرید سریع (سایز/تعداد/آدرس/ارسال/پرداخت امانی) */}
+      <QuickCheckoutSheet
+        item={item}
+        open={checkoutOpen}
+        onOpenChange={setCheckoutOpen}
+      />
     </div>
   );
 }
@@ -1050,8 +1180,8 @@ export default function LiveView() {
 
           {/* پیل برندهٔ فعلی + کارت پایین واحد — با رعایت safe-area */}
           <div className="relative z-20 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),12px)]">
-          {/* پیل برندهٔ فعلی — دقیقاً ۸px بالاتر از کارت پایین (mb-2)، بدون تماس */}
-            {(phase === "running" || phase === "sold") && (
+          {/* پیل برندهٔ فعلی — فقط در حالت مزایده (AUCTION_ENABLED) */}
+            {AUCTION_ENABLED && (phase === "running" || phase === "sold") && (
               <div className="mb-2 flex justify-center">
                 <WinnerBanner winnerId={currentWinnerId} />
               </div>
@@ -1076,8 +1206,8 @@ export default function LiveView() {
         onDismiss={() => setGivDismissed(true)}
       />
 
-      {/* مودال پایان مزایده (برد من / برد ربات) */}
-      <FinishedModal />
+      {/* مودال پایان مزایده (برد من / برد ربات) — فقط در حالت مزایده */}
+      {AUCTION_ENABLED && <FinishedModal />}
     </div>
   );
 }

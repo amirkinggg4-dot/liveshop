@@ -319,19 +319,19 @@ export default function HomeView() {
               ←
             </span>
             <span className="bg-ls-card-2 rounded-lg px-2.5 py-1.5">
-              ۲. بید بده
+              ۲. کالای موردعلاقه رو انتخاب کن
             </span>
             <span className="text-ls-pink" aria-hidden>
               ←
             </span>
             <span className="bg-ls-card-2 rounded-lg px-2.5 py-1.5 text-ls-green">
-              ۳. برنده شو!
+              ۳. همین لحظه بخر!
             </span>
           </div>
           <p className="text-xs leading-6 text-white/65">
-            در شوهای زنده، کالاها یکی‌یکی مزایده می‌شوند. تایمر را دنبال کن و
-            بید بده؛ اگر بالاترین بید را داشته باشی، همان لحظه کالا برای تو
-            ثبت می‌شود!
+            در شوهای زنده، فروشنده کالا را جلوی دوربین نشان می‌دهد و تو همان
+            لحظه با قیمت ثابت می‌خری. پولت به‌صورت امانی نزد لحظه می‌ماند و
+            بعد از تحویل به فروشنده آزاد می‌شود — خیالت راحت!
           </p>
         </div>
       </section>

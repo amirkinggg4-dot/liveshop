@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Info, Plus, ShieldAlert } from "lucide-react";
+import { Info, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toFa } from "@/lib/format";
+import { toFa, faNum } from "@/lib/format";
 import type { Cover } from "@/lib/data/types";
 import { useAppStore } from "@/store/app-store";
 import { useSellerStore } from "@/store/seller-store";
@@ -12,12 +12,15 @@ import { GradientCover, PageHeader } from "@/components/liveshop/shared";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ─────────────────────────────────────────────────────────────
-   ساخت لیستینگ جدید — فاز ۲ (Atlas تصویر ۲۷)
-   گرید عکس با گرادیان‌های چرخشی (بدون عکس واقعی)، مشخصات کالا،
-   وضعیت، قیمت‌گذاری (مزایده + خرید فوری)، فیلدهای ارسال ایران،
-   قوانین دسته و انتشار / ذخیرهٔ پیش‌نویس (به انبار seller-store).
+   ساخت لیستینگ جدید — v1.4 «قیمت ثابت»
+   گرید عکس، مشخصات کالا، قیمت ثابت + موجودی، سایزها/رنگ‌ها با
+   موجودی جدا، وزن و ابعاد، فیلدهای ارسال ایران، قوانین دسته و
+   انتشار / ذخیرهٔ پیش‌نویس (به انبار seller-store).
+   فیلدهای حراج (شروع مزایده + خرید فوری) پشت AUCTION_ENABLED
+   حفظ شده‌اند و پاک نشده‌اند.
    ───────────────────────────────────────────────────────────── */
 
 /* گرادیان‌های پیش‌فرض کاور — با کلیک روی جایگاه‌های خالی می‌چرخند */
@@ -37,6 +40,12 @@ function parseFaNum(s: string): number {
   return digits ? parseInt(digits, 10) : 0;
 }
 
+/* گزینهٔ سایز/رنگ با موجودی جدا */
+interface VariantRow {
+  label: string;
+  stock: string;
+}
+
 export default function SellerCreateListingView() {
   const back = useAppStore((s) => s.back);
   const addDraft = useSellerStore((s) => s.addDraft);
@@ -51,19 +60,46 @@ export default function SellerCreateListingView() {
   const [size, setSize] = useState("");
   const [condition, setCondition] = useState<(typeof CONDITIONS)[number]>("نو با جعبه");
 
+  /* ── v1.4 — قیمت ثابت + موجودی + گزینه‌ها ── */
+  const [priceInput, setPriceInput] = useState("");
+  const [stockInput, setStockInput] = useState("۱");
+  const [variants, setVariants] = useState<VariantRow[]>([]);
+  const [newVariantLabel, setNewVariantLabel] = useState("");
+
+  /* وزن و ابعاد بسته */
+  const [weightInput, setWeightInput] = useState("۹۰۰");
+  const [dimsInput, setDimsInput] = useState("");
+
+  /* ── فیلدهای حراج (پشت AUCTION_ENABLED — حفظ‌شده) ── */
   const [startPriceInput, setStartPriceInput] = useState("");
   const [binOn, setBinOn] = useState(true);
   const [binPriceInput, setBinPriceInput] = useState("");
 
-  const [weightInput, setWeightInput] = useState("۹۰۰");
-  const [dimsInput, setDimsInput] = useState("");
+  const price = parseFaNum(priceInput);
+  const stock = Math.max(0, parseFaNum(stockInput));
 
   const advanceCover = () => {
     setCoverIdx((i) => (i + 1) % PRESET_COVERS.length);
     setCoverPicked(true);
   };
 
-  const startPrice = parseFaNum(startPriceInput);
+  /* افزودن گزینهٔ سایز/رنگ */
+  const addVariant = () => {
+    const label = newVariantLabel.trim();
+    if (!label) {
+      toast.error("برچسب سایز/رنگ را وارد کن");
+      return;
+    }
+    if (variants.some((v) => v.label === label)) {
+      toast.error("این گزینه از قبل هست");
+      return;
+    }
+    setVariants((vs) => [...vs, { label, stock: "۱" }]);
+    setNewVariantLabel("");
+  };
+
+  const removeVariant = (label: string) =>
+    setVariants((vs) => vs.filter((v) => v.label !== label));
 
   /* انتشار با اعتبارسنجی — در دمو به انبار «اضافه» می‌شود */
   const publish = () => {
@@ -71,9 +107,23 @@ export default function SellerCreateListingView() {
       toast.error("عنوان را وارد کن");
       return;
     }
-    if (startPrice <= 0) {
-      toast.error("قیمت شروع مزایده را وارد کن");
-      return;
+    if (AUCTION_ENABLED) {
+      /* حالت مزایده — اعتبارسنجی قبلی (حفظ‌شده) */
+      const startPrice = parseFaNum(startPriceInput);
+      if (startPrice <= 0) {
+        toast.error("قیمت شروع مزایده را وارد کن");
+        return;
+      }
+    } else {
+      /* v1.4 — حالت قیمت ثابت */
+      if (price <= 0) {
+        toast.error("قیمت ثابت را وارد کن");
+        return;
+      }
+      if (variants.length === 0 && stock <= 0) {
+        toast.error("موجودی باید حداقل ۱ عدد باشد");
+        return;
+      }
     }
     toast.success("لیستینگ منتشر شد ✅ — به انبار اضافه شد");
     back();
@@ -87,7 +137,8 @@ export default function SellerCreateListingView() {
     }
     const missing = [
       !coverPicked && "عکس اصلی",
-      startPrice <= 0 && "قیمت شروع",
+      !AUCTION_ENABLED && price <= 0 && "قیمت ثابت",
+      AUCTION_ENABLED && parseFaNum(startPriceInput) <= 0 && "قیمت شروع",
     ].filter((x): x is string => Boolean(x));
     addDraft({
       title: title.trim(),
@@ -99,6 +150,8 @@ export default function SellerCreateListingView() {
     toast.success("پیش‌نویس ذخیره شد — در انبار می‌بینی");
     back();
   };
+
+  const variantTotalStock = variants.reduce((s, v) => s + parseFaNum(v.stock), 0);
 
   return (
     <div className="flex-1 flex flex-col" aria-label="ساخت لیستینگ جدید">
@@ -177,7 +230,7 @@ export default function SellerCreateListingView() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="listing-size" className="text-xs text-white/70">
-                سایز
+                سایز اصلی
               </Label>
               <Input
                 id="listing-size"
@@ -215,71 +268,188 @@ export default function SellerCreateListingView() {
           })}
         </div>
 
-        {/* ── قیمت‌گذاری ── */}
-        <div className="space-y-3.5 rounded-2xl border border-white/5 bg-ls-card p-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="start-price" className="text-xs text-white/70">
-              شروع مزایده (تومان)
-            </Label>
-            <Input
-              id="start-price"
-              dir="ltr"
-              inputMode="numeric"
-              value={startPriceInput}
-              onChange={(e) => setStartPriceInput(e.target.value)}
-              placeholder="مثلاً ۴٬۰۰۰٬۰۰۰"
-              className="h-10 rounded-xl border-white/10 bg-ls-card-2 text-left text-sm tabular-nums"
-              aria-label="شروع مزایده به تومان"
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="bin-switch" className="text-xs font-bold">
-              خرید فوری
-            </Label>
-            <span className="flex items-center gap-2">
-              <span
-                className="inline-flex cursor-help"
-                title="در حین مزایده هم، خریدار می‌تواند با این قیمت فوری بخرد"
-                aria-label="راهنمای خرید فوری"
-              >
-                <Info className="h-3.5 w-3.5 text-white/35" aria-hidden />
-              </span>
-              <Switch
-                id="bin-switch"
-                checked={binOn}
-                onCheckedChange={setBinOn}
-                aria-label="فعال‌سازی خرید فوری"
-                className="data-[state=checked]:bg-ls-purple"
-              />
-            </span>
-          </div>
-
-          {binOn && (
-            <>
+        {/* ═══ v1.4 — قیمت ثابت + موجودی (حالت قیمت ثابت) ═══ */}
+        {!AUCTION_ENABLED && (
+          <div className="space-y-4 rounded-2xl border border-white/5 bg-ls-card p-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="bin-price" className="text-xs text-white/70">
-                  قیمت خرید فوری (تومان)
+                <Label htmlFor="fixed-price" className="text-xs text-white/70">
+                  قیمت ثابت (تومان)
                 </Label>
                 <Input
-                  id="bin-price"
+                  id="fixed-price"
                   dir="ltr"
                   inputMode="numeric"
-                  value={binPriceInput}
-                  onChange={(e) => setBinPriceInput(e.target.value)}
-                  placeholder="مثلاً ۵٬۲۰۰٬۰۰۰"
+                  value={priceInput}
+                  onChange={(e) => setPriceInput(e.target.value)}
+                  placeholder="مثلاً ۶٬۵۰۰٬۰۰۰"
                   className="h-10 rounded-xl border-white/10 bg-ls-card-2 text-left text-sm tabular-nums"
-                  aria-label="قیمت خرید فوری به تومان"
+                  aria-label="قیمت ثابت به تومان"
                 />
               </div>
-              <p className="text-[10px] text-white/40">
-                قیمت فوری معمولاً بالاتر از شروع مزایده تعیین می‌شود.
-              </p>
-            </>
-          )}
-        </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="listing-stock" className="text-xs text-white/70">
+                  {variants.length > 0 ? "موجودی کل (خودکار)" : "موجودی (عدد)"}
+                </Label>
+                <Input
+                  id="listing-stock"
+                  dir="ltr"
+                  inputMode="numeric"
+                  value={variants.length > 0 ? String(variantTotalStock) : stockInput}
+                  onChange={(e) => setStockInput(e.target.value)}
+                  disabled={variants.length > 0}
+                  className="h-10 rounded-xl border-white/10 bg-ls-card-2 text-left text-sm tabular-nums disabled:opacity-60"
+                  aria-label="موجودی کالا"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-white/40">
+              قیمت ثابت = همان مبلغی که خریدار در لایو می‌پردازد (بدون مزایده).
+            </p>
 
-        {/* ── فیلدهای ارسال ایران ── */}
+            {/* ── سایزها/رنگ‌ها با موجودی جدا ── */}
+            <div className="space-y-2 border-t border-white/5 pt-3">
+              <Label className="text-xs font-bold">
+                سایزها / رنگ‌ها — هر گزینه موجودی جدا دارد
+              </Label>
+              {variants.length > 0 && (
+                <ul className="space-y-1.5" aria-label="گزینه‌های سایز/رنگ">
+                  {variants.map((v) => (
+                    <li
+                      key={v.label}
+                      className="flex items-center gap-2 rounded-xl bg-ls-card-2 border border-white/10 p-2"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-xs font-bold">
+                        {v.label}
+                      </span>
+                      <Input
+                        dir="ltr"
+                        inputMode="numeric"
+                        value={v.stock}
+                        onChange={(e) =>
+                          setVariants((vs) =>
+                            vs.map((x) =>
+                              x.label === v.label
+                                ? { ...x, stock: e.target.value }
+                                : x
+                            )
+                          )
+                        }
+                        className="h-8 w-20 rounded-lg border-white/10 bg-ls-card text-center text-xs tabular-nums"
+                        aria-label={`موجودی گزینهٔ ${v.label}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeVariant(v.label)}
+                        aria-label={`حذف گزینهٔ ${v.label}`}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ls-pink/40 text-ls-pink hover:bg-ls-pink/10 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newVariantLabel}
+                  onChange={(e) => setNewVariantLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addVariant();
+                    }
+                  }}
+                  placeholder="مثلاً ۴۲ یا مشکی"
+                  className="h-9 flex-1 rounded-xl border-white/10 bg-ls-card-2 text-sm"
+                  aria-label="برچسب سایز یا رنگ جدید"
+                />
+                <button
+                  type="button"
+                  onClick={addVariant}
+                  className="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-ls-purple/50 px-3 text-xs font-bold text-ls-purple-soft hover:bg-ls-purple/10 transition-colors"
+                  aria-label="افزودن گزینهٔ سایز/رنگ"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                  افزودن
+                </button>
+              </div>
+              {variants.length > 0 && (
+                <p className="text-[10px] text-white/40">
+                  جمع موجودی گزینه‌ها: {faNum(variantTotalStock)} عدد
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ قیمت‌گذاری حراج (پشت AUCTION_ENABLED — حفظ‌شده) ═══ */}
+        {AUCTION_ENABLED && (
+          <div className="space-y-3.5 rounded-2xl border border-white/5 bg-ls-card p-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="start-price" className="text-xs text-white/70">
+                شروع مزایده (تومان)
+              </Label>
+              <Input
+                id="start-price"
+                dir="ltr"
+                inputMode="numeric"
+                value={startPriceInput}
+                onChange={(e) => setStartPriceInput(e.target.value)}
+                placeholder="مثلاً ۴٬۰۰۰٬۰۰۰"
+                className="h-10 rounded-xl border-white/10 bg-ls-card-2 text-left text-sm tabular-nums"
+                aria-label="شروع مزایده به تومان"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="bin-switch" className="text-xs font-bold">
+                خرید فوری
+              </Label>
+              <span className="flex items-center gap-2">
+                <span
+                  className="inline-flex cursor-help"
+                  title="در حین مزایده هم، خریدار می‌تواند با این قیمت فوری بخرد"
+                  aria-label="راهنمای خرید فوری"
+                >
+                  <Info className="h-3.5 w-3.5 text-white/35" aria-hidden />
+                </span>
+                <Switch
+                  id="bin-switch"
+                  checked={binOn}
+                  onCheckedChange={setBinOn}
+                  aria-label="فعال‌سازی خرید فوری"
+                  className="data-[state=checked]:bg-ls-purple"
+                />
+              </span>
+            </div>
+
+            {binOn && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="bin-price" className="text-xs text-white/70">
+                    قیمت خرید فوری (تومان)
+                  </Label>
+                  <Input
+                    id="bin-price"
+                    dir="ltr"
+                    inputMode="numeric"
+                    value={binPriceInput}
+                    onChange={(e) => setBinPriceInput(e.target.value)}
+                    placeholder="مثلاً ۵٬۲۰۰٬۰۰۰"
+                    className="h-10 rounded-xl border-white/10 bg-ls-card-2 text-left text-sm tabular-nums"
+                    aria-label="قیمت خرید فوری به تومان"
+                  />
+                </div>
+                <p className="text-[10px] text-white/40">
+                  قیمت فوری معمولاً بالاتر از شروع مزایده تعیین می‌شود.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── وزن و ابعاد بسته ── */}
         <div className="space-y-1.5">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

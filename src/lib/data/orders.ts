@@ -14,6 +14,23 @@ export function getShippingMethod(id: ShippingMethodId): ShippingMethod {
 export const DEFAULT_ADDRESS =
   "علی رضایی — تهران، خیابان ولیعصر، کوچهٔ یاس، پلاک ۶۴، واحد ۳\n۰۹۱۲ ۴۵۶ ۷۸۹۰";
 
+/* ── v1.4 — تایم‌لاین امانی (escrow) سفارش‌های لایو شاپ ──
+   پول خریدار به‌صورت «امانی» نزد لحظه نگه داشته می‌شود و بعد از تحویل آزاد می‌شود. */
+export function escrowTimeline(doneCount = 1): Order["timeline"] {
+  const steps = [
+    "پرداخت امانی",
+    "آماده‌ی ارسال",
+    "ارسال‌شده",
+    "تحویل",
+    "آزادسازی پول",
+  ] as const;
+  return steps.map((label, i) => ({
+    label,
+    done: i < doneCount,
+    ...(i === 0 ? { atLabel: "همین حالا" } : {}),
+  }));
+}
+
 /* ── سفارش‌های اولیه (Mock) ── */
 export const SEED_ORDERS: Order[] = [
   {
@@ -25,38 +42,47 @@ export const SEED_ORDERS: Order[] = [
     sellerName: "کفش‌خانهٔ سینا",
     sellerEmoji: "👟",
     sellerColor: "#FF3B8B",
-    itemPrice: 5_200_000,
+    itemPrice: 4_600_000,
+    qty: 1,
+    variantLabel: "سایز ۴۲",
     shippingPrice: 45_000,
     shippingMethod: "tipax",
-    total: 5_245_000,
+    total: 4_645_000,
     address: DEFAULT_ADDRESS,
     createdAtLabel: "دیشب ۲۳:۴۰",
     timeline: [
-      { label: "پرداخت شد", done: true, atLabel: "دیشب ۲۳:۴۰" },
-      { label: "در حال آماده‌سازی", done: true, atLabel: "امروز ۱۰:۱۵" },
-      { label: "ارسال شد", done: true, atLabel: "امروز ۱۶:۳۰" },
+      { label: "پرداخت امانی", done: true, atLabel: "دیشب ۲۳:۴۰" },
+      { label: "آماده‌ی ارسال", done: true, atLabel: "امروز ۱۰:۱۵" },
+      { label: "ارسال‌شده", done: true, atLabel: "امروز ۱۶:۳۰" },
+      { label: "تحویل", done: false },
+      { label: "آزادسازی پول", done: false },
     ],
     trackingCode: "TPX-8839",
+    escrow: true,
   },
   {
     id: "۱۰۲۲۹",
-    itemTitle: "فیگور ناروتو سِیج مود",
-    itemBrand: "بانپرستو",
-    itemEmoji: "🥷",
-    cover: { from: "#FF3B8B", to: "#7a1030", emoji: "🥷" },
+    itemTitle: "فانکو پاپ ۱۰ اینچی — نسخهٔ گلو",
+    itemBrand: "فانکو",
+    itemEmoji: "🧸",
+    cover: { from: "#B45CFF", to: "#FF3B8B", emoji: "🧸" },
     sellerName: "کلکسیون‌یار تهران",
     sellerEmoji: "🃏",
     sellerColor: "#6C5CFF",
-    itemPrice: 2_750_000,
+    itemPrice: 4_000_000,
+    qty: 1,
     shippingPrice: 30_000,
     shippingMethod: "post",
-    total: 2_780_000,
+    total: 4_030_000,
     address: DEFAULT_ADDRESS,
     createdAtLabel: "۲ روز پیش",
     timeline: [
-      { label: "پرداخت شد", done: true, atLabel: "۲ روز پیش" },
-      { label: "در حال آماده‌سازی", done: true, atLabel: "دیروز ۱۴:۰۰" },
-      { label: "ارسال شد", done: false },
+      { label: "پرداخت امانی", done: true, atLabel: "۲ روز پیش" },
+      { label: "آماده‌ی ارسال", done: true, atLabel: "دیروز ۱۴:۰۰" },
+      { label: "ارسال‌شده", done: false },
+      { label: "تحویل", done: false },
+      { label: "آزادسازی پول", done: false },
     ],
+    escrow: true,
   },
 ];

@@ -20,9 +20,25 @@ import {
   Chip,
   EmptyState,
 } from "@/components/liveshop/shared";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 function priceOf(item: ShopItem): number {
-  return item.currentBid ?? item.buyNowPrice ?? item.soldPrice ?? item.startPrice;
+  return AUCTION_ENABLED
+    ? item.currentBid ?? item.buyNowPrice ?? item.soldPrice ?? item.startPrice
+    : item.price;
+}
+
+/* v1.4 — فیلترهای حالت قیمت ثابت */
+type FixedFilter = "available" | "inshow" | "soldout" | "draft";
+
+function isAvailable(item: ShopItem): boolean {
+  return item.status !== "sold" && item.stock > 0 && item.status !== "up_next" && item.status !== "auction";
+}
+function isInShow(item: ShopItem): boolean {
+  return item.status === "up_next" || item.status === "auction";
+}
+function isSoldOut(item: ShopItem): boolean {
+  return item.status === "sold" || item.stock <= 0;
 }
 
 export default function SellerInventoryView() {
@@ -30,10 +46,11 @@ export default function SellerInventoryView() {
   const push = useAppStore((s) => s.push);
   const [query, setQuery] = useState("");
 
-  /* فاز ۲ — فیلتر وضعیت انبار + پیش‌نویس‌های فروشنده */
+  /* فاز ۲ — فیلتر وضعیت انبار + پیش‌نویس‌های فروشنده
+     v1.4 — در حالت قیمت ثابت: موجود / تمام‌شده / در شو / پیش‌نویس */
   const [filter, setFilter] = useState<
-    "all" | "auction" | "up_next" | "buy_now" | "sold" | "draft"
-  >("all");
+    "all" | "auction" | "up_next" | "buy_now" | "sold" | "draft" | FixedFilter
+  >(AUCTION_ENABLED ? "all" : "available");
   const drafts = useSellerStore((s) => s.drafts);
 
   const total = getShow("sh1").itemsTotal;
@@ -47,11 +64,22 @@ export default function SellerInventoryView() {
 
   /* فاز ۲ — منبع نهایی لیست بر اساس فیلتر وضعیت (پیش‌نویس‌ها جدا رندر می‌شوند) */
   const visible =
-    filter === "all" || filter === "draft"
+    filter === "all"
       ? items
-      : items.filter((i) => i.status === filter);
+      : filter === "available"
+        ? items.filter(isAvailable)
+        : filter === "inshow"
+          ? items.filter(isInShow)
+          : filter === "soldout"
+            ? items.filter(isSoldOut)
+            : filter === "draft"
+              ? items
+              : items.filter((i) => i.status === filter);
 
-  const activeCount = ITEMS_SH1.filter((i) => i.status !== "sold").length;
+  const activeCount = ITEMS_SH1.filter((i) => !isSoldOut(i)).length;
+  const inShowCount = ITEMS_SH1.filter(isInShow).length;
+  const availableCount = ITEMS_SH1.filter(isAvailable).length;
+  const soldOutCount = ITEMS_SH1.filter(isSoldOut).length;
   const auctionCount = ITEMS_SH1.filter((i) => i.status === "auction").length;
   const soldCount = ITEMS_SH1.filter((i) => i.status === "sold").length;
 
@@ -64,43 +92,50 @@ export default function SellerInventoryView() {
       />
 
       <div className="px-4 pt-4 pb-4 space-y-4">
-        {/* چیپ‌های شمارش وضعیت */}
+        {/* چیپ‌های شمارش وضعیت — v1.4: موجود / در شو / تمام‌شده */}
         <div
           className="flex gap-2 overflow-x-auto no-scrollbar"
           aria-label="خلاصهٔ وضعیت آیتم‌ها"
         >
           <Chip className="shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-ls-green" aria-hidden />
-            فعال {faNum(activeCount)}
+            موجود {faNum(availableCount)}
           </Chip>
           <Chip className="shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-ls-purple" aria-hidden />
-            در مزایده {faNum(auctionCount)}
+            در شو {faNum(inShowCount)}
           </Chip>
           <Chip className="shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-white/40" aria-hidden />
-            فروخته {faNum(soldCount)}
+            تمام‌شده {faNum(soldOutCount)}
           </Chip>
         </div>
 
-        {/* فاز ۲ — چیپ‌های فیلتر وضعیت */}
+        {/* فیلتر وضعیت — v1.4: در حالت قیمت ثابت «موجود/تمام‌شده/در شو/پیش‌نویس» */}
         <div
           className="flex gap-2 overflow-x-auto no-scrollbar"
           aria-label="فیلتر وضعیت انبار"
         >
-          {(
-            [
-              { key: "all", label: "همه" },
-              { key: "auction", label: "در مزایده" },
-              { key: "up_next", label: "آیتم بعدی" },
-              { key: "buy_now", label: "خرید فوری" },
-              { key: "sold", label: "فروخته" },
-              { key: "draft", label: `پیش‌نویس (${faNum(drafts.length)})` },
-            ] as const
+          {(AUCTION_ENABLED
+            ? [
+                { key: "all", label: "همه" },
+                { key: "auction", label: "در مزایده" },
+                { key: "up_next", label: "آیتم بعدی" },
+                { key: "buy_now", label: "خرید فوری" },
+                { key: "sold", label: "فروخته" },
+                { key: "draft", label: `پیش‌نویس (${faNum(drafts.length)})` },
+              ]
+            : [
+                { key: "available", label: "موجود" },
+                { key: "inshow", label: "در شو" },
+                { key: "soldout", label: "تمام‌شده" },
+                { key: "draft", label: `پیش‌نویس (${faNum(drafts.length)})` },
+                { key: "all", label: "همه" },
+              ]
           ).map((c) => (
             <button
               key={c.key}
-              onClick={() => setFilter(c.key)}
+              onClick={() => setFilter(c.key as typeof filter)}
               aria-pressed={filter === c.key}
               className={cn(
                 "shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-colors",
@@ -186,8 +221,8 @@ export default function SellerInventoryView() {
                 <button
                   key={item.id}
                   onClick={() => {
-                    /* فاز ۲ — آیتم در شو فعال: ویرایش قفل است */
-                    if (item.status === "auction") {
+                    /* فاز ۲ — آیتم در شو فعال: ویرایش قفل است (v1.4: مزایده یا در صف شو) */
+                    if (item.status === "auction" || item.status === "up_next") {
                       toast("آیتم در شو فعال است — ویرایش قفل است 🔒");
                       return;
                     }
@@ -208,11 +243,15 @@ export default function SellerInventoryView() {
                     <span className="block text-[11px] text-white/45 truncate mt-0.5">
                       {item.brand}
                       {item.size ? ` • سایز ${item.size}` : ""} • {toFa(item.sku)}
+                      {" • "}
+                      <span className={cn(item.stock <= 0 && "text-white/35")}>
+                        {item.stock <= 0 ? "تمام شد" : `موجود ${faNum(item.stock)}`}
+                      </span>
                     </span>
                     {/* فاز ۲ — قفل ویرایش + وزن */}
-                    {(item.status === "auction" || extra) && (
+                    {(item.status === "auction" || item.status === "up_next" || extra) && (
                       <span className="flex items-center gap-2 mt-1">
-                        {item.status === "auction" && (
+                        {(item.status === "auction" || item.status === "up_next") && (
                           <span className="inline-flex items-center gap-1 text-[10px] text-amber-300">
                             <Lock className="w-3 h-3" aria-hidden /> قفل ویرایش — در شو فعال
                           </span>

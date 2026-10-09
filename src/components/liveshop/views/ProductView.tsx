@@ -8,6 +8,7 @@ import { faClock, toman, toFa } from "@/lib/format";
 import { getItem, getShowItems } from "@/lib/data/items";
 import { getShippingMethod } from "@/lib/data/orders";
 import { getSeller, getShow } from "@/lib/data/shows";
+import { stockLabelFa } from "@/lib/data/items";
 import { useAppStore } from "@/store/app-store";
 import {
   GradientCover,
@@ -25,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 export default function ProductView() {
   const currentItemId = useAppStore((s) => s.currentItemId);
@@ -95,7 +97,8 @@ export default function ProductView() {
 
         {/* کارت قیمت */}
         <div className="rounded-2xl bg-ls-card border border-white/5 p-4 space-y-2.5">
-          {item.status === "auction" && (
+          {AUCTION_ENABLED && item.status === "auction" && (
+            /* حالت مزایده — کد حفظ‌شده (پشت AUCTION_ENABLED) */
             <>
               <p className="text-xs text-white/50 flex items-center gap-1.5">
                 <Gavel className="w-3.5 h-3.5" aria-hidden />
@@ -111,15 +114,37 @@ export default function ProductView() {
             </>
           )}
 
-          {item.status === "buy_now" && (
+          {item.status === "buy_now" ||
+          (!AUCTION_ENABLED && item.status !== "sold" && item.status !== "auction" && item.status !== "up_next") ? (
+            /* v1.4 — قیمت ثابت + موجودی */
             <>
               <p className="text-xs text-white/50">قیمت ثابت</p>
               <Price
-                amount={item.buyNowPrice ?? item.startPrice}
+                amount={item.price}
                 className="text-2xl text-ls-green"
               />
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold",
+                    item.stock <= 0
+                      ? "bg-white/10 text-white/55"
+                      : item.stock < 3
+                        ? "bg-amber-300/10 text-amber-300"
+                        : "bg-ls-green/10 text-ls-green"
+                  )}
+                  aria-live="polite"
+                >
+                  {stockLabelFa(item.stock)}
+                </span>
+                {item.variants && item.variants.length > 0 && (
+                  <span className="inline-flex items-center rounded-full bg-ls-card-2 px-2.5 py-1 text-[11px] text-white/70">
+                    سایز: {item.variants.map((v) => v.label).join(" · ")}
+                  </span>
+                )}
+              </div>
             </>
-          )}
+          ) : null}
 
           {item.status === "sold" && (
             <>
@@ -135,10 +160,16 @@ export default function ProductView() {
 
           {item.status === "up_next" && (
             <>
-              <p className="text-xs text-white/50">آیتم بعدی شو — هنوز به مزایده نرسیده</p>
-              {item.buyNowPrice != null && (
-                <Price amount={item.buyNowPrice} className="text-2xl text-white/85" />
-              )}
+              <p className="text-xs text-white/50">
+                {AUCTION_ENABLED ? "آیتم بعدی شو — هنوز به مزایده نرسیده" : "به‌زودی در همین شو"}
+              </p>
+              {AUCTION_ENABLED
+                ? item.buyNowPrice != null && (
+                    <Price amount={item.buyNowPrice} className="text-2xl text-white/85" />
+                  )
+                : (
+                    <Price amount={item.price} className="text-2xl text-white/85" />
+                  )}
             </>
           )}
         </div>
@@ -168,7 +199,7 @@ export default function ProductView() {
 
       {/* ── نوار اکشن چسبان ── */}
       <div className="sticky bottom-0 z-20 mt-auto bg-ls-bg/90 backdrop-blur border-t border-white/5 p-3">
-        {item.status === "auction" && (
+        {AUCTION_ENABLED && item.status === "auction" && (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setBidOpen(true)}
@@ -189,13 +220,23 @@ export default function ProductView() {
           </div>
         )}
 
-        {item.status === "buy_now" && (
+        {(item.status === "buy_now" ||
+          (!AUCTION_ENABLED &&
+            item.status !== "sold" &&
+            item.status !== "up_next" &&
+            item.status !== "auction")) && (
           <button
             onClick={() => push("checkout", item.id)}
-            className="w-full h-12 rounded-xl bg-ls-green text-sm font-black text-[#04281e] shadow-[0_8px_24px_rgba(0,200,150,.3)] transition-transform active:scale-[.98]"
-            aria-label={`خرید فوری به مبلغ ${toman(item.buyNowPrice ?? item.startPrice)}`}
+            disabled={item.stock <= 0}
+            className={cn(
+              "w-full h-12 rounded-xl text-sm font-black transition-transform active:scale-[.98]",
+              item.stock <= 0
+                ? "cursor-not-allowed bg-white/10 text-white/40"
+                : "bg-ls-green text-[#04281e] shadow-[0_8px_24px_rgba(0,200,150,.3)]"
+            )}
+            aria-label={item.stock <= 0 ? "کالا تمام شد" : `خرید به قیمت ${toman(item.price)}`}
           >
-            خرید فوری — {toman(item.buyNowPrice ?? item.startPrice)}
+            {item.stock <= 0 ? "تمام شد" : <>خرید — {toman(item.price)}</>}
           </button>
         )}
 
@@ -219,7 +260,8 @@ export default function ProductView() {
         )}
       </div>
 
-      {/* ── دیالوگ تأیید بید (baseline) ── */}
+      {/* ── دیالوگ تأیید بید (فقط حالت مزایده — کد حفظ‌شده) ── */}
+      {AUCTION_ENABLED && (
       <Dialog open={bidOpen} onOpenChange={setBidOpen}>
         <DialogContent
           className="bg-ls-card border-white/10 rounded-2xl sm:max-w-sm"
@@ -251,6 +293,7 @@ export default function ProductView() {
           </div>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 }

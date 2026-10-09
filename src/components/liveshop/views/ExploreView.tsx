@@ -19,6 +19,7 @@ import {
 import { SavedSearchesRow } from "@/components/liveshop/saved-searches";
 import PreBidSheet from "@/components/liveshop/pre-bid-sheet";
 import { cn } from "@/lib/utils";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ── فاز ۱ — دکمهٔ toggle یادآوری (span نقش‌محور چون ShowCard خودش button است) ── */
 function ReminderToggle({
@@ -94,7 +95,10 @@ function UpcomingFooter({
               onPrebid(show);
             }
           }}
-          className="mr-auto inline-flex cursor-pointer items-center gap-1 rounded-md border border-ls-purple/40 bg-ls-purple/10 px-2 py-0.5 text-[10px] font-bold text-ls-purple-soft transition-colors hover:bg-ls-purple/20"
+          className={cn(
+            "mr-auto inline-flex cursor-pointer items-center gap-1 rounded-md border border-ls-purple/40 bg-ls-purple/10 px-2 py-0.5 text-[10px] font-bold text-ls-purple-soft transition-colors hover:bg-ls-purple/20",
+            !AUCTION_ENABLED && "hidden"
+          )}
         >
           <Gavel className="w-3 h-3" aria-hidden />
           پیش‌بید
@@ -413,8 +417,8 @@ export default function ExploreView() {
         </>
       )}
 
-      {/* فاز ۳ (P1) — شیت پیش‌بید شو به‌زودی (تصویرهای pre-bid) — فقط اضافه‌شده */}
-      {prebidShow && (
+      {/* فاز ۳ (P1) — شیت پیش‌بید شو به‌زودی — فقط در حالت مزایده */}
+      {AUCTION_ENABLED && prebidShow && (
         <PreBidSheet
           key={prebidShow.id}
           show={prebidShow}

@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Check, MapPin, Wallet as WalletIcon } from "lucide-react";
+import { Check, MapPin, ShieldCheck, Wallet as WalletIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toman } from "@/lib/format";
-import { getItem, getShowItems } from "@/lib/data/items";
+import { getItem, getShowItems, stockLabelFa } from "@/lib/data/items";
 import {
   DEFAULT_ADDRESS,
   SHIPPING_METHODS,
@@ -15,7 +15,7 @@ import { getSeller, getShow } from "@/lib/data/shows";
 import type { ShippingMethodId } from "@/lib/data/types";
 import { useAppStore } from "@/store/app-store";
 import { useWalletStore } from "@/store/wallet-store";
-import { nextOrderId, useOrdersStore } from "@/store/orders-store";
+import { useLiveStore } from "@/store/live-store";
 import {
   GradientCover,
   Price,
@@ -36,9 +36,9 @@ export default function CheckoutView() {
   const setRoot = useAppStore((s) => s.setRoot);
 
   const balance = useWalletStore((s) => s.balance);
-  const canAfford = useWalletStore((s) => s.canAfford);
-  const spend = useWalletStore((s) => s.spend);
-  const addOrder = useOrdersStore((s) => s.addOrder);
+  /* v1.4 — خرید از مسیر واحدِ موتور (purchaseItem): چک موجودی اتمیک + کسر امانی + سفارش امانی */
+  const purchaseItem = useLiveStore((s) => s.purchaseItem);
+  const liveItems = useLiveStore((s) => s.items);
 
   /* ── آیتم هدف: currentItemId وگرنه اولین آیتم خرید فوریِ شو ── */
   const item =
@@ -53,38 +53,30 @@ export default function CheckoutView() {
   const [methodId, setMethodId] = useState<ShippingMethodId>("tipax");
   const method = getShippingMethod(methodId);
 
-  const itemPrice = item.buyNowPrice ?? item.startPrice;
+  /* v1.4 — کالای زندهٔ اتاق (اگر باز باشد) برای موجودی لحظه‌ای */
+  const liveItem = liveItems.find((i) => i.id === item.id);
+  const view = liveItem ?? item;
+  const itemPrice = view.price;
   const total = itemPrice + method.price;
+  const soldOut = view.stock <= 0;
 
   const handlePay = () => {
-    if (!canAfford(total)) {
-      toast.error("موجودی کافی نیست — کیف پول را شارژ کنید");
-      push("wallet");
+    if (soldOut) {
+      toast.error("کالا تمام شد — موجودی این کالا به پایان رسید");
       return;
     }
-    spend(total, "خرید فوری — " + item.title, "purchase");
-    addOrder({
-      id: nextOrderId(),
-      itemTitle: item.title,
-      itemBrand: item.brand,
-      itemEmoji: item.emoji,
-      cover: item.cover,
-      sellerName: seller.name,
-      sellerEmoji: seller.emoji,
-      sellerColor: seller.color,
-      itemPrice,
-      shippingPrice: method.price,
-      shippingMethod: method.id,
-      total,
-      address: DEFAULT_ADDRESS,
-      createdAtLabel: "همین حالا",
-      timeline: [
-        { label: "پرداخت شد", done: true, atLabel: "همین حالا" },
-        { label: "در حال آماده‌سازی", done: false },
-        { label: "ارسال شد", done: false },
-      ],
+    const res = purchaseItem({
+      itemId: view.id,
+      qty: 1,
+      variantLabel: view.variants?.find((v) => v.stock > 0)?.label,
+      shippingMethodId: methodId,
     });
-    toast.success("پرداخت موفق! سفارش ثبت شد 🎉");
+    if (!res.ok) {
+      toast.error(res.error ?? "پرداخت انجام نشد");
+      if (res.error?.includes("کیف پول")) push("wallet");
+      return;
+    }
+    toast.success("پرداخت امانی موفق! سفارش ثبت شد 🎉");
     setRoot("orders");
   };
 
@@ -102,9 +94,31 @@ export default function CheckoutView() {
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold truncate">{item.title}</p>
-            <p className="text-xs text-white/50 truncate">{seller.name}</p>
+            <p className="text-xs text-white/50 truncate">
+              {seller.name} ·{" "}
+              <span
+                className={cn(
+                  soldOut
+                    ? "text-white/45"
+                    : view.stock < 3
+                      ? "text-amber-300"
+                      : "text-ls-green"
+                )}
+              >
+                {stockLabelFa(view.stock)}
+              </span>
+            </p>
           </div>
           <Price amount={itemPrice} className="text-sm shrink-0" />
+        </div>
+
+        {/* ── v1.4 — بنر پرداخت امانی ── */}
+        <div className="flex items-center gap-3 rounded-2xl border border-ls-green/30 bg-ls-green/10 p-3">
+          <ShieldCheck className="w-5 h-5 shrink-0 text-ls-green" aria-hidden />
+          <p className="text-[11px] leading-5 text-white/75">
+            پول شما به‌صورت <span className="font-bold text-ls-green">امانی</span> نزد
+            لحظه نگه داشته می‌شود و بعد از تحویل کالا به فروشنده آزاد می‌گردد.
+          </p>
         </div>
 
         {/* ── آدرس ── */}
@@ -192,10 +206,16 @@ export default function CheckoutView() {
       <div className="sticky bottom-0 z-20 mt-auto bg-ls-bg/90 backdrop-blur border-t border-white/5 p-3">
         <button
           onClick={handlePay}
-          className="w-full h-12 rounded-xl bg-ls-purple text-sm font-black text-white shadow-[0_8px_24px_rgba(108,92,255,.35)] transition-transform active:scale-[.98]"
-          aria-label={`پرداخت مبلغ ${toman(total)} از کیف پول`}
+          disabled={soldOut}
+          className={cn(
+            "w-full h-12 rounded-xl text-sm font-black transition-transform active:scale-[.98]",
+            soldOut
+              ? "cursor-not-allowed bg-white/10 text-white/40"
+              : "bg-ls-purple text-white shadow-[0_8px_24px_rgba(108,92,255,.35)]"
+          )}
+          aria-label={soldOut ? "کالا تمام شد" : `پرداخت امانی مبلغ ${toman(total)} از کیف پول`}
         >
-          پرداخت {toman(total)}
+          {soldOut ? "تمام شد" : <>پرداخت {toman(total)}</>}
         </button>
       </div>
     </div>

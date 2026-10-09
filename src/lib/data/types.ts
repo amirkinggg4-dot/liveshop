@@ -45,6 +45,13 @@ export type ItemStatus = "auction" | "up_next" | "buy_now" | "sold";
 
 export type ItemCondition = "نو با جعبه" | "نو بدون جعبه" | "در حد نو" | "کارکرده";
 
+/** v1.4 — گزینهٔ سایز/رنگ با موجودی جدا (چند گزینه روی یک لیستینگ) */
+export interface VariantOption {
+  /** مثلاً «۴۲» برای سایز یا «مشکی» برای رنگ */
+  label: string;
+  stock: number;
+}
+
 export interface ShopItem {
   id: string;
   showId: string;
@@ -56,6 +63,18 @@ export interface ShopItem {
   size?: string;
   sku: string;
   status: ItemStatus;
+  /* ── v1.4 — فروش با قیمت ثابت (لایو شاپ) ── */
+  /** قیمت ثابت فروش (تومان) — در حالت قیمت ثابت کارت پایین لایو این را نشان می‌دهد */
+  price: number;
+  /** موجودی کل — قبل از کاهش با purchaseItem چک می‌شود (جلوگیری از فروش دوبارهٔ آخرین عدد) */
+  stock: number;
+  /** سایزها/رنگ‌ها با موجودی جداگانه — اختیاری */
+  variants?: VariantOption[];
+  /** وزن بسته (گرم) — برای محاسبهٔ ارسال */
+  weightGrams?: number;
+  /** ابعاد بسته مثل «۳۰×۲۰×۱۲» */
+  dims?: string;
+  /* ── فیلدهای حراج — پشت AUCTION_ENABLED نگه داشته می‌شوند (کد پاک نشده) ── */
   startPrice: number;
   currentBid?: number;
   /** پلهٔ مزایده */
@@ -108,6 +127,10 @@ export interface Order {
   sellerEmoji: string;
   sellerColor: string;
   itemPrice: number;
+  /** v1.4 — تعداد خریداری‌شده */
+  qty?: number;
+  /** v1.4 — سایز/رنگ انتخاب‌شده */
+  variantLabel?: string;
   shippingPrice: number;
   shippingMethod: ShippingMethodId;
   total: number;
@@ -116,6 +139,8 @@ export interface Order {
   timeline: OrderStep[];
   trackingCode?: string;
   rated?: boolean;
+  /** v1.4 — پرداخت به‌صورت امانی (escrow) نگه داشته شده است */
+  escrow?: boolean;
 }
 
 export type WalletTxKind = "charge" | "purchase" | "win" | "refund";

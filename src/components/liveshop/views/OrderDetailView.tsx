@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Check, MapPin, Truck, ShieldCheck } from "lucide-react";
+import { Check, Lock, MapPin, Truck, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toFa, toman } from "@/lib/format";
 import { getShippingMethod } from "@/lib/data/orders";
@@ -56,6 +56,14 @@ export default function OrderDetailView() {
             <p className="text-xs text-white/50 truncate">
               {order.sellerName} · {order.createdAtLabel}
             </p>
+            {/* v1.4 — تعداد و سایز/رنگ انتخاب‌شده */}
+            {(order.qty != null || order.variantLabel) && (
+              <p className="mt-0.5 text-[11px] font-bold text-white/65 truncate">
+                {[order.qty != null ? `${toFa(order.qty)} عدد` : null, order.variantLabel]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
           </div>
           <Price amount={order.total} className="text-sm shrink-0" />
         </div>
@@ -75,6 +83,27 @@ export default function OrderDetailView() {
             </p>
           </div>
         </div>
+
+        {/* ── v1.4 — بنر پرداخت امانی (escrow) ── */}
+        {order.escrow !== false && (
+          <div
+            className="flex items-center gap-3 rounded-2xl border border-ls-purple/30 bg-ls-purple/10 p-3.5"
+            aria-label="پرداخت امانی"
+          >
+            <span className="w-9 h-9 shrink-0 rounded-xl bg-ls-purple/20 flex items-center justify-center">
+              <Lock className="h-4 w-4 text-ls-purple-soft" aria-hidden />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-ls-purple-soft">
+                پول شما نزد لحظه امانت است
+              </p>
+              <p className="text-[11px] text-white/55 mt-0.5 leading-5">
+                مبلغ پرداختی تا لحظهٔ «تحویل» دست فروشنده نمی‌رسد و بعد از تحویل
+                آزاد می‌شود.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ── تفکیک قیمت ── */}
         <div className="rounded-2xl bg-ls-card border border-white/5 p-4 space-y-2.5">

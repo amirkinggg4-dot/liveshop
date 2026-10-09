@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Gauge, Loader2 } from "lucide-react";
+import { Gauge, Loader2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { faNum, toFa, toman } from "@/lib/format";
 import { SHIPPING_METHODS } from "@/lib/data/orders";
@@ -354,6 +354,18 @@ export default function SellerOrdersView() {
       />
 
       <div className="px-4 py-4">
+        {/* ── v1.4 — بنر امانی: پول بعد از تحویل آزاد می‌شود ── */}
+        <div
+          className="flex items-center gap-2.5 rounded-2xl border border-ls-green/40 bg-ls-green/10 p-3.5"
+          aria-label="پرداخت امانی"
+        >
+          <ShieldCheck className="h-5 w-5 shrink-0 text-ls-green" aria-hidden />
+          <p className="text-xs leading-5 text-white/80">
+            پول خریدار نزد لحظه <span className="font-bold text-ls-green">امانی</span> است —
+            بعد از <span className="font-bold">تحویل</span> سفارش به کیف پول تو آزاد می‌شود.
+          </p>
+        </div>
+
         {/* ── تب‌های وضعیت با شمارندهٔ زنده ── */}
         <div
           className="flex gap-2 overflow-x-auto no-scrollbar"

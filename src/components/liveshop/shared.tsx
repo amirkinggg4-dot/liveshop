@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 import { toFa, toman, compactFa, faClock } from "@/lib/format";
 import type { Cover, ItemStatus, Show } from "@/lib/data/types";
 import { getSeller } from "@/lib/data/shows";
-import { getAuctionItem, getShowItems } from "@/lib/data/items";
+import { getAuctionItem, getShowItems, getPinnedItem, stockLabelFa } from "@/lib/data/items";
 import { SHOW_PHOTO, SELLER_PHOTO } from "@/lib/data/media";
 import { ChevronRight, Star, Clock } from "lucide-react";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ─────────────────────────── ابزارهای مشترک LiveShop ─────────────────────────── */
 
@@ -225,11 +226,12 @@ const STATUS_MAP: Record<
     className: "bg-ls-purple text-white shadow-[0_0_14px_rgba(108,92,255,.45)]",
   },
   up_next: {
-    label: "آیتم بعدی",
+    /* v1.4 — در حالت قیمت ثابت «در صف شو» */
+    label: AUCTION_ENABLED ? "آیتم بعدی" : "در صف شو",
     className: "bg-transparent text-ls-pink border border-ls-pink/50",
   },
   buy_now: {
-    label: "خرید فوری",
+    label: AUCTION_ENABLED ? "خرید فوری" : "قیمت ثابت",
     className: "bg-ls-green text-[#04281e] font-extrabold",
   },
   sold: {
@@ -446,8 +448,8 @@ export function ShowCard({
 }
 
 /* ── v1.3.2 — کارت عمودی لایو برای فید دوسطحی خانه (نسبت ۴:۵، عکس تمام‌کارت) ──
-   نشان «زنده + بیننده» بالا، گرادیان تیره پایین با: اسم شو، فروشنده با آواتار،
-   بید فعلی + تایمر کوچک (یا خرید فوری از …). جایگزین چیدمان قبلی ShowCard در فید خانه. */
+   v1.4 — به‌جای «بید فعلی + تایمر»: قیمت ثابت کالای در حال نمایش (پین‌شده) +
+   برچسب «۳ عدد مانده» (زیر ۳ عدد رنگ هشدار). در حالت مزایده همان نمایش قبلی. */
 export function LiveGridCard({
   show,
   onClick,
@@ -457,6 +459,17 @@ export function LiveGridCard({
 }) {
   const seller = getSeller(show.sellerId);
   const photo = SHOW_PHOTO[show.id];
+
+  /* v1.4 — کالای در حال نمایش (پین‌شده) شو */
+  const pinned = getPinnedItem(show.id);
+  const pinnedStock = pinned
+    ? pinned.variants?.length
+      ? pinned.variants.reduce((s, v) => s + v.stock, 0)
+      : pinned.stock
+    : 0;
+  const lowStock = pinnedStock > 0 && pinnedStock < 3;
+
+  /* حالت مزایده (کد حفظ‌شده) */
   const auction = getAuctionItem(show.id);
   const timer = auction?.timerSec ?? 0;
   const urgent = timer <= 30;
@@ -493,7 +506,7 @@ export function LiveGridCard({
         <LiveBadge viewers={show.viewers} className="px-2 py-0.5 text-[10px]" />
       </div>
 
-      {/* گرادیان تیرهٔ پایین + اسم شو + فروشنده + بید/تایمر */}
+      {/* گرادیان تیرهٔ پایین + اسم شو + فروشنده + قیمت ثابت پین‌شده + موجودی */}
       <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-2.5 pt-10">
         <p className="truncate text-[12px] font-extrabold leading-5 text-white">
           {show.title}
@@ -508,26 +521,56 @@ export function LiveGridCard({
           )}
         </div>
         <div className="mt-1.5 flex items-center justify-between gap-1">
-          {auction ? (
+          {AUCTION_ENABLED ? (
+            /* حالت مزایده — نمایش قبلی (کد حفظ‌شده) */
             <>
-              <span className="truncate text-[11px] font-black tabular-nums text-ls-purple-soft">
-                بید فعلی {toman(auction.currentBid ?? auction.startPrice)}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-0.5 text-[10px] font-bold tabular-nums",
-                  urgent ? "text-[#FF3B5C]" : "text-white/75"
-                )}
-              >
-                <Clock className="h-3 w-3" aria-hidden />
-                {faClock(timer)}
-              </span>
+              {auction ? (
+                <>
+                  <span className="truncate text-[11px] font-black tabular-nums text-ls-purple-soft">
+                    بید فعلی {toman(auction.currentBid ?? auction.startPrice)}
+                  </span>
+                  <span
+                    className={cn(
+                      "inline-flex shrink-0 items-center gap-0.5 text-[10px] font-bold tabular-nums",
+                      urgent ? "text-[#FF3B5C]" : "text-white/75"
+                    )}
+                  >
+                    <Clock className="h-3 w-3" aria-hidden />
+                    {faClock(timer)}
+                  </span>
+                </>
+              ) : buyNowMin != null ? (
+                <span className="truncate text-[11px] font-black tabular-nums text-ls-green">
+                  خرید فوری از {toman(buyNowMin)}
+                </span>
+              ) : null}
             </>
-          ) : buyNowMin != null ? (
-            <span className="truncate text-[11px] font-black tabular-nums text-ls-green">
-              خرید فوری از {toman(buyNowMin)}
-            </span>
-          ) : null}
+          ) : (
+            /* v1.4 — قیمت ثابت کالای پین‌شده + «۳ عدد مانده» */
+            <>
+              <span
+                className="min-w-0 flex-1 truncate text-[11px] font-black tabular-nums text-ls-green"
+                aria-label={`قیمت ثابت کالای در حال نمایش: ${toman(pinned?.price ?? 0)}`}
+              >
+                {pinned ? toman(pinned.price) : "—"}
+              </span>
+              {pinned && (
+                <span
+                  className={cn(
+                    "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[9px] font-bold whitespace-nowrap",
+                    pinnedStock <= 0
+                      ? "border-white/15 bg-white/10 text-white/60"
+                      : lowStock
+                        ? "border-amber-300/40 bg-amber-300/10 text-amber-300"
+                        : "border-ls-green/40 bg-ls-green/10 text-ls-green"
+                  )}
+                  aria-live="polite"
+                >
+                  {stockLabelFa(pinnedStock)}
+                </span>
+              )}
+            </>
+          )}
         </div>
       </div>
     </button>

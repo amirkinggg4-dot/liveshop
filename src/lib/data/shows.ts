@@ -11,8 +11,8 @@ export const SELLERS: Seller[] = [
     ratingsCount: 2341,
     followers: 12400,
     verified: true,
-    bio: "کتونی‌های کمیاب، اورجینال و گارانتی اصالت. مزایدهٔ هر شب ساعت ۲۱.",
-    scheduleLabel: "مزایدهٔ هر شب ۲۱:۰۰",
+    bio: "کتونی‌های کمیاب، اورجینال و گارانتی اصالت. لایو خرید هر شب ساعت ۲۱ — همه‌چیز با قیمت ثابت.",
+    scheduleLabel: "لایو خرید هر شب ۲۱:۰۰",
   },
   {
     id: "s2",
@@ -38,7 +38,7 @@ export const SELLERS: Seller[] = [
     followers: 5900,
     verified: true,
     bio: "کارت‌های کلکسیونی، فیگور و یادگاری‌های نایاب. بسته‌بندی ضدضربه.",
-    scheduleLabel: "مزایدهٔ جمعه‌ها ۲۰:۰۰",
+    scheduleLabel: "لایو جمعه‌ها ۲۰:۰۰",
   },
   {
     id: "s4",
@@ -50,7 +50,7 @@ export const SELLERS: Seller[] = [
     ratingsCount: 1204,
     followers: 3100,
     verified: false,
-    bio: "گجت، هدفون و لوازم جانبی با قیمت کارخانه. ضمانت سلامت کالا.",
+    bio: "گجت، هدفون و لوازم جانبی با قیمت ثابت کارخانه. ضمانت سلامت کالا.",
     scheduleLabel: "لایو روزهای زوج ۱۹:۰۰",
   },
   {
@@ -63,7 +63,7 @@ export const SELLERS: Seller[] = [
     ratingsCount: 3105,
     followers: 7500,
     verified: true,
-    bio: "عطر اورجینال و زیورآلات دست‌ساز. قیمت شروع مزایده فقط نصف بازار!",
+    bio: "عطر اورجینال و زیورآلات دست‌ساز. قیمت ثابت — فقط نصف بازار!",
     scheduleLabel: "لایو چهارشنبه‌ها ۲۲:۰۰",
   },
   {
@@ -76,8 +76,8 @@ export const SELLERS: Seller[] = [
     ratingsCount: 742,
     followers: 1900,
     verified: false,
-    bio: "کتاب‌های نایاب، امضادار و چاپ اول. حراج‌های شبانهٔ آخر هفته.",
-    scheduleLabel: "حراج جمعه‌ها ۲۳:۰۰",
+    bio: "کتاب‌های نایاب، امضادار و چاپ اول. لایوهای شبانهٔ آخر هفته.",
+    scheduleLabel: "لایو جمعه‌ها ۲۳:۰۰",
   },
 ];
 
@@ -97,11 +97,11 @@ export const SHOWS: Show[] = [
     itemsTotal: 24,
     itemsSold: 11,
     isFollowing: true,
-    tags: ["مزایده", "اورجینال", "ارسال سریع"],
+    tags: ["قیمت ثابت", "اورجینال", "ارسال سریع"],
   },
   {
     id: "sh3",
-    title: "مزایدهٔ کارت‌های کلکسیونی",
+    title: "شو کارت‌های کلکسیونی — قیمت ثابت",
     sellerId: "s3",
     category: "کارت و کلکسیون",
     status: "live",
@@ -110,7 +110,7 @@ export const SHOWS: Show[] = [
     itemsTotal: 40,
     itemsSold: 22,
     isFollowing: true,
-    tags: ["مزایده", "کلکسیون", "نایاب"],
+    tags: ["قیمت ثابت", "کلکسیون", "نایاب"],
   },
   {
     id: "sh2",
@@ -136,7 +136,7 @@ export const SHOWS: Show[] = [
     itemsTotal: 30,
     itemsSold: 16,
     isFollowing: true,
-    tags: ["مزایده", "دست‌ساز"],
+    tags: ["قیمت ثابت", "دست‌ساز"],
   },
   {
     id: "sh4",
@@ -163,7 +163,7 @@ export const SHOWS: Show[] = [
     itemsTotal: 20,
     itemsSold: 0,
     isFollowing: true,
-    tags: ["حراج", "امضادار"],
+    tags: ["قیمت ثابت", "امضادار"],
   },
   {
     id: "sh7",
@@ -177,7 +177,7 @@ export const SHOWS: Show[] = [
     itemsTotal: 26,
     itemsSold: 0,
     isFollowing: false,
-    tags: ["مزایده", "رپ‌دهی زودهنگام"],
+    tags: ["قیمت ثابت", "رپ‌دهی زودهنگام"],
   },
   {
     id: "sh8",

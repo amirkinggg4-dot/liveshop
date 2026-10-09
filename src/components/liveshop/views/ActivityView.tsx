@@ -9,6 +9,7 @@ import { useAppStore } from "@/store/app-store";
 import { useActivityStore } from "@/store/activity-store";
 import { Avatar, EmptyState, GradientCover, PageHeader } from "@/components/liveshop/shared";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ─────────────────────────────────────────────────────────────
    فعالیت‌های من — فاز ۳ (Atlas تصویر ۱۹)
@@ -257,10 +258,12 @@ export default function ActivityView() {
   const myOffers = useActivityStore((s) => s.myOffers);
   const tickCountdown = useActivityStore((s) => s.tickCountdown);
 
-  const [tab, setTab] = useState<TabId>("bids");
+  /* v1.4 — در حالت قیمت ثابت، تب «بیدها» پشت AUCTION_ENABLED است و پیش‌فرض «پیشنهادها» */
+  const [tab, setTab] = useState<TabId>(AUCTION_ENABLED ? "bids" : "offers");
 
-  /* تیک ثانیه‌ای تایمر بیدهای فعال — با cleanup */
+  /* تیک ثانیه‌ای تایمر بیدهای فعال — با cleanup (فقط حالت مزایده) */
   useEffect(() => {
+    if (!AUCTION_ENABLED) return;
     const id = setInterval(() => tickCountdown(), 1000);
     return () => clearInterval(id);
   }, [tickCountdown]);
@@ -283,23 +286,28 @@ export default function ActivityView() {
     <div className="flex flex-1 flex-col" aria-label="فعالیت‌های من">
       <PageHeader
         title="فعالیت‌های من"
-        subtitle="بیدها، پیشنهادها و تاریخچه"
+        subtitle={AUCTION_ENABLED ? "بیدها، پیشنهادها و تاریخچه" : "پیشنهادها و تاریخچه"}
         onBack={back}
       />
 
       <div className="px-4 py-4">
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)}>
           <TabsList
-            className="grid h-10 w-full grid-cols-3 rounded-xl bg-ls-card-2 p-1"
+            className={cn(
+              "grid h-10 w-full rounded-xl bg-ls-card-2 p-1",
+              AUCTION_ENABLED ? "grid-cols-3" : "grid-cols-2"
+            )}
             aria-label="تب‌های فعالیت"
           >
-            <TabsTrigger
-              value="bids"
-              className="rounded-lg text-xs font-bold text-white/60 data-[state=active]:bg-ls-purple data-[state=active]:text-white"
-              aria-label={`بیدها — ${faNum(activeBids.length)} بید فعال`}
-            >
-              بیدها ({faNum(activeBids.length)})
-            </TabsTrigger>
+            {AUCTION_ENABLED && (
+              <TabsTrigger
+                value="bids"
+                className="rounded-lg text-xs font-bold text-white/60 data-[state=active]:bg-ls-purple data-[state=active]:text-white"
+                aria-label={`بیدها — ${faNum(activeBids.length)} بید فعال`}
+              >
+                بیدها ({faNum(activeBids.length)})
+              </TabsTrigger>
+            )}
             <TabsTrigger
               value="offers"
               className="rounded-lg text-xs font-bold text-white/60 data-[state=active]:bg-ls-purple data-[state=active]:text-white"
@@ -316,7 +324,8 @@ export default function ActivityView() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ── بیدها ── */}
+          {/* ── بیدها — فقط در حالت مزایده (AUCTION_ENABLED) ── */}
+          {AUCTION_ENABLED && (
           <TabsContent value="bids" className="mt-3">
             {activeBids.length === 0 ? (
               <EmptyState
@@ -335,6 +344,7 @@ export default function ActivityView() {
               </ul>
             )}
           </TabsContent>
+          )}
 
           {/* ── پیشنهادها ── */}
           <TabsContent value="offers" className="mt-3">

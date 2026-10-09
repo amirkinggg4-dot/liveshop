@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, X } from "lucide-react";
+import { BarChart3, Package, Pin, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { faNum, toman } from "@/lib/format";
 import { useLiveStore } from "@/store/live-store";
 import { useSellerStore } from "@/store/seller-store";
 import { WATCHING_VIEWERS, type WatchingViewer } from "@/lib/data/seller";
+import { stockLabelFa } from "@/lib/data/items";
 import { Avatar } from "@/components/liveshop/shared";
 import {
   Drawer,
@@ -17,6 +18,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { RaidSheet, CoHostSheet } from "@/components/liveshop/raid-cohost";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ═══════════════════════ SellerLiveDashboard — داشبورد زندهٔ فروشنده (فاز ۲ — اطلس تصویر ۰۴) ═══════════════════════
    کنترل‌پنل حین پخش — فروش زنده و سفارش‌ها از موتور live-store، انعام/پیشنهاد از seller-store.
@@ -46,8 +48,8 @@ const KIND_BADGE: Record<Exclude<DashEventKind, "other">, { label: string; cls: 
 };
 
 const EVENT_FILTERS = [
+  ...(AUCTION_ENABLED ? [{ key: "auction", label: "مزایده" } as const] : []),
   { key: "all", label: "همه" },
-  { key: "auction", label: "مزایده" },
   { key: "sale", label: "فروش" },
   { key: "giveaway", label: "گیواوی" },
   { key: "tip", label: "انعام" },
@@ -71,12 +73,18 @@ export default function SellerLiveDashboard({
   const liveItems = useLiveStore((s) => s.items);
   const soldCount = useLiveStore((s) => s.soldCount);
   const chat = useLiveStore((s) => s.chat);
+  /* v1.4 — پین «کالای در حال نمایش» از همین داشبورد */
+  const pinnedItemId = useLiveStore((s) => s.pinnedItemId);
+  const pinItem = useLiveStore((s) => s.pinItem);
   const tips = useSellerStore((s) => s.tips);
   const offers = useSellerStore((s) => s.offers);
   const addTip = useSellerStore((s) => s.addTip);
 
   const [filter, setFilter] = useState<"all" | "auction" | "sale" | "giveaway" | "tip">("all");
-  const [tab, setTab] = useState<"activity" | "watching">("activity");
+  /* v1.4 — در حالت قیمت ثابت، تب پیش‌فرض «کالاها»ست (پین کالای بعدی) */
+  const [tab, setTab] = useState<"activity" | "watching" | "items">(
+    AUCTION_ENABLED ? "activity" : "items"
+  );
 
   /* ابزارهای رشد پخش — فاز ۳ (Raid / کو-هاست) */
   const [raidOpen, setRaidOpen] = useState(false);
@@ -226,17 +234,32 @@ export default function SellerLiveDashboard({
             role="tablist"
             aria-label="تب داشبورد فروشنده"
           >
-            <button
-              role="tab"
-              aria-selected={tab === "activity"}
-              onClick={() => setTab("activity")}
-              className={cn(
-                "flex-1 rounded-xl py-2 text-xs font-bold transition-colors",
-                tab === "activity" ? "bg-ls-card-2 text-white" : "text-white/45"
-              )}
-            >
-              رویدادها
-            </button>
+            {AUCTION_ENABLED && (
+              <button
+                role="tab"
+                aria-selected={tab === "activity"}
+                onClick={() => setTab("activity")}
+                className={cn(
+                  "flex-1 rounded-xl py-2 text-xs font-bold transition-colors",
+                  tab === "activity" ? "bg-ls-card-2 text-white" : "text-white/45"
+                )}
+              >
+                رویدادها
+              </button>
+            )}
+            {!AUCTION_ENABLED && (
+              <button
+                role="tab"
+                aria-selected={tab === "items"}
+                onClick={() => setTab("items")}
+                className={cn(
+                  "flex-1 rounded-xl py-2 text-xs font-bold transition-colors",
+                  tab === "items" ? "bg-ls-card-2 text-white" : "text-white/45"
+                )}
+              >
+                کالاها
+              </button>
+            )}
             <button
               role="tab"
               aria-selected={tab === "watching"}
@@ -319,6 +342,93 @@ export default function SellerLiveDashboard({
               >
                 ثبت انعام (دمو) 💚
               </button>
+            </div>
+          ) : tab === "items" ? (
+            /* ═══ v1.4 — تب کالاها: پین‌کردن «کالای در حال نمایش» بعدی ═══ */
+            <div className="mt-3">
+              <p className="text-[11px] leading-5 text-white/55">
+                کالایی که پین می‌کنی، همین لحظه کارت پایین اتاقِ همهٔ بیننده‌ها را عوض
+                می‌کند و پیام «کالای جدید: …» در چت می‌رود.
+              </p>
+              <div
+                className="mt-2 space-y-2 max-h-72 overflow-y-auto scroll-thin"
+                aria-label="کالاهای شو — پین کالای در حال نمایش"
+              >
+                {[
+                  ...liveItems.filter((i) => i.id === pinnedItemId),
+                  ...liveItems.filter((i) => i.id !== pinnedItemId),
+                ].map((item) => {
+                  const isPinned = item.id === pinnedItemId;
+                  const out = item.stock <= 0;
+                  return (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        "rounded-xl border p-2.5 flex items-center gap-2.5",
+                        isPinned
+                          ? "border-ls-green/50 bg-ls-green/5"
+                          : "border-white/5 bg-ls-card"
+                      )}
+                    >
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ls-card-2 text-base"
+                        aria-hidden
+                      >
+                        {item.emoji}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-bold text-white/90">
+                          {item.title}
+                        </p>
+                        <p className="mt-0.5 text-[10px] tabular-nums">
+                          <span className={cn("font-bold", out ? "text-white/40" : "text-ls-green")}>
+                            {toman(item.price, false)}
+                          </span>
+                          <span
+                            className={cn(
+                              out
+                                ? "text-white/40"
+                                : item.stock < 3
+                                  ? "text-amber-300"
+                                  : "text-white/45"
+                            )}
+                          >
+                            {" · "}
+                            {stockLabelFa(item.stock)}
+                          </span>
+                        </p>
+                      </div>
+                      {isPinned ? (
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-ls-green px-2.5 py-1.5 text-[10px] font-black text-[#04281e]">
+                          <Pin className="h-3 w-3" aria-hidden />
+                          در حال نمایش
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            if (out) {
+                              toast.error("کالای تمام‌شده پین نمی‌شود");
+                              return;
+                            }
+                            pinItem(item.id);
+                            toast.success(`«${item.title}» برای همه پین شد`);
+                          }}
+                          disabled={out}
+                          aria-label={`پین‌کردن ${item.title} به‌عنوان کالای در حال نمایش`}
+                          className={cn(
+                            "shrink-0 rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition-all active:scale-95",
+                            out
+                              ? "cursor-not-allowed border border-white/10 text-white/30"
+                              : "border border-ls-purple/50 text-ls-purple-soft hover:bg-ls-purple/10"
+                          )}
+                        >
+                          پین
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <div className="mt-3">

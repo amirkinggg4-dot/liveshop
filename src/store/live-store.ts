@@ -1,22 +1,28 @@
 "use client";
 
 import { create } from "zustand";
-import type { ChatMessage, ShopItem } from "@/lib/data/types";
+import type { ChatMessage, ShopItem, ShippingMethodId } from "@/lib/data/types";
 import { getShowItems } from "@/lib/data/items";
 import { getSeller } from "@/lib/data/shows";
 import { CHAT_BY_SHOW } from "@/lib/data/chat";
-import { DEFAULT_ADDRESS } from "@/lib/data/orders";
+import { DEFAULT_ADDRESS, SHIPPING_METHODS, escrowTimeline } from "@/lib/data/orders";
 import { useWalletStore } from "@/store/wallet-store";
 import { useOrdersStore, nextOrderId } from "@/store/orders-store";
 import type { Order } from "@/lib/data/types";
 import { toman } from "@/lib/format";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ─────────────────────────────────────────────────────────────
-   موتور مزایدهٔ شبیه‌سازی‌شدهٔ LiveShop (فاز ۱)
-   - پلهٔ خودکار، ضدکلاهبرداری زمانی (تمدید ۱۰ ثانیه در ثانیه‌های آخر)
-   - رقیب‌های شبیه‌سازی‌شده (ربات)
-   - Max Bid: بید خودکار فقط در رقابت و فقط یک پله
-   - کسر خودکار کیف پول + ساخت سفارش پس از برد
+   موتور اتاق لایو — v1.4 «لایو شاپ با قیمت ثابت»
+   ─ خرید با قیمت ثابت: purchaseItem (تابع واحد کاهش موجودی — قبل از
+     کم‌کردن، موجودی چک می‌شود تا دو خرید هم‌زمان آخرین عدد را دوبار
+     نفروشند؛ ساختار طوری است که بعداً به API سمت سرور وصل شود —
+     کافی است همین تابع با فراخوانی سرور جایگزین شود)
+   ─ فروشنده با pinItem «کالای در حال نمایش» را عوض می‌کند و پیام
+     «کالای جدید: …» در چت می‌آید
+   ─ ربات‌های شبیه‌ساز خریدار به‌جای بید، گاهی «خرید» می‌کنند
+   ─ موتور مزایده (فاز ۱) پشت AUCTION_ENABLED کاملاً حفظ شده است:
+     applyBid، finishItem، Max Bid، تمدید ۱۰ ثانیه و ربات‌های بیدگذار
    ───────────────────────────────────────────────────────────── */
 
 export type AuctionPhase = "idle" | "running" | "sold" | "awaiting_next";
@@ -40,7 +46,7 @@ interface BotRival {
   name: string;
   emoji: string;
   color: string;
-  /** احتمال بید در هر ثانیهٔ فعال */
+  /** احتمال بید/خرید در هر ثانیهٔ فعال */
   aggression: number;
   budget: number;
 }
@@ -72,11 +78,31 @@ interface GiveawayState {
   winnerColor: string;
 }
 
+export interface PurchaseOptions {
+  itemId: string;
+  /** «me» یا id ربات (فروش همان لحظهٔ نمایشی بدون کیف پول) */
+  buyerId?: string;
+  qty?: number;
+  /** سایز/رنگ انتخاب‌شده — وقتی کالا variants دارد الزامی است */
+  variantLabel?: string;
+  shippingMethodId?: ShippingMethodId;
+}
+
+export interface PurchaseResult {
+  ok: boolean;
+  error?: string;
+  orderId?: string;
+}
+
 interface LiveState {
   showId: string | null;
   items: ShopItem[];
   phase: AuctionPhase;
   activeItemId: string | null;
+  /** v1.4 — کالای در حال نمایش (پین‌شده) — با pinItem از داشبورد فروشنده عوض می‌شود */
+  pinnedItemId: string | null;
+  /** v1.4 — برای انیمیشن تعویض کارت پایین هنگام پین‌شدن کالای جدید */
+  pinnedAt: number;
   currentBid: number;
   currentWinnerId: string;
   timerSec: number;
@@ -100,6 +126,9 @@ interface LiveState {
   dismissFinished: () => void;
   startNextItem: () => void;
   clearPendingWin: () => void;
+  /* ── v1.4 — لایو شاپ با قیمت ثابت ── */
+  pinItem: (itemId: string) => void;
+  purchaseItem: (opts: PurchaseOptions) => PurchaseResult;
 }
 
 function nowLabel(): string {
@@ -110,7 +139,7 @@ function nowLabel(): string {
 }
 
 export const useLiveStore = create<LiveState>((set, get) => {
-  /* ── اکشن‌های داخلی موتور ── */
+  /* ── اکشن‌های داخلی موتور مزایده (پشت AUCTION_ENABLED) ── */
   const applyBid = (
     bidderId: string,
     amount: number,
@@ -214,11 +243,33 @@ export const useLiveStore = create<LiveState>((set, get) => {
     }
   };
 
+  /* ── v1.4 — شبیه‌ساز خریدار ربات: گاهی یک عدد از کالای پین‌شده می‌خرد ──
+     (فقط در حالت قیمت ثابت؛ در حالت حراج همان ربات‌ها بید می‌دهند) */
+  const botPurchaseTick = () => {
+    const s = get();
+    const item = s.items.find((i) => i.id === s.pinnedItemId);
+    if (!item || item.stock <= 0) return;
+    for (const bot of BOTS) {
+      /* احتمال پایین تا لایو طبیعی بماند — هر ~۵۰ ثانیه به‌طور میانگین یک خرید */
+      if (Math.random() < bot.aggression * 0.14) {
+        get().purchaseItem({
+          itemId: item.id,
+          buyerId: bot.id,
+          qty: 1,
+          variantLabel: item.variants?.find((v) => v.stock > 0)?.label,
+        });
+        break; /* حداکثر یک خرید ربات در هر تیک */
+      }
+    }
+  };
+
   return {
     showId: null,
     items: [],
     phase: "idle",
     activeItemId: null,
+    pinnedItemId: null,
+    pinnedAt: 0,
     currentBid: 0,
     currentWinnerId: "",
     timerSec: 0,
@@ -232,20 +283,21 @@ export const useLiveStore = create<LiveState>((set, get) => {
     giveaway: { phase: "idle", secondsLeft: 0, winnerLabel: "", winnerEmoji: "", winnerColor: "" },
 
     startShow: (showId) => {
-      const items = getShowItems(showId).map((i) => ({ ...i }));
-      const first =
-        items.find((i) => i.status === "auction") ??
-        items.find((i) => i.status === "up_next") ??
-        items[0];
+      const items = getShowItems(showId).map((i) => ({ ...i, variants: i.variants?.map((v) => ({ ...v })) }));
+      /* v1.4 — کالای در حال نمایش: اولین کالای موجود (پین‌شدهٔ پیش‌فرض شو) */
+      const pinned =
+        items.find((i) => i.status !== "sold" && i.stock > 0) ?? items[0];
       const seedChat = (CHAT_BY_SHOW[showId] ?? []).map((m) => ({ ...m }));
       set({
         showId,
         items,
-        phase: first && first.status !== "sold" ? "running" : "awaiting_next",
-        activeItemId: first && first.status !== "sold" ? first.id : null,
-        currentBid: first?.currentBid ?? first?.startPrice ?? 0,
-        currentWinnerId: first?.status === "auction" ? "bot1" : "",
-        timerSec: first?.timerSec ?? 60,
+        phase: "running",
+        activeItemId: pinned?.id ?? null,
+        pinnedItemId: pinned?.id ?? null,
+        pinnedAt: Date.now(),
+        currentBid: pinned?.price ?? pinned?.startPrice ?? 0,
+        currentWinnerId: "",
+        timerSec: pinned?.timerSec ?? 60,
         soldCount: items.filter((i) => i.status === "sold").length,
         myMaxBidEnabled: false,
         myMaxBidAmount: 0,
@@ -261,6 +313,7 @@ export const useLiveStore = create<LiveState>((set, get) => {
 
     tick: () => {
       const s = get();
+
       /* گیواوی */
       if (s.giveaway.phase === "countdown") {
         const left = s.giveaway.secondsLeft - 1;
@@ -284,6 +337,14 @@ export const useLiveStore = create<LiveState>((set, get) => {
       }
 
       if (s.phase !== "running") return;
+
+      /* ── v1.4 — حالت قیمت ثابت: ربات‌ها گاهی «خرید» می‌کنند، تایمری نیست ── */
+      if (!AUCTION_ENABLED) {
+        botPurchaseTick();
+        return;
+      }
+
+      /* ── موتور مزایده (AUCTION_ENABLED=true) — حفظ‌شده از فاز ۱ ── */
       const item = s.items.find((i) => i.id === s.activeItemId);
       if (!item) return;
       const step = item.step;
@@ -403,5 +464,159 @@ export const useLiveStore = create<LiveState>((set, get) => {
     },
 
     clearPendingWin: () => set({ pendingWin: null }),
+
+    /* ═════════ v1.4 — پین‌کردن «کالای در حال نمایش» توسط فروشنده ═════════ */
+    pinItem: (itemId) => {
+      const s = get();
+      const item = s.items.find((i) => i.id === itemId);
+      if (!item) return;
+      if (item.stock <= 0) return; /* کالای تمام‌شده پین نمی‌شود */
+      if (s.pinnedItemId === itemId) return;
+      set({
+        pinnedItemId: itemId,
+        activeItemId: itemId,
+        pinnedAt: Date.now(),
+        currentBid: item.price,
+        currentWinnerId: "",
+      });
+      get().pushChat({
+        author: "میزبان شو",
+        text: `🆕 کالای جدید: «${item.title}» — ${toman(item.price)}`,
+        kind: "system",
+        time: nowLabel(),
+        emoji: "🆕",
+        color: "#6C5CFF",
+      });
+    },
+
+    /* ═════════ v1.4 — خرید با قیمت ثابت (تابع واحد کاهش موجودی) ═════════
+       اتمیک: چک موجودی + چک کیف پول + کاهش + ساخت سفارش همه در یک فراخوانی
+       همگام انجام می‌شود تا دو خرید هم‌زمان آخرین عدد را دوبار نفروشند.
+       برای اتصال به API سمت سرور کافی است بدنهٔ این تابع با فراخوانی
+       fetch("/api/purchase") جایگزین شود — امضای ورودی/خروجی همان است. */
+    purchaseItem: (opts) => {
+      const s = get();
+      const buyerId = opts.buyerId ?? "me";
+      const item = s.items.find((i) => i.id === opts.itemId);
+      if (!item) return { ok: false, error: "کالا پیدا نشد" };
+
+      /* ۱) چک موجودی — قبل از هر کاهشی */
+      if (item.stock <= 0) {
+        return { ok: false, error: "کالا تمام شد — موجودی این کالا به پایان رسید" };
+      }
+
+      /* ۲) تعداد — حداکثر به اندازهٔ موجودی */
+      const qty = Math.min(Math.max(1, opts.qty ?? 1), item.stock);
+      if (opts.qty && opts.qty > item.stock) {
+        return { ok: false, error: `فقط ${item.stock} عدد باقی مانده است` };
+      }
+
+      /* ۳) سایز/رنگ — اگر کالا گزینه دارد، انتخابش الزامی است */
+      let variantLabel = opts.variantLabel;
+      if (item.variants && item.variants.length > 0) {
+        if (!variantLabel) {
+          return { ok: false, error: "اول سایز/رنگ را انتخاب کن" };
+        }
+        const variant = item.variants.find((v) => v.label === variantLabel);
+        if (!variant || variant.stock <= 0) {
+          return { ok: false, error: "این سایز/رنگ تمام شده — گزینهٔ دیگری انتخاب کن" };
+        }
+        if (variant.stock < qty) {
+          return { ok: false, error: `از این سایز فقط ${variant.stock} عدد باقی مانده است` };
+        }
+      } else {
+        variantLabel = undefined;
+      }
+
+      /* ۴) مبلغ — قیمت ثابت × تعداد + ارسال */
+      const method =
+        SHIPPING_METHODS.find((m) => m.id === (opts.shippingMethodId ?? "tipax")) ??
+        SHIPPING_METHODS[0];
+      const total = item.price * qty + method.price;
+
+      const isMe = buyerId === "me";
+      if (isMe) {
+        /* ۵) چک کیف پول — قبل از کاهش موجودی (اتمیک بودن خرید من) */
+        const wallet = useWalletStore.getState();
+        if (!wallet.canAfford(total)) {
+          return {
+            ok: false,
+            error: `موجودی کیف پول کافی نیست — ${toman(total)} نیاز داری (کیف پول را شارژ کن)`,
+          };
+        }
+      }
+
+      /* ۶) کاهش اتمیک موجودی (کالا + گزینهٔ سایز/رنگ) */
+      const newStock = item.stock - qty;
+      set((st) => ({
+        items: st.items.map((i) => {
+          if (i.id !== item.id) return i;
+          const nextVariants = i.variants?.map((v) =>
+            v.label === variantLabel ? { ...v, stock: Math.max(0, v.stock - qty) } : v
+          );
+          return {
+            ...i,
+            stock: Math.max(0, newStock),
+            variants: nextVariants,
+            status: (newStock <= 0 ? "sold" : i.status === "sold" ? "sold" : "buy_now") as ShopItem["status"],
+            ...(newStock <= 0
+              ? { soldPrice: i.soldPrice ?? i.price, soldTo: isMe ? "علی (شما)" : bidderLabel(buyerId) }
+              : {}),
+          };
+        }),
+        soldCount: newStock <= 0 && item.status !== "sold" ? st.soldCount + 1 : st.soldCount,
+      }));
+
+      /* ۷) پیام چت خرید */
+      const vis = isMe ? { emoji: "🧑‍💻", color: "#6C5CFF" } : botVisual(buyerId);
+      get().pushChat({
+        author: isMe ? "علی" : bidderLabel(buyerId),
+        text: qty > 1 ? `✅ ${qty} عدد خرید کرد` : "✅ خرید کرد",
+        kind: "purchase",
+        tag: "خرید",
+        time: nowLabel(),
+        ...vis,
+      });
+
+      /* ۸) برای خرید من: کسر امانی از کیف پول + ساخت سفارش با تایم‌لاین امانی */
+      if (isMe) {
+        const wallet = useWalletStore.getState();
+        const paid = wallet.spend(total, `خرید لایو — ${item.title}${qty > 1 ? ` ×${qty}` : ""}`, "purchase");
+        if (!paid) {
+          /* عملاً رخ نمی‌دهد (چک بالا) — برای اطمینان موجودی برمی‌گردد */
+          set((st) => ({
+            items: st.items.map((i) => (i.id === item.id ? { ...i, stock: i.stock + qty } : i)),
+          }));
+          return { ok: false, error: "موجودی کیف پول کافی نیست" };
+        }
+        const seller = getSeller(
+          get().showId === "sh1" ? "s1" : get().showId === "sh2" ? "s2" : "s3"
+        );
+        const order: Order = {
+          id: nextOrderId(),
+          itemTitle: item.title,
+          itemBrand: item.brand,
+          itemEmoji: item.emoji,
+          cover: item.cover,
+          sellerName: seller.name,
+          sellerEmoji: seller.emoji,
+          sellerColor: seller.color,
+          itemPrice: item.price * qty,
+          qty,
+          variantLabel,
+          shippingPrice: method.price,
+          shippingMethod: method.id,
+          total,
+          address: DEFAULT_ADDRESS,
+          createdAtLabel: "همین حالا",
+          timeline: escrowTimeline(1),
+          escrow: true,
+        };
+        useOrdersStore.getState().addOrder(order);
+        return { ok: true, orderId: order.id };
+      }
+
+      return { ok: true };
+    },
   };
 });

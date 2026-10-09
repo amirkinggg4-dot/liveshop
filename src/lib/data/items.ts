@@ -1,6 +1,16 @@
 import type { ShopItem } from "./types";
+import { faNum } from "../format";
 
-/* آیتم‌های شو sh1 (کفش‌خانهٔ سینا) — ستون فقرات لایو و تب Shop */
+/* ─────────────────────────────────────────────────────────────
+   v1.4 — دادهٔ mock «لایو شاپ با قیمت ثابت»
+   تمرکز شو اصلی (sh1) روی «کفش و استریت‌ویر» با برندها، سایزها و
+   قیمت‌های واقع‌بینانهٔ تومان. هر کالا: price (قیمت ثابت) + stock
+   (موجودی) و در صورت لزوم variants (سایز/رنگ با موجودی جدا).
+   فیلدهای حراج (startPrice/step/buyNowPrice/…) پشت AUCTION_ENABLED
+   نگه داشته شده‌اند و پاک نشده‌اند.
+   ───────────────────────────────────────────────────────────── */
+
+/* آیتم‌های شو sh1 (کفش‌خانهٔ سینا) — کفش و استریت‌ویر، ستون فقرات لایو و تب Shop */
 export const ITEMS_SH1: ShopItem[] = [
   {
     id: "it1",
@@ -12,15 +22,22 @@ export const ITEMS_SH1: ShopItem[] = [
     condition: "نو با جعبه",
     size: "۴۲",
     sku: "SNK-A101",
-    status: "auction",
-    startPrice: 3_500_000,
-    currentBid: 4_800_000,
+    status: "buy_now",
+    price: 6_500_000,
+    stock: 5,
+    variants: [
+      { label: "۴۱", stock: 2 },
+      { label: "۴۲", stock: 2 },
+      { label: "۴۳", stock: 1 },
+    ],
+    weightGrams: 900,
+    dims: "۳۳×۲۲×۱۲",
+    startPrice: 6_500_000,
     step: 200_000,
-    timerSec: 45,
     buyNowPrice: 6_500_000,
     shippingPrice: 45_000,
     description:
-      "دَنک لو پاندا، سایز ۴۲، کاملاً نو با جعبهٔ اصلی و برچسب. اصالت کالا تضمینی — ارسال با تیپاکس و بسته‌بندی ضدضربه.",
+      "دَنک لو پاندا، اورجینال با جعبهٔ اصلی و برچسب. سایزهای ۴۱ تا ۴۳ موجود است — اصالت کالا تضمینی، ارسال با تیپاکس و بسته‌بندی ضدضربه. همین لحظه از اتاق لایو با قیمت ثابت بخر.",
   },
   {
     id: "it2",
@@ -32,15 +49,21 @@ export const ITEMS_SH1: ShopItem[] = [
     condition: "نو با جعبه",
     size: "۴۳",
     sku: "SNK-A102",
-    status: "auction",
-    startPrice: 3_000_000,
-    currentBid: 3_600_000,
+    status: "buy_now",
+    price: 5_200_000,
+    stock: 4,
+    variants: [
+      { label: "۴۲", stock: 2 },
+      { label: "۴۳", stock: 2 },
+    ],
+    weightGrams: 850,
+    dims: "۳۲×۲۱×۱۱",
+    startPrice: 5_200_000,
     step: 150_000,
-    timerSec: 90,
     buyNowPrice: 5_200_000,
     shippingPrice: 45_000,
     description:
-      "سامبا اورجینال با سه‌خط دوزی دستی. سایز ۴۳، رنگ کرم/مشکی. مناسب استفادهٔ روزمره و استایل رترو.",
+      "سامبا اورجینال با سه‌خط دوزی دستی، رنگ کرم/مشکی. سایز ۴۲ و ۴۳ موجود. مناسب استایل رترو و استفادهٔ روزمره.",
   },
   {
     id: "it3",
@@ -53,12 +76,21 @@ export const ITEMS_SH1: ShopItem[] = [
     size: "۴۱",
     sku: "SNK-A103",
     status: "up_next",
-    startPrice: 2_500_000,
+    price: 8_900_000,
+    stock: 3,
+    variants: [
+      { label: "۴۱", stock: 1 },
+      { label: "۴۲", stock: 1 },
+      { label: "۴۴", stock: 1 },
+    ],
+    weightGrams: 950,
+    dims: "۳۴×۲۳×۱۲",
+    startPrice: 8_900_000,
     step: 100_000,
-    buyNowPrice: 4_200_000,
+    buyNowPrice: 8_900_000,
     shippingPrice: 45_000,
     description:
-      "جردن ۱ مید رنگ‌بندی شیکاگو، سایز ۴۱. آیتم بعدی مزایده — با ثبت بیدِ پیش از شروع، از همان ثانیهٔ اول در رقابت هستید.",
+      "جردن ۱ مید رنگ‌بندی شیکاگو — رنگ‌بندی افسانه‌ای ۱۹۸۵. فقط ۳ عدد وارد شده؛ هر سایز موجودی جدا دارد.",
   },
   {
     id: "it4",
@@ -71,30 +103,41 @@ export const ITEMS_SH1: ShopItem[] = [
     size: "۴۰",
     sku: "SNK-A104",
     status: "buy_now",
+    price: 3_900_000,
+    stock: 6,
+    weightGrams: 800,
+    dims: "۳۰×۲۰×۱۱",
     startPrice: 3_900_000,
     step: 100_000,
     buyNowPrice: 3_900_000,
     shippingPrice: 30_000,
     description:
-      "NB۵۳۰ با تکه‌دوزی نقره‌ای، فقط دو بار پوشیده شده. قیمت ثابت و خرید فوری — بدون مزایده.",
+      "NB۵۳۰ با تکه‌دوزی نقره‌ای، سایز ۴۰، فقط دو بار پوشیده شده. قیمت ثابت و آمادهٔ ارسال.",
   },
   {
     id: "it5",
     showId: "sh1",
-    title: "صندل تابستانی چرم طبیعی",
-    brand: "چرم مشهد",
-    emoji: "🩴",
-    cover: { from: "#FFB454", to: "#7c2d12", emoji: "🩴" },
-    condition: "نو بدون جعبه",
-    size: "۴۴",
+    title: "هودی اورسایز استریت‌ویر",
+    brand: "اَسِت استودیو",
+    emoji: "🧥",
+    cover: { from: "#B45CFF", to: "#FF3B8B", emoji: "🧥" },
+    condition: "نو با جعبه",
     sku: "SNK-A105",
-    status: "sold",
-    startPrice: 1_200_000,
+    status: "buy_now",
+    price: 1_450_000,
+    stock: 8,
+    variants: [
+      { label: "مشکی", stock: 4 },
+      { label: "کرم", stock: 4 },
+    ],
+    weightGrams: 700,
+    dims: "۳۵×۲۸×۱۰",
+    startPrice: 1_450_000,
     step: 50_000,
-    soldPrice: 1_800_000,
-    soldTo: "mina_k72",
+    buyNowPrice: 1_450_000,
     shippingPrice: 30_000,
-    description: "صندل چرم طبیعی با کفی طبی. فروخته شد به کاربر mina_k72 با قیمت ۱٬۸۰۰٬۰۰۰ تومان.",
+    description:
+      "هودی اورسایز نخ پنبهٔ سنگ‌شور ۴۰۰ گرمی، دو رنگ مشکی و کرم. خیاطی تمیز و اورجینال برند ایرانی.",
   },
   {
     id: "it6",
@@ -106,24 +149,36 @@ export const ITEMS_SH1: ShopItem[] = [
     condition: "در حد نو",
     size: "۴۲.۵",
     sku: "SNK-A106",
-    status: "sold",
-    startPrice: 3_000_000,
+    status: "buy_now",
+    price: 4_600_000,
+    stock: 2,
+    variants: [
+      { label: "۴۲", stock: 1 },
+      { label: "۴۲.۵", stock: 1 },
+    ],
+    weightGrams: 820,
+    dims: "۳۱×۲۱×۱۱",
+    startPrice: 4_600_000,
     step: 100_000,
-    soldPrice: 5_200_000,
-    soldTo: "reza_vault",
+    buyNowPrice: 4_600_000,
     shippingPrice: 45_000,
-    description: "کفش رانینگ آسیکس با کفی ژل. مزایدهٔ داغ دیشب — فروش نهایی ۵٬۲۰۰٬۰۰۰ تومان.",
+    description:
+      "کفش رانینگ آسیکس با کفی ژل، فقط ۲ عدد باقی مانده — سایز ۴۲ و ۴۲.۵. قیمت ثابت و ارسال فوری.",
   },
   {
     id: "it7",
     showId: "sh1",
     title: "ست ۳ عددی جوراب ورزشی",
-    brand: "لايف اسپرت",
+    brand: "لایف اسپرت",
     emoji: "🧦",
     cover: { from: "#FF3B8B", to: "#FFB454", emoji: "🧦" },
     condition: "نو با جعبه",
     sku: "SNK-A107",
     status: "buy_now",
+    price: 380_000,
+    stock: 12,
+    weightGrams: 200,
+    dims: "۲۵×۱۵×۵",
     startPrice: 380_000,
     step: 20_000,
     buyNowPrice: 380_000,
@@ -140,15 +195,66 @@ export const ITEMS_SH1: ShopItem[] = [
     condition: "نو با جعبه",
     sku: "SNK-A108",
     status: "up_next",
-    startPrice: 900_000,
+    price: 1_450_000,
+    stock: 5,
+    weightGrams: 1100,
+    dims: "۴۵×۳۰×۱۵",
+    startPrice: 1_450_000,
     step: 50_000,
     buyNowPrice: 1_450_000,
     shippingPrice: 30_000,
-    description: "کولهٔ ضدآب با محفظهٔ لپ‌تاپ ۱۵ اینچ و جیب مخفی ضدسرقت. آیتم بعدی برنامهٔ شو.",
+    description: "کولهٔ ضدآب با محفظهٔ لپ‌تاپ ۱۵ اینچ و جیب مخفی ضدسرقت. آمادهٔ ارسال.",
+  },
+  {
+    id: "it9",
+    showId: "sh1",
+    title: "تیشرت اورسایز گرافیک",
+    brand: "اَسِت استودیو",
+    emoji: "👕",
+    cover: { from: "#FFB454", to: "#6C5CFF", emoji: "👕" },
+    condition: "نو با جعبه",
+    sku: "SNK-A109",
+    status: "buy_now",
+    price: 690_000,
+    stock: 10,
+    variants: [
+      { label: "مشکی", stock: 5 },
+      { label: "سفید", stock: 5 },
+    ],
+    weightGrams: 250,
+    dims: "۳۰×۲۵×۴",
+    startPrice: 690_000,
+    step: 20_000,
+    buyNowPrice: 690_000,
+    shippingPrice: 25_000,
+    description: "تیشرت اورسایز با چاپ گرافیک اختصاصی، نخ پنبهٔ ۲۲۰ گرمی. دو رنگ موجود.",
+  },
+  {
+    id: "it10",
+    showId: "sh1",
+    title: "کانورس چاک تیلور ۷۰ های‌تاپ",
+    brand: "کانورس",
+    emoji: "👟",
+    cover: { from: "#1b1729", to: "#3b2a86", emoji: "👟" },
+    condition: "نو با جعبه",
+    size: "۴۳",
+    sku: "SNK-A110",
+    status: "sold",
+    price: 2_850_000,
+    stock: 0,
+    weightGrams: 750,
+    dims: "۳۲×۲۰×۱۱",
+    startPrice: 2_850_000,
+    step: 50_000,
+    buyNowPrice: 2_850_000,
+    soldPrice: 2_850_000,
+    soldTo: "sara_snkrs",
+    shippingPrice: 30_000,
+    description: "چاک تیلور ۷۰ های‌تاپ مشکی — همین امشب در لایو تمام شد. به‌زودی شارژ مجدد می‌شود.",
   },
 ];
 
-/* آیتم‌های شو sh3 (کلکسیون‌یار تهران) */
+/* آیتم‌های شو sh3 (کلکسیون‌یار تهران) — از دستهٔ دیگر (کارت و کلکسیون) */
 export const ITEMS_SH3: ShopItem[] = [
   {
     id: "ct1",
@@ -159,15 +265,17 @@ export const ITEMS_SH3: ShopItem[] = [
     cover: { from: "#FFB454", to: "#6C5CFF", emoji: "🃏" },
     condition: "نو با جعبه",
     sku: "CRD-C201",
-    status: "auction",
-    startPrice: 8_000_000,
-    currentBid: 12_500_000,
+    status: "buy_now",
+    price: 18_000_000,
+    stock: 1,
+    weightGrams: 300,
+    dims: "۲۰×۱۵×۳",
+    startPrice: 18_000_000,
     step: 500_000,
-    timerSec: 60,
     buyNowPrice: 18_000_000,
     shippingPrice: 45_000,
     description:
-      "کارت گرید BGS 9.5 با قاب محافظ ضداشعه. یکی از نایاب‌ترین کارت‌های این فصل بازار ایران.",
+      "کارت گرید BGS 9.5 با قاب محافظ ضداشعه. تک‌عدد — اولین خریدار مالک می‌شود.",
   },
   {
     id: "ct2",
@@ -178,11 +286,13 @@ export const ITEMS_SH3: ShopItem[] = [
     cover: { from: "#B45CFF", to: "#FF3B8B", emoji: "🧸" },
     condition: "نو با جعبه",
     sku: "CRD-C202",
-    status: "auction",
-    startPrice: 2_000_000,
-    currentBid: 2_900_000,
+    status: "buy_now",
+    price: 4_000_000,
+    stock: 3,
+    weightGrams: 900,
+    dims: "۳۵×۲۵×۲۰",
+    startPrice: 4_000_000,
     step: 100_000,
-    timerSec: 75,
     buyNowPrice: 4_000_000,
     shippingPrice: 30_000,
     description: "فانکو پاپ سایز بزرگ با جعبهٔ سالم و شفاف. مناسب کلکسیون‌داران جدی.",
@@ -197,11 +307,15 @@ export const ITEMS_SH3: ShopItem[] = [
     condition: "نو با جعبه",
     sku: "CRD-C203",
     status: "buy_now",
+    price: 850_000,
+    stock: 8,
+    weightGrams: 500,
+    dims: "۲۸×۲۴×۴",
     startPrice: 850_000,
     step: 50_000,
     buyNowPrice: 850_000,
     shippingPrice: 30_000,
-    description: "بایندر ۹ پوکتی با قاب‌های سادهٔ بدون اسید. قیمت ثابت و خرید فوری.",
+    description: "بایندر ۹ پوکتی با قاب‌های سادهٔ بدون اسید. قیمت ثابت و ارسال فوری.",
   },
   {
     id: "ct4",
@@ -213,12 +327,15 @@ export const ITEMS_SH3: ShopItem[] = [
     condition: "در حد نو",
     sku: "CRD-C204",
     status: "sold",
-    startPrice: 1_500_000,
+    price: 2_750_000,
+    stock: 0,
+    startPrice: 2_750_000,
     step: 100_000,
+    buyNowPrice: 2_750_000,
     soldPrice: 2_750_000,
     soldTo: "ali_rezaei",
     shippingPrice: 45_000,
-    description: "فیگور اورجینال بانپرستو. فروش رفتهٔ شب قبل — مزایدهٔ بعدی را از دست ندهید.",
+    description: "فیگور اورجینال بانپرستو — تمام شد. شو بعدی را از دست ندهید.",
   },
   {
     id: "ct5",
@@ -229,12 +346,16 @@ export const ITEMS_SH3: ShopItem[] = [
     cover: { from: "#6C5CFF", to: "#1b1729", emoji: "🎴" },
     condition: "نو با جعبه",
     sku: "CRD-C205",
-    status: "up_next",
-    startPrice: 1_200_000,
+    status: "buy_now",
+    price: 2_100_000,
+    stock: 4,
+    weightGrams: 150,
+    dims: "۲۲×۱۶×۲",
+    startPrice: 2_100_000,
     step: 100_000,
     buyNowPrice: 2_100_000,
     shippingPrice: 30_000,
-    description: "پنج کارت هولوگرافیک یوگی-او با پک ضدضربه. آیتم بعدی شو.",
+    description: "پنج کارت هولوگرافیک یوگی-او با پک ضدضربه. قیمت ثابت.",
   },
   {
     id: "ct6",
@@ -246,16 +367,19 @@ export const ITEMS_SH3: ShopItem[] = [
     condition: "در حد نو",
     sku: "CRD-C206",
     status: "sold",
-    startPrice: 700_000,
+    price: 1_150_000,
+    stock: 0,
+    startPrice: 1_150_000,
     step: 50_000,
+    buyNowPrice: 1_150_000,
     soldPrice: 1_150_000,
     soldTo: "sara_snkrs",
     shippingPrice: 30_000,
-    description: "ماگ شهر توکیو از سری «بین من» — فروش‌رفتهٔ هفتهٔ گذشته.",
+    description: "ماگ شهر توکیو از سری «بین من» — تمام شد.",
   },
 ];
 
-/* آیتم‌های شو sh2 (گلخانهٔ مینا) */
+/* آیتم‌های شو sh2 (گلخانهٔ مینا) — از دستهٔ دیگر (گیاه و گلخانه) */
 export const ITEMS_SH2: ShopItem[] = [
   {
     id: "pl1",
@@ -266,11 +390,13 @@ export const ITEMS_SH2: ShopItem[] = [
     cover: { from: "#00C896", to: "#0b5f4a", emoji: "🌿" },
     condition: "نو با جعبه",
     sku: "PLT-B301",
-    status: "auction",
-    startPrice: 4_000_000,
-    currentBid: 6_200_000,
+    status: "buy_now",
+    price: 9_000_000,
+    stock: 2,
+    weightGrams: 2500,
+    dims: "۵۰×۳۵×۲۵",
+    startPrice: 9_000_000,
     step: 200_000,
-    timerSec: 50,
     buyNowPrice: 9_000_000,
     shippingPrice: 45_000,
     description:
@@ -286,6 +412,10 @@ export const ITEMS_SH2: ShopItem[] = [
     condition: "نو با جعبه",
     sku: "PLT-B302",
     status: "buy_now",
+    price: 980_000,
+    stock: 6,
+    weightGrams: 1500,
+    dims: "۳۰×۲۰×۲۰",
     startPrice: 980_000,
     step: 50_000,
     buyNowPrice: 980_000,
@@ -301,12 +431,16 @@ export const ITEMS_SH2: ShopItem[] = [
     cover: { from: "#FFB454", to: "#0b5f4a", emoji: "🌳" },
     condition: "در حد نو",
     sku: "PLT-B303",
-    status: "up_next",
-    startPrice: 2_800_000,
+    status: "buy_now",
+    price: 4_500_000,
+    stock: 1,
+    weightGrams: 4000,
+    dims: "۴۵×۳۵×۳۰",
+    startPrice: 4_500_000,
     step: 100_000,
     buyNowPrice: 4_500_000,
     shippingPrice: 45_000,
-    description: "بونسای فیکوس پنج‌ساله با پوشال آویز و زیرگلدان چوبی. آیتم بعدی گلخانه.",
+    description: "بونسای فیکوس پنج‌ساله با پوشال آویز و زیرگلدان چوبی. تک‌عدد.",
   },
   {
     id: "pl4",
@@ -318,12 +452,15 @@ export const ITEMS_SH2: ShopItem[] = [
     condition: "نو با جعبه",
     sku: "PLT-B304",
     status: "sold",
-    startPrice: 640_000,
+    price: 890_000,
+    stock: 0,
+    startPrice: 890_000,
     step: 20_000,
+    buyNowPrice: 890_000,
     soldPrice: 890_000,
     soldTo: "kian_plant",
     shippingPrice: 25_000,
-    description: "چهار ساکولنت مینی با گلدان بتنی. فروخته شد شب گذشته.",
+    description: "چهار ساکولنت مینی با گلدان بتنی — تمام شد.",
   },
 ];
 
@@ -344,7 +481,23 @@ export function getItem(id: string): ShopItem | undefined {
   return ALL_ITEMS.find((i) => i.id === id);
 }
 
-/** آیتم فعلیِ در مزایدهٔ یک شو (برای پیش‌نمایش کارت‌ها و لایو) */
+/** آیتم در مزایدهٔ یک شو — فقط وقتی AUCTION_ENABLED فعال است مصرف می‌شود (کد پاک نشده) */
 export function getAuctionItem(showId: string): ShopItem | undefined {
   return getShowItems(showId).find((i) => i.status === "auction");
+}
+
+/** v1.4 — «کالای در حال نمایش» (پین‌شدهٔ) هر شو: اولین کالای موجود با قیمت ثابت */
+export function getPinnedItem(showId: string): ShopItem | undefined {
+  const items = getShowItems(showId);
+  return (
+    items.find((i) => i.status !== "sold" && i.stock > 0) ??
+    items.find((i) => i.status !== "sold") ??
+    items[0]
+  );
+}
+
+/** v1.4 — برچسب موجودی فارسی: «۳ عدد مانده» / «تمام شد» */
+export function stockLabelFa(stock: number): string {
+  if (stock <= 0) return "تمام شد";
+  return `${faNum(stock)} عدد مانده`;
 }
