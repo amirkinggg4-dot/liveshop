@@ -483,3 +483,21 @@ Stage Summary:
 - چیزهایی که عمداً push نشد: `.env`، `node_modules/`، `.next/`، `download/*.zip` (آرشیوهای نسخه‌ها)، `upload/` (PDF و اسکرین‌شات‌های مرجع ۲۳MB)، `tool-results/` (خروجی‌های داخلی ابزارها) — و به‌جای .env فایل `.env.example` اضافه شد
 - ویوی «برد» (WinView) در اسکرین‌شات‌ها نیست چون فقط پس از بردن یک مزایدهٔ کامل ظاهر می‌شود؛ ۲۷ ویوی دیگر کامل پوشش داده شدند
 - هیچ فایل کد/قابلیتی تغییر یا حذف نشد؛ فقط فایل‌های مستندسازی (README، docs)، `.env.example`، `.gitignore` و اسکرین‌شات‌ها اضافه شدند
+
+---
+Task ID: publish-v1.3 (فاز push)
+Agent: main (Z.ai Code)
+Task: تکمیل انتشار — push کامیت آمادهٔ v1.3 به مخزن amirkinggg4-dot/liveshop روی main با توکن جدید کاربر
+
+Work Log:
+- کامیت آمادهٔ فاز قبل (fe3529f، ۲۲۲ فایل) سالم بود: اسکن git grep روی کل درخت tracked برای الگوهای توکن (github_pat_ / ghp_ / gho_) → تمیز؛ .env در تاریخچه نیست (تک‌کامیت squash‌شدهٔ ریشه)
+- توکن جدید کاربر با API تست شد: GET /user → amirkinggg4-dot ✓؛ GET /repos/amirkinggg4-dot/liveshop → permissions: admin/push/maintain ✓؛ 404 قبلی GET /contents فقط به‌دلیل خالی بودن مخزن بود («This repository is empty»)
+- push موفق: `git -c credential.helper= push https://x-access-token:<TOKEN>@github.com/amirkinggg4-dot/liveshop.git main:main` → «* [new branch] main -> main»؛ توکن فقط به‌صورت درون‌خطی در URL صریح استفاده شد و در هیچ فایلی (از جمله .git/config) ذخیره نشد
+- راستی‌آزمایی: ls-remote → refs/heads/main = fe3529f5cde88935c54e34a2cee614d25d023598 == HEAD لوکال ✓؛ GET /commits/fe3529f → 200 با ۲۲۲ فایل ✓؛ git tree recursive → ۲۴۶ آبجکت، truncated=false ✓
+- upstream تنظیم شد: git fetch origin main + git branch -u origin/main main → «## main...origin/main» همگام
+
+Stage Summary:
+- انتشار کامل شد: https://github.com/amirkinggg4-dot/liveshop (public) — شاخهٔ main
+- کامیت: https://github.com/amirkinggg4-dot/liveshop/commit/fe3529f5cde88935c54e34a2cee614d25d023598
+- عمداً منتشر نشد: .env، node_modules/، .next/، download/*.zip، upload/، tool-results/ — به‌جای .env فایل .env.example منتشر شد
+- توصیهٔ امنیتی: هر دو توکن fine-grained که کاربر در چت پیست کرده (قدیمی و جدید) پس از اطمینان از انتشار باید revoke شوند
