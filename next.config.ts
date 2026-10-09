@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  /* v1.3.2 — حذف نشان «N» ابزار توسعه از اسکرین‌شات‌ها و روی دکمه‌ها */
+  devIndicators: false,
 };
 
 export default nextConfig;

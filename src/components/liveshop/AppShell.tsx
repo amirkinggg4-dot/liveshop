@@ -111,7 +111,7 @@ export default function AppShell() {
               </span>
               <div className="leading-tight">
                 <p className="font-black text-sm">LiveShop</p>
-                <p className="text-[10px] text-white/45">خرید زنده، مزایدهٔ لحظه‌ای</p>
+                <p className="text-[10px] text-white/55">خرید زنده، مزایدهٔ لحظه‌ای</p>
               </div>
             </div>
             <button
@@ -144,7 +144,7 @@ export default function AppShell() {
                       aria-current={active ? "page" : undefined}
                       className={cn(
                         "w-full flex flex-col items-center gap-0.5 py-1.5 rounded-xl transition-colors",
-                        active ? "text-ls-purple-soft" : "text-white/45 hover:text-white/75"
+                        active ? "text-ls-purple-soft" : "text-white/55 hover:text-white/85"
                       )}
                     >
                       <Icon

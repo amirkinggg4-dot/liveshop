@@ -1,66 +1,90 @@
 "use client";
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   HomeView — صفحهٔ خانه (بازطراحی v1.3.2)
+   ─ ردیف «همین حالا زنده» با دایره‌های استوری و حلقهٔ رنگی (جدید)
+   ─ چیپ‌های دسته‌بندی کوچک‌تر با اسکرول افقی روان
+   ─ فید لایو دوسطحی (گرید ۲ ستونه، کارت عمودی ۴:۵ با عکس تمام‌کارت — LiveGridCard)
+   ─ کارت‌های «به‌زودی» با عکس واقعی (بدون ایموجی بزرگ) + یادآوری
+   ─ تب‌بار پایین: safe-area و عدم هم‌پوشانی در AppShell رعایت شده است
+   قواعد طلایی: منطق/استور/دیتا دست نخورد — فقط چیدمان و ظاهر (فاز ۱ حفظ شد).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 import { useState } from "react";
+import Image from "next/image";
 import { Clock } from "lucide-react";
 import { toast } from "sonner";
 import { useAppStore } from "@/store/app-store";
-import { faNum, faClock, toman } from "@/lib/format";
+import { faNum } from "@/lib/format";
 import { CATEGORIES } from "@/lib/data/categories";
-import { LIVE_SHOWS, UPCOMING_SHOWS } from "@/lib/data/shows";
-import { getAuctionItem, getShowItems } from "@/lib/data/items";
-import { ShowCard, SectionTitle, Chip } from "@/components/liveshop/shared";
+import { LIVE_SHOWS, UPCOMING_SHOWS, getSeller } from "@/lib/data/shows";
+import { SELLER_PHOTO, SHOW_PHOTO } from "@/lib/data/media";
+import {
+  ShowCard,
+  LiveGridCard,
+  SectionTitle,
+  Chip,
+} from "@/components/liveshop/shared";
 import type { Show } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
 
 type HomeTab = "forYou" | "following";
 
-/* ── فاز ۱ — کمترین قیمت خرید فوری یک شو (با گارد آرایهٔ خالی) ── */
-function minBuyNowPrice(showId: string): number | null {
-  const prices = getShowItems(showId)
-    .map((i) => i.buyNowPrice)
-    .filter((p): p is number => typeof p === "number");
-  return prices.length > 0 ? Math.min(...prices) : null;
-}
-
-/* ── فاز ۱ — نوار پیش‌نمایش «بید فعلی + تایمر» یا «خرید فوری از …» روی کارت شو زنده ── */
-function LiveBidBar({ show }: { show: Show }) {
-  const auction = getAuctionItem(show.id);
-
-  if (auction) {
-    const timer = auction.timerSec ?? 0;
-    const urgent = timer <= 30;
-    return (
-      <div className="mt-1 flex items-center gap-2 rounded-lg bg-ls-card-2 px-2.5 py-1.5 text-[11px]">
-        <span
-          className="w-1.5 h-1.5 shrink-0 rounded-full bg-ls-purple"
-          aria-hidden
-        />
-        <span className="font-bold text-ls-purple-soft">
-          بید فعلی {toman(auction.currentBid ?? auction.startPrice)}
-        </span>
-        <span
-          className={cn(
-            "ms-auto inline-flex items-center gap-1 font-bold tabular-nums",
-            urgent ? "text-[#FF3B5C]" : "text-white/55"
-          )}
-        >
-          <Clock className="w-3 h-3" aria-hidden />
-          {faClock(timer)}
-        </span>
-      </div>
-    );
-  }
-
-  const min = minBuyNowPrice(show.id);
-  if (min == null) return null;
+/* ── v1.3.2 — دایرهٔ استوری «همین حالا زنده» با حلقهٔ رنگی برند ── */
+function StoryBubble({
+  show,
+  onOpen,
+}: {
+  show: Show;
+  onOpen: (id: string) => void;
+}) {
+  const seller = getSeller(show.sellerId);
+  const photo = SELLER_PHOTO[show.sellerId];
   return (
-    <div className="mt-1 flex items-center gap-2 rounded-lg bg-ls-card-2 px-2.5 py-1.5 text-[11px]">
+    <button
+      onClick={() => onOpen(show.id)}
+      className="flex w-[68px] shrink-0 flex-col items-center gap-1"
+      aria-label={`ورود به شو زندهٔ ${seller.name}`}
+    >
       <span
-        className="w-1.5 h-1.5 shrink-0 rounded-full bg-ls-green"
-        aria-hidden
-      />
-      <span className="font-bold text-ls-green">خرید فوری از {toman(min)}</span>
-    </div>
+        className="relative h-[68px] w-[68px] rounded-full p-[2.5px]"
+        style={{
+          background:
+            "conic-gradient(from 210deg, #6C5CFF, #FF3B8B, #00C896, #6C5CFF)",
+        }}
+      >
+        <span className="relative block h-full w-full overflow-hidden rounded-full border-[2.5px] border-ls-bg">
+          {photo ? (
+            <Image
+              src={photo}
+              alt=""
+              fill
+              sizes="68px"
+              className="object-cover"
+            />
+          ) : (
+            <span
+              className="flex h-full w-full items-center justify-center text-xl"
+              style={{ backgroundColor: `${seller.color}33` }}
+              aria-hidden
+            >
+              {seller.emoji}
+            </span>
+          )}
+        </span>
+        {/* نشان کوچک «زنده» روی حلقه */}
+        <span className="absolute -bottom-0.5 left-1/2 flex -translate-x-1/2 items-center gap-0.5 whitespace-nowrap rounded-full bg-[#FF3B5C] px-1.5 py-px text-[8px] font-black text-white shadow-md ring-1 ring-ls-bg">
+          <span
+            className="h-1 w-1 rounded-full bg-white animate-ls-pulse"
+            aria-hidden
+          />
+          زنده
+        </span>
+      </span>
+      <span className="w-full truncate text-center text-[10px] font-bold text-white/75">
+        {seller.name}
+      </span>
+    </button>
   );
 }
 
@@ -117,7 +141,7 @@ function UpcomingFooter({
     <>
       <div className="mt-1 flex items-center gap-2 rounded-lg bg-ls-card-2 px-2.5 py-1.5 text-[11px]">
         <Clock className="w-3 h-3 shrink-0 text-ls-pink" aria-hidden />
-        <span className="font-bold text-white/75">
+        <span className="font-bold text-white/80">
           شروع: {show.startsAtLabel ?? "به‌زودی"}
         </span>
       </div>
@@ -155,21 +179,31 @@ export default function HomeView() {
       {/* سربرگ خوش‌آمد */}
       <header>
         <h1 className="text-2xl font-black">سلام علی 👋</h1>
-        <p className="text-sm text-white/55 mt-1">
+        <p className="text-sm text-white/65 mt-1">
           امشب {faNum(LIVE_SHOWS.length)} شو زنده داریم!
         </p>
       </header>
 
-      {/* چیپ‌های دسته‌بندی */}
+      {/* v1.3.2 — ردیف «همین حالا زنده»: دایره‌های استوری با حلقهٔ رنگی */}
+      <section aria-label="همین حالا زنده" className="space-y-2">
+        <SectionTitle title="همین حالا زنده" icon="🔴" />
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+          {LIVE_SHOWS.map((s) => (
+            <StoryBubble key={s.id} show={s} onOpen={openShow} />
+          ))}
+        </div>
+      </section>
+
+      {/* چیپ‌های دسته‌بندی — v1.3.2: کوچک‌تر + اسکرول افقی روان */}
       <nav
-        className="flex gap-2 overflow-x-auto no-scrollbar"
+        className="flex snap-x gap-2 overflow-x-auto no-scrollbar"
         aria-label="دسته‌بندی‌های خرید"
       >
         {CATEGORIES.map((c) => (
           <Chip
             key={c.id}
             onClick={() => setRoot("explore")}
-            className="shrink-0"
+            className="shrink-0 snap-start px-2.5 py-1 text-[11px]"
           >
             <span aria-hidden>{c.emoji}</span>
             {c.label}
@@ -177,7 +211,7 @@ export default function HomeView() {
         ))}
       </nav>
 
-      {/* شوهای زندهٔ داغ */}
+      {/* شوهای زندهٔ داغ — v1.3.2: گرید دوسطحی کارت عمودی ۴:۵ */}
       <section aria-label="شوهای زندهٔ داغ">
         <SectionTitle title="شوهای زندهٔ داغ" icon="🔴" />
 
@@ -190,7 +224,7 @@ export default function HomeView() {
               "rounded-full px-4 py-1.5 text-xs font-bold transition-colors",
               tab === "forYou"
                 ? "bg-ls-purple text-white"
-                : "bg-ls-card-2 text-white/60 hover:text-white"
+                : "bg-ls-card-2 text-white/70 hover:text-white"
             )}
           >
             برای شما
@@ -202,7 +236,7 @@ export default function HomeView() {
               "rounded-full px-4 py-1.5 text-xs font-bold transition-colors",
               tab === "following"
                 ? "bg-ls-purple text-white"
-                : "bg-ls-card-2 text-white/60 hover:text-white"
+                : "bg-ls-card-2 text-white/70 hover:text-white"
             )}
           >
             دنبال‌شده‌ها
@@ -210,13 +244,13 @@ export default function HomeView() {
         </div>
 
         {visibleLiveShows.length > 0 ? (
-          <div className="space-y-3">
+          /* v1.3.2 — گرید ۲ ستونه؛ عرض هر کارت در ۳۹۰px ≈ ۱۷۳px، نسبت ۴:۵ */
+          <div className="grid grid-cols-2 gap-3">
             {visibleLiveShows.map((show) => (
-              <ShowCard
+              <LiveGridCard
                 key={show.id}
                 show={show}
                 onClick={() => openShow(show.id)}
-                footer={<LiveBidBar show={show} />}
               />
             ))}
           </div>
@@ -229,7 +263,7 @@ export default function HomeView() {
             <p className="mt-2 text-sm font-bold">
               هنوز فروشنده‌ای را دنبال نکرده‌ای
             </p>
-            <p className="mt-1 text-xs leading-6 text-white/50">
+            <p className="mt-1 text-xs leading-6 text-white/60">
               از صفحهٔ کاوش فروشنده‌های موردعلاقه‌ات را فالو کن تا لایوهایشان
               اینجا نمایش داده شود.
             </p>
@@ -244,7 +278,7 @@ export default function HomeView() {
         )}
       </section>
 
-      {/* به‌زودی */}
+      {/* به‌زودی — v1.3.2: کاور با عکس واقعی به‌جای ایموجی بزرگ */}
       <section aria-label="شوهای به‌زودی">
         <SectionTitle title="به‌زودی" icon="🕒" />
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 -mb-1">
@@ -253,6 +287,7 @@ export default function HomeView() {
               <ShowCard
                 compact
                 show={show}
+                photo={SHOW_PHOTO[show.id]}
                 onClick={() =>
                   toast("این شو هنوز شروع نشده — یادآوری فعال می‌شود")
                 }
@@ -293,7 +328,7 @@ export default function HomeView() {
               ۳. برنده شو!
             </span>
           </div>
-          <p className="text-xs leading-6 text-white/55">
+          <p className="text-xs leading-6 text-white/65">
             در شوهای زنده، کالاها یکی‌یکی مزایده می‌شوند. تایمر را دنبال کن و
             بید بده؛ اگر بالاترین بید را داشته باشی، همان لحظه کالا برای تو
             ثبت می‌شود!

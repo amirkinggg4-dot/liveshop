@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { toFa, toman, compactFa } from "@/lib/format";
+import { toFa, toman, compactFa, faClock } from "@/lib/format";
 import type { Cover, ItemStatus, Show } from "@/lib/data/types";
 import { getSeller } from "@/lib/data/shows";
-import { ChevronRight, Star } from "lucide-react";
+import { getAuctionItem, getShowItems } from "@/lib/data/items";
+import { SHOW_PHOTO, SELLER_PHOTO } from "@/lib/data/media";
+import { ChevronRight, Star, Clock } from "lucide-react";
 
 /* ─────────────────────────── ابزارهای مشترک LiveShop ─────────────────────────── */
 
@@ -13,11 +17,16 @@ export function GradientCover({
   className,
   emojiClassName,
   children,
+  photo,
+  sizes = "300px",
 }: {
   cover: Cover;
   className?: string;
   emojiClassName?: string;
   children?: React.ReactNode;
+  /** v1.3.2 — عکس واقعی به‌جای ایموجی (fallback = گرادیان + ایموجی) */
+  photo?: string;
+  sizes?: string;
 }) {
   return (
     <div
@@ -36,15 +45,96 @@ export function GradientCover({
             "radial-gradient(circle at 25% 20%, rgba(255,255,255,.35) 0%, transparent 45%), radial-gradient(circle at 80% 85%, rgba(0,0,0,.35) 0%, transparent 50%)",
         }}
       />
-      <span
-        className={cn("relative select-none drop-shadow-lg", emojiClassName)}
-        aria-hidden
-      >
-        {cover.emoji}
-      </span>
+      {photo ? (
+        <SmartImg
+          src={photo}
+          alt=""
+          sizes={sizes}
+          className="object-cover"
+        />
+      ) : (
+        <span
+          className={cn("relative select-none drop-shadow-lg", emojiClassName)}
+          aria-hidden
+        >
+          {cover.emoji}
+        </span>
+      )}
       {children}
     </div>
   );
+}
+
+/* ── v1.3.2 — عکس با اسکلت: تا بارگذاری، اسکلت پالس‌دار نشان داده می‌شود ──
+   (والد باید relative باشد چون Image با fill کار می‌کند) */
+export function SmartImg({
+  src,
+  alt,
+  sizes,
+  className,
+  priority,
+}: {
+  src: string;
+  alt: string;
+  sizes?: string;
+  className?: string;
+  priority?: boolean;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <>
+      {!loaded && (
+        <span
+          className="absolute inset-0 animate-pulse bg-white/10"
+          aria-hidden
+        />
+      )}
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes={sizes}
+        priority={priority}
+        onLoad={() => setLoaded(true)}
+        className={cn(
+          "transition-opacity duration-300",
+          loaded ? "opacity-100" : "opacity-0",
+          className
+        )}
+      />
+    </>
+  );
+}
+
+/* ── v1.3.2 — آواتار عکس‌دار فروشنده با fallback ایموجی ── */
+export function SellerAvatar({
+  sellerId,
+  className,
+}: {
+  sellerId: string;
+  className?: string;
+}) {
+  const seller = getSeller(sellerId);
+  const photo = SELLER_PHOTO[sellerId];
+  if (photo) {
+    return (
+      <span
+        className={cn(
+          "relative shrink-0 overflow-hidden rounded-full ring-2 ring-white/10",
+          className ?? "h-9 w-9"
+        )}
+        aria-hidden
+      >
+        <SmartImg
+          src={photo}
+          alt=""
+          sizes="48px"
+          className="object-cover"
+        />
+      </span>
+    );
+  }
+  return <Avatar emoji={seller.emoji} color={seller.color} className={className} />;
 }
 
 export function Avatar({
@@ -260,7 +350,7 @@ export function PageHeader({
       )}
       <div className="min-w-0 flex-1">
         <h1 className="text-base font-extrabold truncate">{title}</h1>
-        {subtitle && <p className="text-xs text-white/50 truncate">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-white/60 truncate">{subtitle}</p>}
       </div>
       {trailing}
     </header>
@@ -284,7 +374,7 @@ export function EmptyState({
         {emoji}
       </span>
       <p className="font-bold text-white/90">{title}</p>
-      {desc && <p className="text-sm text-white/50 leading-6">{desc}</p>}
+      {desc && <p className="text-sm text-white/60 leading-6">{desc}</p>}
       {action && <div className="mt-3">{action}</div>}
     </div>
   );
@@ -296,12 +386,15 @@ export function ShowCard({
   onClick,
   footer,
   compact = false,
+  photo,
 }: {
   show: Show;
   onClick?: () => void;
   /** محتوای اضافه پایین کارت (مثل نوار «بید فعلی + تایمر» در فاز ۱) */
   footer?: React.ReactNode;
   compact?: boolean;
+  /** v1.3.2 — عکس واقعی کاور (fallback = گرادیان + ایموجی) */
+  photo?: string;
 }) {
   const seller = getSeller(show.sellerId);
   return (
@@ -315,6 +408,8 @@ export function ShowCard({
     >
       <GradientCover
         cover={show.cover}
+        photo={photo}
+        sizes="220px"
         className={cn("w-full", compact ? "h-28" : "h-40")}
         emojiClassName={cn(compact ? "text-4xl" : "text-6xl", "group-hover:scale-110 transition-transform duration-300")}
       >
@@ -338,13 +433,102 @@ export function ShowCard({
       </GradientCover>
       <div className="p-3 space-y-1.5">
         <p className="font-bold text-sm leading-5 line-clamp-1">{show.title}</p>
-        <div className="flex items-center gap-1.5 text-xs text-white/60">
-          <Avatar emoji={seller.emoji} color={seller.color} size="sm" />
+        <div className="flex items-center gap-1.5 text-xs text-white/70">
+          <SellerAvatar sellerId={seller.id} className="h-7 w-7" />
           <span className="truncate">{seller.name}</span>
           {seller.verified && <span className="text-ls-purple-soft" title="فروشندهٔ تأییدشده">✓</span>}
           <RatingStars rating={seller.rating} className="mr-auto" />
         </div>
         {footer}
+      </div>
+    </button>
+  );
+}
+
+/* ── v1.3.2 — کارت عمودی لایو برای فید دوسطحی خانه (نسبت ۴:۵، عکس تمام‌کارت) ──
+   نشان «زنده + بیننده» بالا، گرادیان تیره پایین با: اسم شو، فروشنده با آواتار،
+   بید فعلی + تایمر کوچک (یا خرید فوری از …). جایگزین چیدمان قبلی ShowCard در فید خانه. */
+export function LiveGridCard({
+  show,
+  onClick,
+}: {
+  show: Show;
+  onClick?: () => void;
+}) {
+  const seller = getSeller(show.sellerId);
+  const photo = SHOW_PHOTO[show.id];
+  const auction = getAuctionItem(show.id);
+  const timer = auction?.timerSec ?? 0;
+  const urgent = timer <= 30;
+  const buyNowMin = (() => {
+    const prices = getShowItems(show.id)
+      .map((i) => i.buyNowPrice)
+      .filter((p): p is number => typeof p === "number");
+    return prices.length > 0 ? Math.min(...prices) : null;
+  })();
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={`ورود به شو: ${show.title}`}
+      className="group relative block aspect-[4/5] w-full overflow-hidden rounded-2xl border border-white/10 bg-ls-card text-right shadow-lg transition-transform active:scale-[.98] hover:border-ls-purple/40"
+    >
+      {photo ? (
+        <SmartImg
+          src={photo}
+          alt={`تصویر شو ${show.title}`}
+          sizes="(max-width: 640px) 45vw, 200px"
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      ) : (
+        <GradientCover
+          cover={show.cover}
+          className="absolute inset-0"
+          emojiClassName="text-4xl"
+        />
+      )}
+
+      {/* نشان زنده + تعداد بیننده — بالا */}
+      <div className="absolute inset-x-2 top-2 z-10 flex items-start">
+        <LiveBadge viewers={show.viewers} className="px-2 py-0.5 text-[10px]" />
+      </div>
+
+      {/* گرادیان تیرهٔ پایین + اسم شو + فروشنده + بید/تایمر */}
+      <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-2.5 pt-10">
+        <p className="truncate text-[12px] font-extrabold leading-5 text-white">
+          {show.title}
+        </p>
+        <div className="mt-1 flex min-w-0 items-center gap-1.5">
+          <SellerAvatar sellerId={seller.id} className="h-5 w-5 ring-1 ring-white/25" />
+          <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-white/80">
+            {seller.name}
+          </span>
+          {seller.verified && (
+            <span className="text-[10px] text-ls-purple-soft" title="فروشندهٔ تأییدشده">✓</span>
+          )}
+        </div>
+        <div className="mt-1.5 flex items-center justify-between gap-1">
+          {auction ? (
+            <>
+              <span className="truncate text-[11px] font-black tabular-nums text-ls-purple-soft">
+                بید فعلی {toman(auction.currentBid ?? auction.startPrice)}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-0.5 text-[10px] font-bold tabular-nums",
+                  urgent ? "text-[#FF3B5C]" : "text-white/75"
+                )}
+              >
+                <Clock className="h-3 w-3" aria-hidden />
+                {faClock(timer)}
+              </span>
+            </>
+          ) : buyNowMin != null ? (
+            <span className="truncate text-[11px] font-black tabular-nums text-ls-green">
+              خرید فوری از {toman(buyNowMin)}
+            </span>
+          ) : null}
+        </div>
       </div>
     </button>
   );

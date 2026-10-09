@@ -280,59 +280,94 @@ function LiveRail({
 
 const CHAT_TTL_NORMAL = 6000; // پیام‌های معمولی بعد از ~۶ ثانیه محو می‌شوند
 const CHAT_TTL_SPECIAL = 9500; // سیستم/برنده/گیواوی کمی longer می‌مانند
-const CHAT_FADE_MS = 800;
+const CHAT_FADE_MS = 400; // v1.3.2 — همهٔ انیمیشن‌ها زیر ۴۰۰ms
 const CHAT_MAX_VISIBLE = 4;
+
+/* v1.3.2 — چیپ کوچک نوع پیام (جای کادرهای بزرگ) */
+function ChipTag({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: "neutral" | "green" | "purple" | "pink";
+}) {
+  const tones = {
+    neutral: "bg-white/15 text-white/75",
+    green: "bg-ls-green/20 text-ls-green",
+    purple: "bg-ls-purple/30 text-ls-purple-soft",
+    pink: "bg-ls-pink/25 text-ls-pink",
+  } as const;
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-full px-1.5 py-px align-middle text-[9px] font-bold leading-[14px]",
+        tones[tone]
+      )}
+    >
+      {children}
+    </span>
+  );
+}
 
 function ChatLine({ m, fading }: { m: ChatMessage; fading: boolean }) {
   const fadeCls = cn(
-    "transition-all duration-700 ease-out",
+    "transition-all duration-[400ms] ease-out",
     fading ? "opacity-0 translate-y-1" : "opacity-100"
   );
 
   if (m.kind === "system" || m.kind === "winner" || m.kind === "giveaway") {
-    const pillCls =
-      m.kind === "winner"
-        ? "border-ls-purple/45 bg-ls-purple/25 text-ls-purple-soft"
-        : m.kind === "giveaway"
-          ? "border-ls-pink/50 bg-ls-pink/25 text-ls-pink"
-          : "border-white/15 bg-black/55 text-white/75";
+    /* v1.3.2 — بدون کادر: متن سادهٔ سفید با سایهٔ ملایم + چیپ کوچک نوع پیام.
+       خط ثبت بید (کاربر X پیشنهاد داد) زرد برجسته می‌شود */
+    const isBidLine =
+      m.text.includes("ثبت کرد") || m.text.includes("Max Bid");
+    const label =
+      m.kind === "winner" ? "برنده" : m.kind === "giveaway" ? "گیواوی" : null;
+    const tone = m.kind === "winner" ? "purple" : "pink";
     return (
-      <div
+      <p
         className={cn(
-          "mx-auto w-fit max-w-full rounded-full border px-3 py-1 text-center text-[11px] font-bold backdrop-blur-sm",
-          pillCls,
+          "px-1 text-[12px] leading-[18px] [text-shadow:0_1px_3px_rgba(0,0,0,.95)]",
           fadeCls
         )}
       >
-        {m.kind === "winner" && "🏆 "}
-        {m.kind === "giveaway" && "🎁 "}
-        {m.kind === "system" && "📣 "}
-        {m.text}
-      </div>
+        {label && (
+          <span className="me-1 inline-flex translate-y-px">
+            <ChipTag tone={tone}>{label}</ChipTag>
+          </span>
+        )}
+        <span className="font-black" style={{ color: m.color }}>
+          {m.author}
+        </span>
+        <span
+          className={cn(
+            "text-white/95",
+            isBidLine && "font-bold text-amber-300"
+          )}
+        >
+          {" "}
+          {m.text}
+        </span>
+      </p>
     );
   }
 
   if (m.kind === "purchase") {
-    /* چت خریدمحور — هایلایت سبز (سؤال سایز و…) حفظ شده */
+    /* v1.3.2 — کادر سبز حذف شد: متن سفید ساده + چیپ کوچک نوع سؤال کنار نام کاربر */
     return (
-      <div
+      <p
         className={cn(
-          "rounded-xl border border-ls-green/45 bg-black/55 px-2.5 py-1.5 backdrop-blur-sm",
+          "px-1 text-[12px] leading-[18px] [text-shadow:0_1px_3px_rgba(0,0,0,.95)]",
           fadeCls
         )}
       >
-        {m.tag && (
-          <span className="mb-0.5 inline-flex rounded-full bg-ls-green/20 px-1.5 py-px text-[9px] font-bold text-ls-green">
-            {m.tag}
-          </span>
-        )}
-        <p className="text-[11px] leading-[18px]">
-          <span className="font-black" style={{ color: m.color }}>
-            {m.author}
-          </span>
-          <span className="font-bold text-ls-green"> {m.text}</span>
-        </p>
-      </div>
+        <span className="me-1 inline-flex translate-y-px">
+          <ChipTag tone="green">{m.tag ?? "سؤال"}</ChipTag>
+        </span>
+        <span className="font-black" style={{ color: m.color }}>
+          {m.author}
+        </span>
+        <span className="text-white/95"> {m.text}</span>
+      </p>
     );
   }
 
@@ -405,7 +440,14 @@ function LiveChatOverlay({ className }: { className?: string }) {
     .slice(-CHAT_MAX_VISIBLE);
 
   return (
-    <div className={cn("pointer-events-none flex flex-col justify-end gap-2", className)}>
+    <div
+      className={cn(
+        "pointer-events-none flex flex-col justify-end gap-2 rounded-2xl p-2",
+        /* v1.3.2 — گرادیان تیرهٔ ملایم پشت چت برای خوانایی */
+        "bg-[linear-gradient(to_top,rgba(0,0,0,.5),rgba(0,0,0,.2)_60%,transparent)]",
+        className
+      )}
+    >
       {/* پیام‌ها — متن سفید روی تصویر، حداکثر ~۴ پیام، قدیمی‌ها محو */}
       <div
         role="log"
@@ -507,6 +549,16 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
   const [bidOpen, setBidOpen] = useState(false);
   const [bidNonce, setBidNonce] = useState(0);
 
+  /* v1.3.2 — پالس قیمت هنگام تغییر بید (remount با key → انیمیشن ls-bid-pop) */
+  const [bidPulse, setBidPulse] = useState(0);
+  const prevBidRef = useRef(currentBid);
+  useEffect(() => {
+    if (currentBid !== prevBidRef.current) {
+      prevBidRef.current = currentBid;
+      setBidPulse((k) => k + 1);
+    }
+  }, [currentBid]);
+
   const item = items.find((i) => i.id === activeItemId) ?? null;
 
   const openBidSheet = () => {
@@ -534,11 +586,8 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
   }
 
   const photo = ITEM_PHOTO[item.id];
-  const meta = [
-    item.brand,
-    item.size ? `سایز ${item.size}` : null,
-    item.condition,
-  ]
+  /* v1.3.2 — خط ریز واحد: برند · سایز · هزینهٔ ارسال */
+  const meta = [item.brand, item.size ? `سایز ${item.size}` : null]
     .filter(Boolean)
     .join(" · ");
   const stockLabel =
@@ -550,79 +599,88 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
 
   return (
     <div className={cardCls}>
-      {/* ردیف ۱ — عکس گرد ۶۴px + نام/موجودی/شرح | قیمت درشت + تایمر */}
+      {/* ردیف ۱ — عکس گرد ۶۴px (با نشان کوچک تگ گوشهٔ عکس) + نام/موجودی/شرح | قیمت درشت + تایمر */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={goToProduct}
-          aria-label={`مشاهدهٔ محصول: ${item.title}`}
-          className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full ring-2 ring-white/20 hover:ring-ls-purple/60 transition-all"
-        >
-          {photo ? (
-            <Image
-              src={photo}
-              alt={`تصویر کالا: ${item.title}`}
-              fill
-              sizes="64px"
-              className="object-cover"
-            />
-          ) : (
-            <GradientCover
-              cover={item.cover}
-              className="h-full w-full"
-              emojiClassName="text-2xl"
-            />
+        <div className="relative shrink-0">
+          <button
+            onClick={goToProduct}
+            aria-label={`مشاهدهٔ محصول: ${item.title}`}
+            className="relative block h-16 w-16 overflow-hidden rounded-full ring-2 ring-white/20 hover:ring-ls-purple/60 transition-all"
+          >
+            {photo ? (
+              <Image
+                src={photo}
+                alt={`تصویر کالا: ${item.title}`}
+                fill
+                sizes="64px"
+                className="object-cover"
+              />
+            ) : (
+              <GradientCover
+                cover={item.cover}
+                className="h-full w-full"
+                emojiClassName="text-2xl"
+              />
+            )}
+          </button>
+          {/* v1.3.2 — تگ‌ها از کارت حذف شدند؛ یک نشان کوچک روی گوشهٔ عکس */}
+          {show.tags[0] && (
+            <span
+              className="absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-ls-purple px-1.5 py-px text-[8px] font-black text-white shadow-md"
+              aria-hidden
+            >
+              {show.tags[0]}
+            </span>
           )}
-        </button>
+        </div>
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-extrabold text-white">{item.title}</p>
-          <div className="mt-1 flex items-center gap-1.5">
-            <span
-              className={cn(
-                "text-[11px] font-bold",
-                item.status === "sold" ? "text-white/45" : "text-ls-green"
-              )}
-            >
-              {stockLabel}
-            </span>
-            {/* تگ‌ها داخل کارت — کوچک و بی‌آزار */}
-            {show.tags.slice(0, 2).map((t) => (
-              <span
-                key={t}
-                className="rounded-full bg-white/10 px-1.5 py-px text-[9px] font-bold text-white/70"
-              >
-                {t}
-              </span>
-            ))}
-          </div>
-          <p className="mt-1 truncate text-[10px] text-white/50">
+          <span
+            className={cn(
+              "mt-1 inline-block text-[11px] font-bold",
+              item.status === "sold" ? "text-white/55" : "text-ls-green"
+            )}
+          >
+            {stockLabel}
+          </span>
+          <p className="mt-1 truncate text-[10px] text-white/60">
             {meta} · ارسال {toman(item.shippingPrice)}
           </p>
         </div>
 
         <div className="flex shrink-0 flex-col items-end">
-          <span className="text-[9px] font-bold text-white/45">
+          <span className="text-[9px] font-bold text-white/55">
             {item.status === "auction" ? "بید فعلی" : "قیمت"}
           </span>
           <Price
+            key={item.status === "auction" ? bidPulse : "static"}
             amount={
               item.status === "auction"
                 ? currentBid
                 : item.buyNowPrice ?? item.soldPrice ?? item.startPrice
             }
-            className="text-[19px] leading-6 text-ls-purple-soft"
+            className={cn(
+              "text-[19px] leading-6 text-ls-purple-soft",
+              item.status === "auction" &&
+                "inline-block origin-bottom-right animate-ls-bid-pop"
+            )}
           />
           {item.status === "auction" && (
+            /* v1.3.2 — تایمر درشت (≥۱۸px بولد): زیر ۱۰ ثانیه قرمز پالس‌دار، زیر ۵ ثانیه بزرگ‌تر */
             <span
               className={cn(
-                "mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-extrabold tabular-nums",
+                "mt-1 inline-flex items-center gap-1 font-black leading-none tabular-nums transition-all",
                 timerSec <= 10
-                  ? "border-[#FF3B5C]/50 bg-[#FF3B5C]/15 text-[#FF3B5C] animate-ls-timer-alert"
-                  : "border-white/10 bg-white/10 text-white/80"
+                  ? cn(
+                      "text-[#FF3B5C] animate-ls-timer-alert",
+                      timerSec <= 5 ? "text-[21px]" : "text-[18px]"
+                    )
+                  : "text-[18px] text-white/85"
               )}
               aria-label={`زمان باقی‌ماندهٔ مزایده: ${faClock(timerSec)}`}
             >
-              <Clock className="h-3 w-3" aria-hidden />
+              <Clock className="h-4 w-4" aria-hidden />
               {faClock(timerSec)}
             </span>
           )}
@@ -658,7 +716,8 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
                 stop(e);
                 push("checkout", item.id);
               }}
-              className="h-12 shrink-0 whitespace-nowrap rounded-xl border border-ls-green/60 bg-ls-green/10 px-4 text-xs font-extrabold text-ls-green hover:bg-ls-green/20 active:scale-[.98] transition-all"
+              /* v1.3.2 — خرید فوری: دکمهٔ ثانویهٔ باریک‌تر، جدا از دکمهٔ بید */
+              className="h-12 shrink-0 whitespace-nowrap rounded-xl border border-ls-green/60 bg-ls-green/10 px-3 text-[11px] font-extrabold text-ls-green hover:bg-ls-green/20 active:scale-[.98] transition-all"
               aria-label="خرید فوری"
             >
               خرید فوری
@@ -986,11 +1045,12 @@ export default function LiveView() {
                 onSellerDash={() => setSellerDashOpen(true)}
               />
             </div>
-            <LiveChatOverlay className="absolute bottom-2 left-3 z-10 w-[min(272px,68%)]" />
+            <LiveChatOverlay className="absolute bottom-1 left-1.5 z-10 w-[min(300px,76%)]" />
           </div>
 
           {/* پیل برندهٔ فعلی + کارت پایین واحد — با رعایت safe-area */}
           <div className="relative z-20 shrink-0 px-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+          {/* پیل برندهٔ فعلی — دقیقاً ۸px بالاتر از کارت پایین (mb-2)، بدون تماس */}
             {(phase === "running" || phase === "sold") && (
               <div className="mb-2 flex justify-center">
                 <WinnerBanner winnerId={currentWinnerId} />

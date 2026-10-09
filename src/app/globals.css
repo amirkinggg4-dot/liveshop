@@ -248,3 +248,19 @@
 .animate-ls-kenburns {
   animation: ls-kenburns 26s ease-in-out infinite;
 }
+
+/* ── v1.3.2 — پالس کوتاه قیمت هنگام ثبت بید (scale 1.12، کمتر از ۴۰۰ms) ── */
+@keyframes ls-bid-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-ls-bid-pop {
+  animation: ls-bid-pop 380ms ease-out;
+}
