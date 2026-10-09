@@ -501,3 +501,25 @@ Stage Summary:
 - کامیت: https://github.com/amirkinggg4-dot/liveshop/commit/fe3529f5cde88935c54e34a2cee614d25d023598
 - عمداً منتشر نشد: .env، node_modules/، .next/، download/*.zip، upload/، tool-results/ — به‌جای .env فایل .env.example منتشر شد
 - توصیهٔ امنیتی: هر دو توکن fine-grained که کاربر در چت پیست کرده (قدیمی و جدید) پس از اطمینان از انتشار باید revoke شوند
+
+---
+Task ID: 8 (v1.3.2)
+Agent: main (Z.ai Code)
+Task: پالیش ظاهر اتاق لایو و خانه طبق مرجع Whatnot + اسکرین‌شات‌های موبایل + commit/push — بدون تغییر منطق/استور/دیتا
+
+Work Log:
+- الف) اتاق لایو (LiveView): کادر سبز پیام‌های سؤال حذف → متن سفید ساده + چیپ کوچک کنار نام (ChatLine بازنویسی + ChipTag جدید)؛ چیپ نوع برای system/winner/giveaway؛ گرادیان تیرهٔ ملایم پشت چت؛ تایمر ۱۸px بولد (≤۱۰ث قرمز پالس‌دار، ≤۵ث ۲۱px)؛ داک ساده (نام/۱ موجود/قیمت/خط ریز برند·سایز·ارسال)؛ تگ‌ها → نشان کوچک گوشهٔ عکس؛ خرید فوری باریک‌تر؛ پالس قیمت با ls-bid-pop ۳۸۰ms (key remount)؛ خطوط «بید … ثبت کرد» زرد؛ devIndicators: false در next.config
+- ب) خانه (HomeView): ردیف استوری «همین حالا زنده» (حلقهٔ conic برند + نشان زنده)؛ گرید دوسطحی LiveGridCard ۴:۵ با عکس تمام‌کارت/گرادیان پایین/بید+تایمر؛ چیپ‌های ۱۱px با snap؛ کارت‌های به‌زودی با عکس واقعی (photo prop به ShowCard/GradientCover — افزودنی)
+- ج) عمومی: SmartImg (اسکلت پالس‌دار + fade ۳۰۰ms)؛ SellerAvatar؛ کنتراست خاکستری‌ها /45-50→/55-65؛ CHAT_FADE ۸۰۰→۴۰۰ms؛ ls-bid-pop keyframe جدید در globals.css (تنها افزودنی)
+- رسانه: ۱۹ عکس واقعی با z-ai image تولید شد (۱۰ دسته، ۵ آواتار s2-s6، ۴ کالا) → media.ts گسترش (SHOW_PHOTO/CATEGORY_PHOTO کامل). نکته: فراخوانی موازی z-ai → 429؛ ترتیبی با ریترای شد
+- تأیید مرورگری ۳۹۰×۸۴۴ (agent-browser): خانه/لایو/شیت بید/سفارش‌ها ✓؛ خط زرد بید با بید ربات‌ها (بید شخصی به‌دلیل موجودی دموی ۲.۵M < ۵M ممکن نشد — همان مسیر کد pushChat) ✓؛ کلاس پالس روی قیمت ✓؛ فونت‌سایز تایمر ۱۸px ✓؛ nextjs-portal فقط STYLE نامرئی ✓؛ بدون خطای کنسول؛ lint تمیز
+- بید اول شخص به ۵٬۰۰۰٬۰۰۰ خطای «موجودی کافی نیست» داد و اعتبارسنجی شیت را هم تأیید کرد (رفتار درست)
+- اسکرین‌شات‌های موبایل جایگزین شد: home / live-room / live-room-bid-sheet-open / orders (دسکتاپ دست نخورد)
+- CHANGELOG.md ورودی v1.3.2 + آرشیو download/liveshop-v1.3.2.zip (۹.۵MB/۲۶۴ فایل — بدون node_modules/.next/.git/skills/upload/zips/.env)
+- commit «feat: v1.3.2 ui polish — …» (c4e550f، ۳۱ فایل) + push موفق به main؛ ls-remote == HEAD لوکال
+- نکتهٔ امنیتی: تطبیق «github_pat_» در کامیت خودکار worklog فقط کلمهٔ الگو در متن گزارش بود، نه توکن (ریجکس توکن کامل → خالی)
+
+Stage Summary:
+- v1.3.2 منتشر شد: https://github.com/amirkinggg4-dot/liveshop/commit/c4e550f84c41408fa15d2da5b5b0bf6da4cc9c7a
+- موارد حفظ‌شده (از قبل بود): حداکثر ۴ پیام/محو ۶ث، «تو پیشتی!» سبز، دکمهٔ آمار فقط برای صاحب شو، safe-area تب‌بار
+- صادقانه: چند عکس به‌ازای هر دسته نه — ۱ عکس برای هر ۱۰ دسته؛ وضعیت «شرط کالا» از خط ریز داک برداشته شد (در صفحهٔ محصول هست)؛ LiveBidBar حذف شد چون اطلاعات‌اش داخل LiveGridCard آمد (جابه‌جایی نه حذف قابلیت)؛ انیمیشن‌های محیطی بی‌پایان (ken-burns/pulse) طبق طراحی قبلی ماندند
