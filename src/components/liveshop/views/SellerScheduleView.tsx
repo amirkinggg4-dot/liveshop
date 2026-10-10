@@ -16,6 +16,7 @@ import {
   PageHeader,
   GradientCover,
   SectionTitle,
+  CategoryIcon,
 } from "@/components/liveshop/shared";
 import { AUCTION_ENABLED } from "@/lib/config";
 import { cn } from "@/lib/utils";
@@ -38,12 +39,12 @@ const HOUR_OPTIONS = ["۱۸:۰۰", "۲۰:۰۰", "۲۱:۰۰", "۲۲:۰۰", "۲۳:
 
 /* چیپ تک‌انتخابی (روز / ساعت / دسته‌بندی) */
 function PickChip({
-  label,
+  children,
   active,
   onClick,
   ariaLabel,
 }: {
-  label: string;
+  children: React.ReactNode;
   active: boolean;
   onClick: () => void;
   ariaLabel: string;
@@ -53,11 +54,11 @@ function PickChip({
       onClick={onClick}
       aria-pressed={active}
       aria-label={ariaLabel}
-      className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors active:scale-[.98] ${
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors active:scale-[.98] ${
         active ? "bg-ls-purple text-white" : "bg-ls-card-2 text-white/60 hover:text-white"
       }`}
     >
-      {label}
+      {children}
     </button>
   );
 }
@@ -182,11 +183,14 @@ export default function SellerScheduleView() {
             {CATEGORIES.map((c) => (
               <PickChip
                 key={c.id}
-                label={`${c.emoji} ${c.label}`}
                 active={category === c.label}
                 onClick={() => setCategory(c.label)}
                 ariaLabel={`دستهٔ ${c.label}`}
-              />
+              >
+                {/* v1.4.1 — آیکون خطی یکدست به‌جای ایموجی */}
+                <CategoryIcon id={c.id} className="h-3.5 w-3.5" />
+                {c.label}
+              </PickChip>
             ))}
           </div>
         </div>
@@ -200,11 +204,12 @@ export default function SellerScheduleView() {
             {DAY_OPTIONS.map((d) => (
               <PickChip
                 key={d}
-                label={d}
                 active={day === d}
                 onClick={() => setDay(d)}
                 ariaLabel={`روز ${d}`}
-              />
+              >
+                {d}
+              </PickChip>
             ))}
           </div>
           <div
@@ -214,11 +219,12 @@ export default function SellerScheduleView() {
             {HOUR_OPTIONS.map((h) => (
               <PickChip
                 key={h}
-                label={h}
                 active={hour === h}
                 onClick={() => setHour(h)}
                 ariaLabel={`ساعت ${h}`}
-              />
+              >
+                {h}
+              </PickChip>
             ))}
           </div>
         </div>

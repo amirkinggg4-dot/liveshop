@@ -23,7 +23,7 @@ import {
   ShowCard,
   LiveGridCard,
   SectionTitle,
-  Chip,
+  CategoryTile,
 } from "@/components/liveshop/shared";
 import type { Show } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
@@ -194,20 +194,18 @@ export default function HomeView() {
         </div>
       </section>
 
-      {/* چیپ‌های دسته‌بندی — v1.3.2: کوچک‌تر + اسکرول افقی روان */}
+      {/* v1.4.1 — دسته‌بندی‌ها: کارت‌های کوچک عکس‌دار (بدون ایموجی) در یک ردیف افقی اسکرولی */}
       <nav
-        className="flex snap-x gap-2 overflow-x-auto no-scrollbar"
+        className="flex snap-x gap-1.5 overflow-x-auto no-scrollbar pb-1"
         aria-label="دسته‌بندی‌های خرید"
       >
         {CATEGORIES.map((c) => (
-          <Chip
+          <CategoryTile
             key={c.id}
+            id={c.id}
+            label={c.label}
             onClick={() => setRoot("explore")}
-            className="shrink-0 snap-start px-2.5 py-1 text-[11px]"
-          >
-            <span aria-hidden>{c.emoji}</span>
-            {c.label}
-          </Chip>
+          />
         ))}
       </nav>
 

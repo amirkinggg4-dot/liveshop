@@ -7,8 +7,23 @@ import { toFa, toman, compactFa, faClock } from "@/lib/format";
 import type { Cover, ItemStatus, Show } from "@/lib/data/types";
 import { getSeller } from "@/lib/data/shows";
 import { getAuctionItem, getShowItems, getPinnedItem, stockLabelFa } from "@/lib/data/items";
-import { SHOW_PHOTO, SELLER_PHOTO } from "@/lib/data/media";
-import { ChevronRight, Star, Clock } from "lucide-react";
+import { CATEGORY_PHOTO, SHOW_PHOTO, SELLER_PHOTO } from "@/lib/data/media";
+import {
+  BookOpen,
+  ChevronRight,
+  Clock,
+  Footprints,
+  Gem,
+  Headphones,
+  Home as HomeIcon,
+  Layers,
+  Palette,
+  Puzzle,
+  Shirt,
+  Sprout,
+  Star,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ─────────────────────────── ابزارهای مشترک LiveShop ─────────────────────────── */
@@ -579,4 +594,86 @@ export function LiveGridCard({
 
 export function ViewerCount({ n }: { n: number }) {
   return <span>{compactFa(n)} بیننده</span>;
+}
+
+/* ── v1.4.1 — دسته‌بندی‌ها یکدست: ایموجی حذف، آیکون خطی lucide + عکس واقعی ──
+   CategoryIcon → آیکون خطی یکدست هر دسته (fallback همه‌جا)
+   CategoryTile → کارت کوچک عکس‌دار برای ردیف افقی اسکرولی (خانه و کاوش) */
+
+const CATEGORY_ICON: Record<string, LucideIcon> = {
+  sneakers: Footprints,
+  plants: Sprout,
+  cards: Layers,
+  tech: Headphones,
+  fashion: Shirt,
+  beauty: Gem,
+  home: HomeIcon,
+  toys: Puzzle,
+  books: BookOpen,
+  art: Palette,
+};
+
+export function CategoryIcon({
+  id,
+  className,
+}: {
+  id: string;
+  className?: string;
+}) {
+  const Icon = CATEGORY_ICON[id];
+  if (!Icon) return null;
+  return <Icon className={cn("h-4 w-4", className)} aria-hidden />;
+}
+
+export function CategoryTile({
+  id,
+  label,
+  onClick,
+  active,
+  subtitle,
+}: {
+  id: string;
+  label: string;
+  onClick?: () => void;
+  active?: boolean;
+  /** مثلا «۱۲۸ شو زنده» — در خانه مخفی تا کارت کوچک‌تر بماند */
+  subtitle?: string;
+}) {
+  const photo = CATEGORY_PHOTO[id];
+  return (
+    <button
+      onClick={onClick}
+      aria-label={`دستهٔ ${label}${subtitle ? ` — ${subtitle}` : ""}`}
+      aria-pressed={active}
+      className={cn(
+        "flex w-[76px] shrink-0 snap-start flex-col items-center gap-1 rounded-2xl border p-1.5 pb-2 text-center transition-all active:scale-[.97]",
+        active
+          ? "border-ls-purple bg-ls-purple/15"
+          : "border-transparent hover:bg-white/5"
+      )}
+    >
+      <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl ring-1 ring-white/10">
+        {photo ? (
+          <SmartImg
+            src={photo}
+            alt=""
+            sizes="56px"
+            className="object-cover"
+          />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center bg-ls-card-2">
+            <CategoryIcon id={id} className="h-6 w-6 text-ls-purple-soft" />
+          </span>
+        )}
+      </span>
+      <span className="w-full truncate text-[10px] font-bold leading-4 text-white/85">
+        {label}
+      </span>
+      {subtitle && (
+        <span className="text-[9px] font-bold leading-3 text-ls-pink tabular-nums">
+          {subtitle}
+        </span>
+      )}
+    </button>
+  );
 }

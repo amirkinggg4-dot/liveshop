@@ -803,20 +803,14 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
 
   return (
     <div className={cardCls}>
-      {/* v1.4 — پیل «کالای در حال نمایش» + انیمیشن کوتاه تعویض کالا */}
-      <div className="mb-2 flex items-center justify-between">
+      {/* v1.4 — پیل «کالای در حال نمایش» + انیمیشن کوتاه تعویض کالا
+          v1.4.1 — چیپ تگ شو (که برای این شوها «قیمت ثابت» است) از کارت پایین حذف شد تا
+          برچسب «قیمت ثابت» فقط روی کارت‌های شیت Shop دیده شود */}
+      <div className="mb-2">
         <span className="inline-flex items-center gap-1 rounded-full bg-ls-purple/25 px-2.5 py-1 text-[10px] font-extrabold text-ls-purple-soft">
           <span className="h-1.5 w-1.5 rounded-full bg-ls-purple-soft animate-ls-pulse" aria-hidden />
           کالای در حال نمایش
         </span>
-        {show.tags[0] && (
-          <span
-            className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[9px] font-bold text-white/75"
-            aria-hidden
-          >
-            {show.tags[0]}
-          </span>
-        )}
       </div>
 
       <div key={`${item.id}-${pinnedAt}`} className="animate-ls-fade-up">
@@ -863,8 +857,8 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
             </p>
           </div>
 
+          {/* v1.4.1 — برچسب «قیمت ثابت» فقط روی کارت‌های شیت Shop است؛ اینجا فقط قیمت */}
           <div className="flex shrink-0 flex-col items-end">
-            <span className="text-[9px] font-bold text-white/55">قیمت ثابت</span>
             <Price amount={item.price} className="text-[19px] leading-6 text-ls-green" />
           </div>
         </div>

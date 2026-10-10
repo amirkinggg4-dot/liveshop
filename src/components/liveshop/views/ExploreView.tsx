@@ -15,6 +15,8 @@ import {
   Avatar,
   RatingStars,
   EmptyState,
+  CategoryIcon,
+  CategoryTile,
 } from "@/components/liveshop/shared";
 import { SavedSearchesRow } from "@/components/liveshop/saved-searches";
 import PreBidSheet from "@/components/liveshop/pre-bid-sheet";
@@ -272,7 +274,7 @@ export default function ExploreView() {
               aria-label="حذف فیلتر دسته‌بندی"
               className="self-start inline-flex items-center gap-1.5 rounded-full bg-ls-purple text-white px-3 py-1.5 text-xs font-bold hover:bg-ls-purple-deep transition-colors"
             >
-              <span aria-hidden>{activeCat.emoji}</span>
+              <CategoryIcon id={activeCat.id} className="h-3.5 w-3.5" />
               {activeCat.label}
               <X className="w-3.5 h-3.5" aria-hidden />
             </button>
@@ -280,22 +282,17 @@ export default function ExploreView() {
 
           <section aria-label="دسته‌بندی‌ها">
             <SectionTitle title="دسته‌بندی‌ها" icon="🧭" />
-            <div className="grid grid-cols-2 gap-3">
+            {/* v1.4.1 — کارت‌های کوچک عکس‌دار (بدون ایموجی) در یک ردیف افقی اسکرولی — مثل خانه */}
+            <div className="flex snap-x gap-1.5 overflow-x-auto no-scrollbar pb-1">
               {CATEGORIES.map((c) => (
-                <button
+                <CategoryTile
                   key={c.id}
+                  id={c.id}
+                  label={c.label}
+                  subtitle={`${faNum(c.liveCount)} شو زنده`}
+                  active={activeCat?.id === c.id}
                   onClick={() => setActiveCat(c)}
-                  aria-label={`فیلتر دستهٔ ${c.label}`}
-                  className="bg-ls-card border border-white/5 rounded-2xl p-4 text-right hover:border-ls-purple/40 transition-colors active:scale-[.98]"
-                >
-                  <span className="text-3xl" aria-hidden>
-                    {c.emoji}
-                  </span>
-                  <p className="font-bold text-sm mt-2">{c.label}</p>
-                  <p className="text-xs text-ls-pink font-bold mt-0.5">
-                    {faNum(c.liveCount)} شو زنده
-                  </p>
-                </button>
+                />
               ))}
             </div>
           </section>

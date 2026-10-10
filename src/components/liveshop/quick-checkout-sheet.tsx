@@ -1,13 +1,14 @@
 "use client";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   QuickCheckoutSheet — خرید سریع با قیمت ثابت (v1.4)
+   QuickCheckoutSheet — خرید سریع با قیمت ثابت (v1.4 / v1.4.1 ظاهر)
    با زدن «خرید» از پایین باز می‌شود:
-   ─ انتخاب سایز/رنگ (در صورت وجود — بدون انتخاب، پرداخت خطا می‌دهد)
+   ─ انتخاب سایز/رنگ (دکمه‌های ≥۴۸px، موجودی هر سایز زیر دکمه با فونت خوانا)
    ─ تعداد (تا سقف موجودی زندهٔ همین لحظه)
    ─ آدرس ذخیره‌شدهٔ پیش‌فرض
    ─ روش ارسال (تیپاکس/پست پیشتاز/پیک شهری) با هزینه
    ─ جمع کل شامل ارسال + موجودی کیف پول با لینک شارژ
+   ─ «پرداخت» در فوتر چسبان پایین شیت — محتوا بالایش اسکرول می‌شود
    ─ «پرداخت» → کسر امانی از کیف پول + سفارش با تایم‌لاین امانی +
      کانفتی کوتاه + پیام «خرید شما ثبت شد» + خط چت «علی ✅ خرید کرد»
    خطاها: موجودی کیف پول کم / کالا تمام شد / سایز انتخاب نشده
@@ -126,22 +127,23 @@ export default function QuickCheckoutSheet({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="bg-ls-card border-t border-ls-green/30 rounded-t-3xl">
+      {/* v1.4.1 — ارتفاع ثابت: محتوا در وسط اسکرول می‌شود، «پرداخت» در فوتر چسبان همیشه دیده می‌شود */}
+      <DrawerContent className="h-[85vh] bg-ls-card border-t border-ls-green/30 rounded-t-3xl">
         {celebrate > 0 && <Confetti key={celebrate} />}
-        <DrawerHeader className="text-right pb-2">
+        <DrawerHeader className="shrink-0 pb-2 text-right">
           <DrawerTitle className="flex items-center gap-2 text-base font-black">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-ls-green/15 text-sm" aria-hidden>
               🛒
             </span>
             خرید سریع
-            <span className="text-[11px] font-medium text-white/45">قیمت ثابت</span>
           </DrawerTitle>
           <DrawerDescription className="sr-only">
             انتخاب سایز، تعداد، آدرس و روش ارسال و پرداخت امانی از کیف پول
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="flex flex-col gap-4 px-4 pb-[max(env(safe-area-inset-bottom),16px)] pt-1 max-h-[80vh] overflow-y-auto scroll-thin">
+        {/* ── ناحیهٔ اسکرول‌شونده ── */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-1 pb-4 scroll-thin">
           {/* ── خلاصهٔ کالا ── */}
           <div className="flex items-center gap-3 rounded-2xl bg-ls-card-2 border border-white/5 p-3">
             <GradientCover
@@ -162,45 +164,49 @@ export default function QuickCheckoutSheet({
             <Price amount={current.price} className="shrink-0 text-sm text-ls-green" />
           </div>
 
-          {/* ── سایز/رنگ ── */}
+          {/* ── سایز/رنگ — v1.4.1: دکمه‌های ≥۴۸px، موجودی هر گزینه زیر دکمه با فونت خوانا ── */}
           {current.variants && current.variants.length > 0 && (
             <div role="radiogroup" aria-label="انتخاب سایز یا رنگ">
               <p className="mb-2 text-xs font-extrabold text-white/80">سایز / رنگ</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-x-2 gap-y-2.5">
                 {current.variants.map((v) => {
                   const active = variant === v.label;
                   const out = v.stock <= 0;
+                  const low = !out && v.stock < 3;
                   return (
-                    <button
-                      key={v.label}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      disabled={out}
-                      onClick={() => {
-                        setVariantRaw(v.label);
-                        changeQty(1);
-                      }}
-                      aria-label={`انتخاب ${v.label} — ${stockLabelFa(v.stock)}`}
-                      className={cn(
-                        "rounded-xl border px-3 py-2 text-xs font-bold transition-all active:scale-[.97]",
-                        out
-                          ? "cursor-not-allowed border-white/10 bg-white/5 text-white/30 line-through"
-                          : active
-                            ? "border-ls-purple bg-ls-purple/20 text-white shadow-[0_0_12px_rgba(108,92,255,.35)]"
-                            : "border-white/15 bg-ls-card-2 text-white/75 hover:border-ls-purple/50"
-                      )}
-                    >
-                      {v.label}
-                      <span
+                    <div key={v.label} className="flex min-w-[64px] flex-col items-center gap-1">
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        disabled={out}
+                        onClick={() => {
+                          setVariantRaw(v.label);
+                          changeQty(1);
+                        }}
+                        aria-label={`انتخاب ${v.label}`}
                         className={cn(
-                          "mr-1.5 text-[9px] font-medium",
-                          out ? "text-white/25" : active ? "text-ls-green" : "text-white/40"
+                          "flex min-h-12 min-w-12 items-center justify-center rounded-xl border px-3.5 text-sm font-bold transition-all active:scale-[.97]",
+                          out
+                            ? "cursor-not-allowed border-white/10 bg-white/5 text-white/30 line-through"
+                            : active
+                              ? "border-ls-purple bg-ls-purple/20 text-white shadow-[0_0_12px_rgba(108,92,255,.35)]"
+                              : "border-white/15 bg-ls-card-2 text-white/75 hover:border-ls-purple/50"
                         )}
                       >
-                        {out ? "تمام" : faNum(v.stock)}
+                        {v.label}
+                      </button>
+                      {/* موجودی همین سایز — زیر دکمه، فونت خوانا */}
+                      <span
+                        className={cn(
+                          "text-[11px] font-bold leading-4",
+                          out ? "text-white/35" : low ? "text-amber-300" : "text-ls-green"
+                        )}
+                        aria-live="polite"
+                      >
+                        {out ? "تمام شد" : `${faNum(v.stock)} عدد`}
                       </span>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -343,15 +349,17 @@ export default function QuickCheckoutSheet({
               پول تو به‌صورت امانی نزد لحظه می‌ماند و بعد از تحویل به فروشنده آزاد می‌شود.
             </p>
           </div>
+        </div>
 
-          {/* ── دکمهٔ پرداخت ── */}
+        {/* ── v1.4.1 — فوتر چسبان: دکمهٔ «پرداخت» همیشه پایین شیت دیده می‌شود ── */}
+        <div className="shrink-0 border-t border-white/10 bg-ls-card px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)]">
           <button
             type="button"
             onClick={pay}
             disabled={soldOut}
             aria-label={soldOut ? "کالا تمام شد" : `پرداخت ${toman(total)} از کیف پول`}
             className={cn(
-              "h-13 w-full rounded-xl py-3.5 text-sm font-black transition-all active:scale-[.98]",
+              "flex h-13 w-full items-center justify-center rounded-xl py-3.5 text-sm font-black transition-all active:scale-[.98]",
               soldOut
                 ? "cursor-not-allowed bg-white/10 text-white/40"
                 : short
