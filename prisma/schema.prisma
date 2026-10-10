@@ -1,32 +1,345 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// LiveShop — real backend schema (PostgreSQL)
+// Money: whole Toman. Prices use Int; wallet/ledger use BigInt.
+// IMPORTANT: the raw-SQL constraints (stock >= 0 and one pinned item per
+// show) live in the first migration: prisma/migrations/<ts>_init/migration.sql
+//   ALTER TABLE "Variant"        ADD CONSTRAINT stock_nonneg CHECK (stock >= 0);
+//   CREATE UNIQUE INDEX one_pinned_per_show ON "ShowItem" ("showId") WHERE "pinned";
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ───────── Users & auth ─────────
+enum Role {
+  BUYER
+  SELLER
+  ADMIN
 }
 
-model Post {
+enum SellerStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+model User {
+  id             String         @id @default(cuid())
+  phone          String         @unique // login by SMS OTP
+  name           String?
+  avatarUrl      String?
+  role           Role           @default(BUYER)
+  createdAt      DateTime       @default(now())
+  seller         SellerProfile?
+  addresses      Address[]
+  orders         Order[]        @relation("BuyerOrders")
+  messages       ChatMessage[]
+  follows        Follow[]       @relation("Follower")
+  accounts       Account[]
+  refreshTokens  RefreshToken[]
+}
+
+model OtpCode {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  requestIp String? // rate limit per IP (spec §1: 3 per 10 min per phone and per IP)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@index([phone, createdAt])
+  @@index([requestIp, createdAt])
+}
+
+// Rotating refresh tokens (spec §1: POST /auth/refresh rotates the token).
+// Stored hashed (sha256) — the raw token is only ever seen by the client.
+// Reuse of a rotated/expired token revokes every session of that user.
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Address {
+  id          String  @id @default(cuid())
+  userId      String
+  user        User    @relation(fields: [userId], references: [id])
+  receiver    String
+  phone       String
+  province    String
+  city        String
+  addressLine String
+  postalCode  String
+  isDefault   Boolean @default(false)
+}
+
+// ───────── Sellers ─────────
+model SellerProfile {
+  id             String       @id @default(cuid())
+  userId         String       @unique
+  user           User         @relation(fields: [userId], references: [id])
+  shopName       String
+  slug           String       @unique
+  bio            String?
+  avatarUrl      String? // storefront/live card avatar (public media path or URL)
+  status         SellerStatus @default(PENDING)
+  nationalIdHash String? // KYC data: store minimal, encrypted at rest
+  iban           String? // sheba, for payouts
+  ratingAvg      Float        @default(0)
+  ratingCount    Int          @default(0)
+  products       Product[]
+  shows          Show[]
+  followers      Follow[]     @relation("Followed")
+  createdAt      DateTime     @default(now())
+}
+
+model Follow {
+  followerId String
+  sellerId   String
+  follower   User          @relation("Follower", fields: [followerId], references: [id])
+  seller     SellerProfile @relation("Followed", fields: [sellerId], references: [id])
+
+  @@id([followerId, sellerId])
+}
+
+// ───────── Catalog ─────────
+model Category {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  nameFa   String
+  products Product[]
+  shows    Show[]
+}
+
+model Product {
+  id          String        @id @default(cuid())
+  sellerId    String
+  seller      SellerProfile @relation(fields: [sellerId], references: [id])
+  categoryId  String
+  category    Category      @relation(fields: [categoryId], references: [id])
+  title       String
+  description String?
+  brand       String?
+  images      String[] // object-storage keys
+  price       Int // fixed price, Toman
+  weightGram  Int?
+  isDraft     Boolean       @default(true)
+  variants    Variant[]
+  showItems   ShowItem[]
+  createdAt   DateTime      @default(now())
+
+  @@index([sellerId, isDraft])
+}
+
+model Variant {
+  id            String      @id @default(cuid())
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id])
+  label         String // e.g. "42 / مشکی"
+  sku           String?
+  stock         Int // must stay >= 0 (CHECK constraint)
+  priceOverride Int?
+  orderItems    OrderItem[]
+}
+
+// ───────── Shows & live ─────────
+enum ShowStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELED
+}
+
+model Show {
+  id          String        @id @default(cuid())
+  sellerId    String
+  seller      SellerProfile @relation(fields: [sellerId], references: [id])
+  categoryId  String
+  category    Category      @relation(fields: [categoryId], references: [id])
+  title       String
+  coverUrl    String?
+  status      ShowStatus    @default(SCHEDULED)
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  endedAt     DateTime?
+  livekitRoom String?       @unique
+  peakViewers Int           @default(0)
+  items       ShowItem[]
+  messages    ChatMessage[]
+  createdAt   DateTime      @default(now()) // stable keyset ordering for /shows feed
+
+  @@index([status, scheduledAt])
+}
+
+model ShowItem {
+  id        String  @id @default(cuid())
+  showId    String
+  show      Show    @relation(fields: [showId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  position  Int
+  pinned    Boolean @default(false) // exactly one pinned item per live show (partial unique index)
+  soldCount Int     @default(0)
+
+  @@unique([showId, productId])
+  @@index([showId, position])
+}
+
+enum MessageKind {
+  TEXT
+  QUESTION_SHIPPING
+  QUESTION_SIZE
+  QUESTION_PRICE
+  SYSTEM
+  PURCHASE
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  showId    String
+  show      Show        @relation(fields: [showId], references: [id])
+  userId    String?
+  user      User?       @relation(fields: [userId], references: [id])
+  kind      MessageKind @default(TEXT)
+  body      String
+  createdAt DateTime    @default(now())
+
+  @@index([showId, createdAt])
+}
+
+// ───────── Orders & escrow ─────────
+enum OrderStatus {
+  PAID_HELD // money is in escrow
+  READY_TO_SHIP
+  SHIPPED
+  DELIVERED
+  RELEASED // escrow paid to seller
+  DISPUTED
+  REFUNDED
+  CANCELED
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  idempotencyKey String      @unique // client-generated, prevents double purchase
+  buyerId        String
+  buyer          User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId       String
+  showId         String?
+  status         OrderStatus @default(PAID_HELD)
+  itemsTotal     Int
+  shippingFee    Int
+  commission     Int // platform fee, computed at purchase
+  total          Int
+  addressSnapshot Json
+  shipDeadline   DateTime // seller must ship before this
+  items          OrderItem[]
+  shipment       Shipment?
+  dispute        Dispute?
+  createdAt      DateTime    @default(now())
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, status])
+}
+
+model OrderItem {
+  id            String  @id @default(cuid())
+  orderId       String
+  order         Order   @relation(fields: [orderId], references: [id])
+  variantId     String
+  variant       Variant @relation(fields: [variantId], references: [id])
+  titleSnapshot String
+  unitPrice     Int
+  qty           Int
+}
+
+model Shipment {
+  id           String    @id @default(cuid())
+  orderId      String    @unique
+  order        Order     @relation(fields: [orderId], references: [id])
+  carrier      String // tipax | post | courier
+  trackingCode String?
+  shippedAt    DateTime?
+  deliveredAt  DateTime?
+}
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED_REFUND
+  RESOLVED_RELEASE
+}
+
+model Dispute {
+  id        String        @id @default(cuid())
+  orderId   String        @unique
+  order     Order         @relation(fields: [orderId], references: [id])
+  reason    String
+  status    DisputeStatus @default(OPEN)
+  createdAt DateTime      @default(now())
+}
+
+// ───────── Wallet & double-entry ledger ─────────
+enum AccountType {
+  USER_WALLET
+  ESCROW
+  PLATFORM_REVENUE
+  SELLER_PAYABLE
+  GATEWAY_CLEARING
+}
+
+model Account {
+  id      String        @id @default(cuid())
+  type    AccountType
+  userId  String?
+  user    User?         @relation(fields: [userId], references: [id])
+  entries LedgerEntry[]
+
+  @@unique([type, userId])
+}
+
+enum LedgerKind {
+  TOPUP
+  PURCHASE_HOLD
+  ESCROW_RELEASE
+  COMMISSION
+  REFUND
+  PAYOUT
+}
+
+// Every business transaction = 2+ entries with the same txnId whose amounts sum to 0.
+// Balance of an account = SUM(amount). Never UPDATE or DELETE entries.
+model LedgerEntry {
+  id         String     @id @default(cuid())
+  txnId      String
+  accountId  String
+  account    Account    @relation(fields: [accountId], references: [id])
+  amount     BigInt // signed
+  kind       LedgerKind
+  orderId    String?
+  gatewayRef String? // payment gateway reference
+  createdAt  DateTime   @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([txnId])
+}
+
+model Report {
+  id           String   @id @default(cuid())
+  reporterId   String
+  showId       String?
+  targetUserId String?
+  reason       String
+  resolved     Boolean  @default(false)
+  createdAt    DateTime @default(now())
 }

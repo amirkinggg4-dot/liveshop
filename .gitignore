@@ -62,3 +62,7 @@ server.log
 /tool-results/
 # فایل نمونهٔ env باید commit شود
 !.env.example
+
+# --- backend phase 1: Postgres لوکال (سندباکس/دسکتاپ) ---
+/db/postgres/
+/db/pg-runner.log

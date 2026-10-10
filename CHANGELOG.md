@@ -5,6 +5,39 @@
 
 ---
 
+## [backend-phase-1] — Postgres، ورود با OTP و API کالا/شو (بدون هیچ تغییر UI)
+
+پیاده‌سازی «مرحلهٔ ۱» بک‌اند مطابق قرارداد `docs/api-spec.md` (v0.1) — **UI/استورها/دیتای mock دقیقاً دست‌نخورده** (رگرسیون مرورگری انجام شد):
+
+### دیتابیس: SQLite → PostgreSQL
+- `prisma/schema.prisma` به provider `postgresql` مهاجرت کرد (اسکیمای ارائه‌شده به‌عنوان مبنای واقعی بک‌اند).
+- migration اول (`prisma/migrations/…_init`) شامل قیود raw-SQL اسپک: `CHECK (stock >= 0)` روی Variant و partial unique index «حداکثر یک کالای پین‌شده در هر شو».
+- `scripts/dev-postgres.ts` + `bun run postgres`: سرور Postgres 17 واقعی از پیش‌ساخته (بدون نصب سیستم‌عاملی؛ داده‌ها در `db/postgres/` — gitignored). `.env.example` با `DATABASE_URL` و `AUTH_SECRET` جدید.
+- افزوده‌های کوچک به اسکیما (با دلیل، در کامنت‌ها): `RefreshToken` (چرخش توکن §1)، `OtpCode.requestIp` (محدودیت per-IP §1)، `SellerProfile.avatarUrl`، `Show.createdAt` (cursor پایدار فید).
+
+### احراز هویت با OTP (بخش ۱ اسپک)
+- `POST /api/v1/auth/otp/request` — کد ۶رقمی با عمر ۲ دقیقه، هش HMAC-SHA256، حداکثر ۵ تلاش، یک‌بارمصرف؛ محدودیت نرخ **۳ در ۱۰ دقیقه به‌ازای هر شماره و هر IP** (429). بدون provider پیامک، کد به کنسول می‌رود و `devCode` در پاسخ dev برمی‌گردد؛ با `KAVENEGAR_API_KEY` ارسال واقعی.
+- `POST /api/v1/auth/otp/verify` — ساخت کاربر در اولین ورود؛ خروجی `{accessToken, refreshToken, expiresIn, user, isNewUser}`.
+- `POST /api/v1/auth/refresh` — چرخش refresh (ذخیرهٔ هش SHA-256)؛ **تشخیص reuse**: استفادهٔ دوباره از توکن چرخیده، کل نشست‌های کاربر را باطل می‌کند.
+- `GET/PATCH /api/v1/me` — پروفایل + موجودی کیف پول از دفترکل دوبل (`SUM(LedgerEntry)`).
+
+### API کالا و شو — Discovery (بخش ۲ اسپک)
+- `GET /api/v1/categories` با تعداد شوهای زنده.
+- `GET /api/v1/shows?status=&category=&cursor=&limit=` — کارت‌ها شامل فروشنده/دسته و **قیمت + موجودی کالای پین‌شده**؛ pagination کلیدی (keyset).
+- `GET /api/v1/shows/:id` — شو + آیتم‌ها با واریانت‌ها (موجودی و قیمت مؤثر) + کالای پین‌شده.
+- `GET /api/v1/sellers/:slugOrId` — ویترین فروشنده (کالاها/شوها/فالوورها + `isFollowing` اختیاری).
+- `POST/DELETE /api/v1/sellers/:id/follow` (نیازمند توکن؛ ممنوعیت فالو خود).
+- `GET /api/v1/search?q=` — جستجوی فارسی/بی‌حساس‌به‌حرف در شوها، فروشندگان و کالاها.
+- قرارداد خطا در همهٔ مسیرها: `{ "error": { "code", "message" } }` با پیام فارسی؛ اعتبارسنجی zod.
+
+### زیرساخت و تست
+- کتابخانه‌های سرور: `src/lib/server/{http,auth,otp,shows}.ts`.
+- `prisma/seed.ts` + `bun run db:seed`: همان دنیای mock اپ — ۵ فروشنده، ۱۰ دسته، ۱۰ کالا/۲۸ واریانت، ۳ شو LIVE + ۱ SCHEDULED + ۱ ENDED، خریدار دمو با کیف پول ۵٬۰۰۰٬۰۰۰ تومانی (دفترکل دوبل).
+- صحت‌سنجی E2E: **۲۹/۲۹ تست پاس** (جریان کامل OTP، reuse refresh، هر دو محدودیت نرخ، pagination، follow، جستجو، قرارداد خطا) + تأیید مرورگری که UI سالم است.
+- مستندات: `docs/BACKEND.md` (راه‌اندازی + جریان OTP + نمونه‌ها) و `docs/api-spec.md` (قرارداد)؛ بخش بک‌اند به README اضافه شد.
+
+---
+
 ## [v1.4.1] — اصلاحات ظاهری (فقط UI؛ منطق/استورها/دیتای mock دست نخورد)
 
 ۶ اصلاح ظاهری روی v1.4 — هیچ منطق، استور یا داده‌ای تغییر نکرد:

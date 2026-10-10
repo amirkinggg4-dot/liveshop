@@ -567,3 +567,27 @@ Stage Summary:
 - v1.4.1 = فقط ظاهر: ۶ مورد درخواستی کاربر اعمال/تأیید شد؛ هیچ استور/منطق/دیتایی تغییر نکرد (categories.ts با ایموجی سرجایش است)
 - «قیمت ثابت» حالا دقیقاً یک جاست: کارت‌های شیت Shop
 - صادقانه: ۱) ویدیوی حلقه‌ای فروشنده انجام نشد چون فایل ویدیوی نمونه در public/ نیست (شرط کاربر) — عکس ثابت ماند ۲) اسکرین‌شات‌های دسکتاپ هنوز از v1.3 هستند (خارج از درخواست) ۳) موجودی/کیف پول دمو در جریان تست تغییر کرد (mock، با رفرش به seed برنمی‌گردد) ۴) کیف پول برای اسکرین‌شات سبز از UI شارژ شد
+
+---
+Task ID: 11 (backend-phase-1)
+Agent: main (Z.ai Code)
+Task: فقط مرحلهٔ ۱ بک‌اند — PostgreSQL واقعی، ورود با OTP و API کالا/شو (بخش‌های ۱ و ۲ قرارداد api-spec.md)؛ بدون دست‌زدن به UI. کاربر کد را پس از push می‌خواند.
+
+Work Log:
+- وضعیت گیت: main لوکال = dc0ca3e (v1.4.1) و ls-remote نشان داد remote هم همان است (only tracking ref stale بود)؛ چیزی برای push قبلی نمانده بود.
+- دو فایل آپلودی کاربر خوانده شد: upload/api-spec.md (قرارداد v0.1 — پایهٔ /api/v1، Bearer JWT ۱۵دقیقه+refresh، خطاها {error:{code,message}} فارسی) و upload/schema.prisma (اسکیمای هدف PostgreSQL).
+- دیتابیس: Postgres در سندباکس نصب نبود و پروسه‌های spawn از tool calls بین فراخوانی‌ها کشته می‌شوند (تست کنترل‌شده با sleep تأیید شد) → بستهٔ embedded-postgres@17.10 (PostgreSQL 17.10 واقعی) + scripts/dev-postgres.ts (idempotent؛ cluster در db/postgres/، gitignored). نکتهٔ سندباکس: DATABASE_URL قدیمی sqlite در env صادر می‌شود و بر .env اولویت دارد → همهٔ عملیات CLI/سرور با override درون‌خطی.
+- اسکیما: فایل کاربر عیناً ملاک شد + ۴ افزودن مستندشده: RefreshToken (چرخش §1)، OtpCode.requestIp (rate per-IP §1)، SellerProfile.avatarUrl (ویترین)، Show.createdAt (keyset cursor فید /shows — مدل Show createdAt نداشت). قیود raw-SQL اسپک (stock_nonneg CHECK + one_pinned_per_show partial unique index) به انتهای migration اول append شد و migrate reset/dev دوباره اجرا شد.
+- کتابخانه‌های سرور در src/lib/server: http.ts (ApiError + قرارداد خطا + handle wrapper + zod parseBody)، auth.ts (jose HS256، access ۱۵دقیقه، refresh ۳۰روزه هش‌شده، rotateSession با تشخیص reuse و باطل‌سازی کل خانواده، requireUser/getOptionalUser، walletBalance از SUM(LedgerEntry))، otp.ts (نرمال‌سازی 09/+98/0098، هش HMAC، TTL ۲دقیقه، ۵ تلاش، یک‌بارمصرف، rate 3/10min per phone و per IP، ارسال Kavenegar یا کنسول+devCode)، shows.ts (include و سریالایز کارت شو با قیمت/موجودی پین).
+- مسیرها (۱۰ فایل در src/app/api/v1): auth/otp/request، auth/otp/verify، auth/refresh، me (GET/PATCH)، categories، shows (فیلتر status/category + cursor keyset + limit)، shows/[id]، sellers/[idOrSlug] (storefront؛ fallback id)، sellers/[idOrSlug]/follow (POST/DELETE + CANNOT_FOLLOW_SELF)، search؛ و بازنویسی /api به health با ping دیتابیس. باگ مسیر Next: [slug] و [id] هم‌سطح مجاز نیستند → یکسان‌سازی به [idOrSlug].
+- باگ منطقی که در تست خودش را نشان داد: deleteMany سراسری phone در requestOtp شمارندهٔ rate را صفر می‌کرد → حذف شد (فقط ردیف‌های منقضی پاک می‌شوند؛ verify فقط ردیف همان کد را می‌سوزاند) تا «۳ درخواست در پنجره» واقعاً برقرار باشد.
+- seed (prisma/seed.ts + bun run db:seed): TRUNCATE همهٔ جدول‌ها + همان دنیای mock اپ: ۱۰ دسته، ۵ فروشندهٔ APPROVED (سینا/مینا/کلکسیون‌یار/گجت‌بازار/عطر و نگین با عکس‌های public/liveshop)، ۱۰ کالا با ۲۸ واریانت سایز (دانک پاندا/سامبا/جردن ۱/NB۵۳۰/مونسترا/فیکوس/کارت پیکاچو/فیگور/هدفون/عود)، ۳ شو LIVE + ۱ SCHEDULED + ۱ ENDED هرکدام با یک پین، خریدار دمو 09121234567 با کیف پول ۵٬۰۰۰٬۰۰۰ (دو ردیف Ledger با txnId مشترک جمعاً صفر).
+- تست E2E (اسکریپت fetch خارج از ریپو در ~/tmp-tests — هیچ تستی commit نشد): ۲۹/۲۹ پاس شامل devCode، کد غلط→INVALID_OTP، verify→tokens، me+wallet، patch نام، چرخش refresh، reuse→401 INVALID_REFRESH_TOKEN، ابطال خانواده، 3+1 rate (per phone) و per-IP، categories، shows LIVE/SCHEDULED+category، cursor pagination، جزئیات شو، storefront، follow/unfollow/401، جستجوی فارسی، ۴ قرارداد خطا. نکته: پنجرهٔ rate در DB ماندگار است → re-seed قبل از هر run.
+- رگرسیون UI: git status فقط فایل‌های بک‌اند (هیچ فایل components/store/data/format/config/page/layout/globals) + تأیید مرورگری ۳۹۰×۸۴۴ که خانه با همان استورهای mock کامل رندر می‌شود و کنسول تمیز است.
+- tsc پاک (فقط خطاهای vendored examples/skills قدیمی خارج از محدوده) و lint پاک.
+- مستندات: docs/api-spec.md (کپی قرارداد کاربر)، docs/BACKEND.md (راه‌اندازی postgres/deploy/seed، جریان OTP، نمونه‌ها، امنیت، لیست افزوده‌های اسکیما با دلیل)، README بخش «بک‌اند»، CHANGELOG ورودی [backend-phase-1] (سرفصل v1.4.1 در جایگزینی حذف شده بود که فوراً بازگردانده شد).
+
+Stage Summary:
+- مرحلهٔ ۱ کامل شد و push شد: Postgres واقعی (17.10) + migration با قیود بیزینسی + OTP login با تمام قیود اسپک + Discovery API کالا/شو با کارت «قیمت+موجودی کالای پین‌شده» — UI صفر درصد تغییر کرد.
+- تصمیم‌های مهم برای مرحلهٔ ۲: بخش ۴ (چک‌اوت) روی همین Account/Ledger و CHECK stock می‌نشیند؛ بخش ۳ (اتاق لایو) روی show:{id} socket؛ devCode فقط وقتی KAVENEGAR_API_KEY خالی است؛ refreshها هش‌شده و family-revocable.
+- نکات سندباکس برای ایجنت‌های بعدی: پروسه‌های طولانی بین tool calls زنده نمی‌مانند (mega-call لازم)؛ DATABASE_URL صادرشده باید inline override شود؛ Postgres cluster در db/postgres/ (gitignored) ماندگار است.
