@@ -651,3 +651,27 @@ Work Log:
 Stage Summary:
 - v1.6.1 کامل: هر ۹ خواسته پیاده شد؛ خانه دیگر به LIVE_SHOWS وصل نیست (useLiveShows/useCategories با cursor pagination)؛ هیچ صفحهٔ دیگری بازطراحی نشد (فقط مصرف نیت در کاوش + پراپ‌های اختیاری مشترک)
 - صادقانه: شمارش نسبی از mock می‌آید (نه scheduledAt واقعی)؛ در حالت API واقعی isFollowing=false و کاور/آواتار به URL واقعی وابسته‌اند (fallback دارد)؛ SoonBadge کاور به‌زودی‌ها همچنان ایموجی 🕒 دارد (کامپوننت مشترک با کاوش — خارج از محدوده)؛ در ?state=error|empty سربرگ تعداد واقعی دیتای mock را نشان می‌دهد؛ حالت API=true فقط با تست mapper پوشش داده شد (نه E2E با دیتابیس پر)؛ عکس‌ها روی dev server گرفته شدند (نه build)
+
+---
+Task ID: v1.6.2-explore-redesign
+Agent: Z.ai Code (main)
+Task: دو بخش — الف) اصلاح‌های کوچک خانه (بنر «چطور کار می‌کنه؟» یک‌خطی با شیت، SoonBadge لوسید، سربرگ صادق در ?state=error|empty) ب) بازطراحی کامل «کاوش» (کارت‌های خانه، تب‌های جستجو، فیلتر/مرتب‌سازی، جستجوهای اخیر، حالت‌ها، hookهای React Query) + ۲۴ اسکرین‌شات + تست + v1.6.2 + push
+
+Work Log:
+- شروع: git در 979c72d (v1.6.1 محلی، هنوز push نشده بود)؛ recon کامل HomeView/ExploreView/shared/hooks/api-spec §2/route‌های API
+- الف-خانه: ‏HowItWorksBanner → نوار یک‌خطی فشرده (Sparkles + «چطور کار می‌کنه؟» + «بیشتر بدانید» + ✕) با HowItWorksSheet جدید (گام‌ها + توضیح امانی + «متوجهم»/«دیگر نشان نده») — dismiss دائمی همان localStorage try/catch؛ سربرگ در error/empty متن جایگزین («الان نمی‌توانیم لایوها را نشان دهیم» / «فعلاً لایوی در جریان نیست»)؛ استورهای ?state=/online/useMounted به lib/forced-state.ts مشترک منتقل شد
+- SoonBadge (shared.tsx): 🕒 → Clock لوسید؛ ShowCard: اسم فروشنده دیگر truncate نیست (break-words + فونت ریزتر)؛ CategoryTile: عنوان تا ۲ خط بدون «…» (max-h-8 overflow-hidden)؛ saved-searches: 🔎 → Search
+- استخراج UpcomingShowCard + UpcomingFooter + ReminderToggle به views/home/upcoming-card.tsx (شمارش نسبی + یادآوری + پیش‌بید اختیاری) — خانه و کاوش هر دو همین را مصرف می‌کنند؛ خانه در v1.6.1 با ShowCard inline بود، حالا مشترک
+- ب-کاوش (بازنویسی کامل ExploreView + اجزای views/explore/*): نوار ابزار (فیلتر با نشان تعداد + مرتب‌سازی با نام فعال + سوییچ «فقط لایوها»)، چیپ‌های فیلتر فعال قابل‌حذف، تیتر ثابت «فهرست شوها»، تب‌های جستجو شوها/کالاها/فروشندگان با شمارش، کارت کالا با «در لایوی فلان» (openShow)، ردیف فروشنده با BadgeCheck، پرطرفدارها، EmptyStateهای Moon/SearchX لوسید، skeleton/error/آفلاین با ?state=، شیت فیلتر (قیمت از/تا، سایز، برند، نو/دست‌دوم، فقط زنده — اعمال/حذف همه) و شیت مرتب‌سازی (۴ گزینه با تیک) — فایل‌ها: explore/filters.ts، filter-sheet.tsx، sort-sheet.tsx، product-card.tsx، recent-searches.tsx
+- لایهٔ داده: ‏hooks/useSearch.ts (mock با نرمال‌سازی فارسی + مسیر API ‏GET /search?q= + مپر apiSearchToUi) و hooks/useExploreShows.ts (mock LIVE+UPCOMING با فیلتر دسته + API دو درخواست موازی LIVE/SCHEDULED با category slug)؛ apiShowToUiShow در useLiveShows پارامتر وضعیت گرفت (LIVE→live، SCHEDULED→upcoming) + apiShowStatusToUi — نکته: ‏.map(apiShowToUiShow) با پارامتر دوم به index پارامتر می‌داد (tsc گرفت — wrap شد)
+- src/lib/persian.ts: نرمال‌سازی ی/ي، ك/ك، ارقام فارسی/عربی→لاتین، حذف نیم‌فاصله/اعراب + faIncludes/faEquals — جستجو با «پوكمون» (ك عربی) و «۹.۵» (ارقام فارسی) کار می‌کند
+- جستجوهای اخیر: localStorage try/catch + استور useSyncExternalStore — باگ مهم: getSnapshot که آرایهٔ نو می‌ساخت حلقهٔ بی‌نهایت رندر داد (Maximum update depth exceeded) → کش اسنپ‌شات + notify؛ اسکلت کاشی‌ها اسکرول افقی می‌داد → overflow-hidden؛ «پرطرفدارها»/«جستجوهای اخیر» فقط در uiState=ready (قاب error/skeleton تمیز)
+- تست: ‏src/hooks/__tests__/explore-api-mapping.test.ts — ۱۵ تست (mapper /search با seed واقعی شامل SCHEDULED/ENDED، null-safety، نرمال‌سازی، searchMock، mock کاوش) — جمعاً ۲۳/۲۳ پاس با تست‌های خانه
+- اسکرین‌شات: ‏shots-runner/explore-shots-v162.mjs — ۱۲ وضعیت × موبایل ۳۹۰/دسکتاپ ۱۲۸۰؛ هر عکس قبل از ذخیره assert محتوایی با نامش (تب فعال، متن کلیدی، وضعیت) و بعدش hash-جدا بودن هر ۲۴ فایل؛ دو اشکال رانر: ‏:has-text("نو") کانورس را می‌گرفت (تطبیق دقیق ^نو$ شد) و toast مرتب‌سازی قاب را می‌پوشاند (انتظار ۵ ثانیه)؛ ۱۸ عکس خانه هم با رانر v1.6.1 بازگرفته شد (بنر عوض شده بود) و ۱۶ عکس قدیمی کاوش (UI قبلی) git rm شد؛ بازبینی چشمی ۱۷ عکس
+- docs: ‏INDEX.md (۲۴ ردیف جدید + نگاشت قدیم→جدید + نکته‌های صادقانه + حل‌شدن‌های v1.6.1)؛ CHANGELOG [v1.6.2]؛ config.ts APP_VERSION + package.json = 1.6.2
+- verify نهایی: ۲۳/۲۳ تست ✓؛ lint پاک ✓؛ tsc صفر خطای پروژه (فقط vendored قدیمی) ✓؛ smoke مرورگری ۱۳ مرحله‌ای (تب‌ها، نرمال‌سازی، فیلتر/مرتب‌سازی، سه حالت ?state=، سوییچ فقط لایوها، سربرگ خانه در error/empty) همه پاس با صفر خطای کنسول ✓؛ dev.log تمیز ✓
+- push: سه کامیت (086ffb5، 979c72d، 8a8f68c) با توکن inline و ‏-c credential.helper= پush شد؛ origin/main = 8a8f68c با ls-remote تأیید شد؛ توکن در هیچ فایل/کامیتی نیست (فقط دو اشارهٔ متنی به «الگوی github_pat_» در گزارش‌های اسکن قدیمی worklog — همان false-positive مستند قبلی)
+
+Stage Summary:
+- v1.6.2 کامل و push شد: هر ۳ خواستهٔ خانه و ۹ خواستهٔ کاوش پیاده شد؛ کاوش حالا از همان زبان بصری خانه استفاده می‌کند (LiveGridCard دوستونه + کارت به‌زودی مشترک + حالت‌ها و کلید ?state= یکسان)؛ لایهٔ دادهٔ کاوش مثل خانه React-Query با کلید NEXT_PUBLIC_USE_API (پیش‌فرض mock)
+- صادقانه انجام‌نشده: نرمال‌سازی فارسی سمت سرور /search (فقط mock نرمال می‌کند)؛ «در لایوی فلان» و فیلتر سایز/وضعیت فقط در mock معنا دارند (پاسخ API فعلی showId/سایز/وضعیت کالا را برنمی‌گرداند)؛ مرتب‌سازی «تازه‌ترین» در mock ترتیب فهرست است؛ حالت آفلاین واقعی با قطع شبکهٔ مرورگر تست شد نه قطع سرور؛ حالت API=true فقط با تست mapper پوشش داده شد (E2E با دیتابیس پر نشد)
