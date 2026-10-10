@@ -609,3 +609,23 @@ Work Log:
 Stage Summary:
 - v1.5.1 کامل و push شد: هر ۶ مورد امنیتی با تست fail-before/pass-after پوشش داده شد؛ کلاینت دیگر نمی‌تواند با هدر جعلی محدودیت per-IP را دور بزند، ۱۰۰ حدس مواز دیگر از سقف ۵ تلاش عبور نمی‌کند، حذف ردیف‌ها شمارندهٔ نرخ را صفر نمی‌کند، secret خالی/ضعیف به‌جای کلید تهی خطای بلند می‌دهد، مسابقهٔ refresh فقط یک برنده دارد و production بدون سرویس پیامک به‌جای لو دادن کد fail-closed می‌شود
 - صادقانه تست‌نشده: ارسال واقعی SMS کاوه‌نگار (کلید واقعی نداریم — فقط مسیر نبودِ کلید/خطای provider)، کلاینت بیرونی واقعی از اینترنت (تست پراکسی با curl داخل سندباکس بود)، سرانس تایمینگ مقایسهٔ fixedTimeEqual به‌صورت آماری، و تست E2E UI روی مسیر ورود (فاز ۱ UI را به API وصل نکرده — طبق محدودهٔ کاربر)
+
+---
+Task ID: docs-shots-v1.5.1
+Agent: Z.ai Code (main)
+Task: full screenshot set for v1.5.1 — only docs/screenshots + INDEX.md; zero code changes (UI & backend untouched)
+
+Work Log:
+- verified git state: local HEAD = origin/main = 25415ad (v1.5.1); re-seeded Postgres demo data
+- recon: app is single-route SPA (zustand stack views), mock data in src/lib/data, wallet seed 2,500,000 Toman, chat TTL 6s, no localStorage persistence → fresh page load = fresh state
+- two Explore agents produced full interaction recipes for buyer + seller views
+- built Playwright runner (/home/z/shots-runner/runner.mjs, outside repo) with 120 shot definitions × 2 devices (mobile 390×844@2x, desktop 1280×800), per-shot verify strings + active-tab assertions + min-size checks; dev indicator hidden in capture env (nextjs-portal display:none via init script; project already had devIndicators:false)
+- fixed 10+ selector issues (aria-labels override visible text, chips role=tab vs button, wallet pill absent in live room, second topup must run from wallet page, drain race with bot purchases, confetti unmounts with closing drawer)
+- captured 240 PNGs (120 states × 2 devices), 44 fullPage; deleted 52 old v1.4 screenshots (git rm), 2 old names (seller-ready-room-*) overwritten in place by fresh captures
+- built docs/screenshots/INDEX.md: 240-row table (file/page/state/size), 12-item honest "uncovered" list, old→new replacement mapping, visual observations (latin digits in live dock price, sticky-header fullPage artifact, invisible quick-checkout confetti)
+- visual spot-checks via image reads: live-room sold-out dock, confetti giveaway, checkout view, order timeline stage 3, followed tab, rates calculator, raid confirm, topup success, hub full — all match their filenames
+
+Stage Summary:
+- docs/screenshots now holds exactly the v1.5.1 set: 240 files + INDEX.md; no app code changed
+- known UI observations recorded in INDEX: quick-checkout success confetti is rendered inside the closing drawer (effectively invisible), latin digits in live-room dock price, buyer settings/addresses rows are toast-only
+- still unreachable without code changes: order timeline stages 4-5, buyer rating dialog, auction UI (gated off), true offline UI
