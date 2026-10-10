@@ -7,7 +7,7 @@
    با true شدن دوباره فعال می‌شوند و استورها همیشه کامپایل می‌مانند.
    ───────────────────────────────────────────────────────────── */
 
-export const APP_VERSION = "v1.6.1";
+export const APP_VERSION = "v1.6.2";
 
 /** کلید اصلی خاموش/روشن‌کردن حراج (v1.4: false = لایو شاپ با قیمت ثابت) */
 export const AUCTION_ENABLED = false as boolean;

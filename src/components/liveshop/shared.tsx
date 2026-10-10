@@ -210,7 +210,9 @@ export function LiveBadge({
 export function SoonBadge({ label }: { label?: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-bold text-white/90 backdrop-blur-sm border border-white/15">
-      🕒 {label ?? "به‌زودی"}
+      {/* v1.6.2 — ایموجی ساعت → آیکون lucide (مشترک خانه/کاوش) */}
+      <Clock className="h-3 w-3 shrink-0" aria-hidden />
+      {label ?? "به‌زودی"}
     </span>
   );
 }
@@ -474,7 +476,10 @@ export function ShowCard({
         <p className="font-bold text-sm leading-5 line-clamp-1">{show.title}</p>
         <div className="flex items-center gap-1.5 text-xs text-white/70">
           <SellerAvatar sellerId={seller.id} className="h-7 w-7" />
-          <span className="truncate">{seller.name}</span>
+          {/* v1.6.2 — اسم فروشنده بریده نمی‌شود (می‌شکند، فونت کوچک‌تر) */}
+          <span className="min-w-0 break-words text-[11px] font-bold leading-4">
+            {seller.name}
+          </span>
           {seller.verified && <span className="text-ls-purple-soft" title="فروشندهٔ تأییدشده">✓</span>}
           <RatingStars rating={seller.rating} className="mr-auto" />
         </div>
@@ -730,7 +735,8 @@ export function CategoryTile({
           </span>
         )}
       </span>
-      <span className="w-full truncate text-[10px] font-bold leading-4 text-white/85">
+      {/* v1.6.2 — عنوان تا ۲ خط بدون «…» (می‌شکند، اضافه بدون نقطه‌چین clip می‌شود) */}
+      <span className="max-h-8 w-full overflow-hidden break-words text-[10px] font-bold leading-4 text-white/85">
         {label}
       </span>
       {subtitle && (

@@ -55,14 +55,27 @@ export interface ApiShowsResponse {
   nextCursor: string | null;
 }
 
-/** تبدیل پاسخ API به تایپ UI (Show) — بدون خطا روی فیلدهای null */
-export function apiShowToUiShow(raw: ApiShowCard): Show {
+/** وضعیت API → وضعیت UI (v1.6.2 — کاوش SCHEDULED را هم می‌خواند) */
+export function apiShowStatusToUi(
+  status: ApiShowCard["status"]
+): Show["status"] {
+  if (status === "LIVE") return "live";
+  if (status === "SCHEDULED") return "upcoming";
+  return "ended";
+}
+
+/** تبدیل پاسخ API به تایپ UI (Show) — بدون خطا روی فیلدهای null
+    v1.6.2 — وضعیت قابل override است (SCHEDULED → upcoming برای کاوش) */
+export function apiShowToUiShow(
+  raw: ApiShowCard,
+  status: Show["status"] = apiShowStatusToUi(raw.status)
+): Show {
   return {
     id: raw.id,
     title: raw.title,
     sellerId: raw.seller.id,
     category: raw.category?.nameFa ?? "",
-    status: "live",
+    status,
     viewers: raw.viewers ?? 0,
     /* کاور واقعی از photoUrl می‌آید؛ cover فقط fallback گرادیان است */
     cover: { from: "#6C5CFF", to: "#FF3B8B", emoji: "🛍️" },
@@ -97,7 +110,10 @@ async function fetchApiLiveShowsPage(
     throw new Error(`GET /shows failed: ${res.status}`);
   }
   const data = (await res.json()) as ApiShowsResponse;
-  return { shows: data.shows.map(apiShowToUiShow), nextCursor: data.nextCursor };
+  return {
+    shows: data.shows.map((s) => apiShowToUiShow(s)),
+    nextCursor: data.nextCursor,
+  };
 }
 
 /* ── حالت mock: همان LIVE_SHOWS، برش‌شده به صفحات با cursor عددی ── */

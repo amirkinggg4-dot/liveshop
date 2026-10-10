@@ -87,12 +87,12 @@ const SAMPLE_CATEGORIES_RESPONSE: ApiCategoriesResponse = {
 
 describe("apiShowToUiShow — پاسخ نمونهٔ API seed به تایپ UI", () => {
   test("کل پاسخ seed بدون خطا تبدیل می‌شود", () => {
-    const ui = SAMPLE_SEED_RESPONSE.shows.map(apiShowToUiShow);
+    const ui = SAMPLE_SEED_RESPONSE.shows.map((s) => apiShowToUiShow(s));
     expect(ui).toHaveLength(2);
   });
 
   test("فیلدهای اصلی کارت درست map می‌شوند", () => {
-    const [s1] = SAMPLE_SEED_RESPONSE.shows.map(apiShowToUiShow);
+    const [s1] = SAMPLE_SEED_RESPONSE.shows.map((s) => apiShowToUiShow(s));
     expect(s1.id).toBe("clx9f2show0001");
     expect(s1.title).toBe("شب کتونی‌های کمیاب");
     expect(s1.status).toBe("live");
@@ -106,7 +106,7 @@ describe("apiShowToUiShow — پاسخ نمونهٔ API seed به تایپ UI", 
   });
 
   test("فیلدهای null امن map می‌شوند (بدون pinnedItem و بدون category)", () => {
-    const [, s2] = SAMPLE_SEED_RESPONSE.shows.map(apiShowToUiShow);
+    const [, s2] = SAMPLE_SEED_RESPONSE.shows.map((s) => apiShowToUiShow(s));
     expect(s2.category).toBe("");
     expect(s2.pinnedPrice).toBeNull();
     expect(s2.pinnedStock).toBeNull();
@@ -117,7 +117,7 @@ describe("apiShowToUiShow — پاسخ نمونهٔ API seed به تایپ UI", 
   });
 
   test("خروجی همهٔ فیلدهای اجباری Show را دارد (نوع خروجی = تایپ UI)", () => {
-    for (const ui of SAMPLE_SEED_RESPONSE.shows.map(apiShowToUiShow)) {
+    for (const ui of SAMPLE_SEED_RESPONSE.shows.map((s) => apiShowToUiShow(s))) {
       for (const key of [
         "id",
         "title",

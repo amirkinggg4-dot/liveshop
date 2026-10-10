@@ -39,7 +39,7 @@ export function SavedSearchesRow({
     toast(
       alertOn
         ? `هشدار «${query}» خاموش شد`
-        : `هشدار «${query}» روشن شد 🔔`
+        : `هشدار «${query}» روشن شد`
     );
   };
 
@@ -53,7 +53,7 @@ export function SavedSearchesRow({
     if (!q) return;
     const res = saveSearch(q);
     if (res.ok) {
-      toast.success("جستجو ذخیره شد 🔔");
+      toast.success("جستجو ذخیره شد");
     } else {
       toast.error(res.error ?? "ذخیرهٔ جستجو ممکن نشد");
     }
@@ -87,7 +87,8 @@ export function SavedSearchesRow({
             className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-white/10 bg-ls-card px-3 py-1.5 text-xs transition-colors hover:border-ls-purple/40"
             aria-label={`اعمال جستجوی ${s.query} — ${faNum(s.matchCount)} نتیجه`}
           >
-            <span aria-hidden>🔎</span>
+            {/* v1.6.2 — ایموجی 🔎 → آیکون lucide */}
+            <Search className="h-3.5 w-3.5 shrink-0 text-white/45" aria-hidden />
             <span className="max-w-[140px] truncate font-medium">{s.query}</span>
             <span
               className="rounded-full bg-ls-green/15 px-1.5 py-px text-[10px] font-black text-ls-green"

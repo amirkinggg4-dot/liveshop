@@ -1,121 +1,236 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Search, X, Clock, Gavel } from "lucide-react";
+/* ═══════════════════════════════════════════════════════════════════════════
+   ExploreView — صفحهٔ کاوش (بازطراحی v1.6.2)
+   ─ کارت‌های نتیجه: همان LiveGridCard خانه (عکس تمام‌کارت، دو ستونه،
+     قیمت کالای پین‌شده کامل، موجودی در ردیف جدا) — اسم فروشنده بریده نمی‌شود
+   ─ شوهای آینده با همان کارت «به‌زودی» خانه (UpcomingShowCard مشترک)
+     و لمس → همان شیت پیش‌نمایش خانه
+   ─ همهٔ ایموجی‌ها → آیکون lucide (جستجوهای ذخیره‌شده، تیتر بخش‌ها،
+     حالت خالی، نتیجه‌ای پیدا نشد)
+   ─ «فقط لایوها» کلید Switch در نوار ابزار — تیتر بخش جدا و ثابت
+   ─ عنوان کاشی‌های دسته تا ۲ خط (بدون «…»)
+   ─ جستجو: نتایج در سه تب شوها / کالاها / فروشندگان؛ کارت کوچک کالا با
+     «در لایوی فلان» که به همان شو می‌برد؛ جستجوی فارسی بدون حساسیت به
+     ی/ي و ک/ك و ارقام فارسی/لاتین (src/lib/persian.ts)
+   ─ فیلتر (شیت پایین): بازهٔ قیمت، سایز، برند، وضعیت کالا، فقط زنده؛
+     مرتب‌سازی: محبوب‌ترین/تازه‌ترین/ارزان‌ترین/گران‌ترین؛ نشان تعداد روی
+     دکمهٔ فیلتر + چیپ‌های فعال قابل‌حذف
+   ─ جستجوی خالی: «جستجوهای اخیر» (قابل پاک‌کردن، localStorage با try/catch)
+     و «پرطرفدارها»؛ «ذخیرهٔ این جستجو» از صفحهٔ نتایج در دسترس است
+   ─ حالت‌ها مثل خانه: skeleton، خطا با «تلاش دوباره»، آفلاین — با ?state=
+   ─ لایهٔ داده: useSearch و useExploreShows (React Query — NEXT_PUBLIC_USE_API
+     → GET /search?q= و GET /shows?status=LIVE|SCHEDULED، spec §2)؛ پیش‌فرض mock
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowUpDown,
+  BadgeCheck,
+  Clock,
+  Compass,
+  Flame,
+  Moon,
+  Radio,
+  RotateCcw,
+  Search,
+  SearchX,
+  SlidersHorizontal,
+  TriangleAlert,
+  WifiOff,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { useAppStore } from "@/store/app-store";
 import { useExploreIntentStore } from "@/store/explore-intent-store";
 import { faNum } from "@/lib/format";
-import { SHOWS, SELLERS, LIVE_SHOWS, UPCOMING_SHOWS } from "@/lib/data/shows";
+import { normalizeFa } from "@/lib/persian";
+import { forcedStateStore, useForcedState, useOnline } from "@/lib/forced-state";
 import { CATEGORIES } from "@/lib/data/categories";
-import type { Category, Show } from "@/lib/data/types";
 import {
-  ShowCard,
-  SectionTitle,
   Avatar,
-  RatingStars,
-  EmptyState,
   CategoryIcon,
   CategoryTile,
+  EmptyState,
+  LiveGridCard,
+  RatingStars,
+  SectionTitle,
 } from "@/components/liveshop/shared";
 import { SavedSearchesRow } from "@/components/liveshop/saved-searches";
 import PreBidSheet from "@/components/liveshop/pre-bid-sheet";
-import { cn } from "@/lib/utils";
+import { UpcomingShowCard } from "./home/upcoming-card";
+import UpcomingPreviewSheet from "./home/upcoming-preview-sheet";
+import ProductResultCard from "./explore/product-card";
+import FilterSheet from "./explore/filter-sheet";
+import SortSheet from "./explore/sort-sheet";
+import { RecentSearchesSection, useRecentSearches } from "./explore/recent-searches";
+import {
+  EMPTY_FILTERS,
+  activeFilterChips,
+  filterProductResult,
+  filterShow,
+  filtersCount,
+  sortLabel,
+  sortProducts,
+  sortShows,
+  type ExploreFilters,
+  type SortId,
+} from "./explore/filters";
+import {
+  EMPTY_SEARCH,
+  useSearch,
+  type SearchResults,
+  type SellerResult,
+} from "@/hooks/useSearch";
+import { useExploreShows } from "@/hooks/useExploreShows";
+import { useCategories } from "@/hooks/useCategories";
 import { AUCTION_ENABLED } from "@/lib/config";
+import type { Category, Show } from "@/lib/data/types";
 
-/* ── فاز ۱ — دکمهٔ toggle یادآوری (span نقش‌محور چون ShowCard خودش button است) ── */
-function ReminderToggle({
-  show,
-  on,
-  onToggle,
-}: {
-  show: Show;
-  on: boolean;
-  onToggle: (show: Show) => void;
-}) {
+/* ── پیشنهادهای پرطرفدار (mock) ── */
+const POPULAR_QUERIES = [
+  "کتونی",
+  "مونسترا",
+  "پوکمون",
+  "جردن",
+  "عطر",
+  "هدفون",
+  "فانکو پاپ",
+  "بونسای",
+];
+
+/* ── اسکلت‌های حالت بارگذاری ── */
+
+function TilesSkeleton() {
   return (
-    <span
-      role="button"
-      tabIndex={0}
-      aria-pressed={on}
-      aria-label={`${on ? "حذف یادآوری" : "فعال‌سازی یادآوری"} برای شو ${show.title}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle(show);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          e.stopPropagation();
-          onToggle(show);
-        }
-      }}
-      className={cn(
-        "mt-1.5 block w-full cursor-pointer select-none rounded-lg py-1.5 text-center text-[11px] font-bold transition-colors",
-        on
-          ? "bg-ls-green text-[#04281e]"
-          : "border border-ls-pink/50 text-ls-pink hover:bg-ls-pink/10"
-      )}
-    >
-      {on ? "یادآوری فعال ✓" : "یادآوری 🔔"}
-    </span>
+    <div className="flex gap-1.5 overflow-hidden pb-1" aria-hidden>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex w-[76px] shrink-0 flex-col items-center gap-1">
+          <Skeleton className="h-14 w-14 rounded-2xl" />
+          <Skeleton className="h-2.5 w-10 rounded-full" />
+        </div>
+      ))}
+    </div>
   );
 }
 
-/* ── فاز ۱ — فوتر کارت شو به‌زودی: نوار «شروع: …» + دکمهٔ یادآوری (الگوی یکسان با HomeView) ──
-   فاز ۳ (P1) — افزودنی: دکمهٔ «پیش‌بید» در همان ردیف (بدون تغییر بقیهٔ فوتر) */
-function UpcomingFooter({
-  show,
-  reminderOn,
-  onToggleReminder,
-  onPrebid,
-}: {
-  show: Show;
-  reminderOn: boolean;
-  onToggleReminder: (show: Show) => void;
-  onPrebid: (show: Show) => void;
-}) {
+function GridSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <>
-      <div className="mt-1 flex items-center gap-2 rounded-lg bg-ls-card-2 px-2.5 py-1.5 text-[11px]">
-        <Clock className="w-3 h-3 shrink-0 text-ls-pink" aria-hidden />
-        <span className="font-bold text-white/75">
-          شروع: {show.startsAtLabel ?? "به‌زودی"}
-        </span>
-        <span
-          role="button"
-          tabIndex={0}
-          aria-label={`ثبت پیش‌بید برای شو ${show.title}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onPrebid(show);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              e.stopPropagation();
-              onPrebid(show);
-            }
-          }}
-          className={cn(
-            "mr-auto inline-flex cursor-pointer items-center gap-1 rounded-md border border-ls-purple/40 bg-ls-purple/10 px-2 py-0.5 text-[10px] font-bold text-ls-purple-soft transition-colors hover:bg-ls-purple/20",
-            !AUCTION_ENABLED && "hidden"
-          )}
+    <div className="grid grid-cols-2 gap-3" aria-hidden>
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="overflow-hidden rounded-2xl border border-white/10 bg-ls-card"
         >
-          <Gavel className="w-3 h-3" aria-hidden />
-          پیش‌بید
-        </span>
-      </div>
-      <ReminderToggle show={show} on={reminderOn} onToggle={onToggleReminder} />
-    </>
+          <Skeleton className="aspect-[4/5] w-full rounded-none" />
+        </div>
+      ))}
+    </div>
   );
 }
+
+/* ── بنر آفلاین / کارت خطا (هم‌شکل خانه) ── */
+
+function OfflineBanner() {
+  return (
+    <div
+      role="status"
+      className="flex items-center gap-2 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2.5 text-xs font-bold text-amber-300"
+    >
+      <WifiOff className="h-4 w-4 shrink-0" aria-hidden />
+      اتصال اینترنت قطع است — آخرین داده‌های ذخیره‌شده نشان داده می‌شود
+    </div>
+  );
+}
+
+function ErrorCard({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="rounded-2xl border border-white/5 bg-ls-card px-6 py-10 text-center">
+      <span
+        className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-ls-card-2 ring-1 ring-white/10"
+        aria-hidden
+      >
+        <TriangleAlert className="h-8 w-8 text-amber-300" />
+      </span>
+      <p className="font-bold text-white/90">لود کاوش خطا خورد</p>
+      <p className="mt-1 text-xs leading-6 text-white/60">
+        اتصالت را بررسی کن و دوباره امتحان کن.
+      </p>
+      <button
+        onClick={onRetry}
+        className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-ls-purple px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-ls-purple-deep"
+      >
+        <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+        تلاش دوباره
+      </button>
+    </div>
+  );
+}
+
+/* ── ردیف فروشنده در تب «فروشندگان» — اسم بریده نمی‌شود ── */
+
+function SellerResultRow({ seller }: { seller: SellerResult }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-ls-card p-3">
+      {seller.avatarUrl ? (
+        <span
+          className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full ring-2 ring-white/10"
+          aria-hidden
+        >
+          <img
+            src={seller.avatarUrl}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        </span>
+      ) : (
+        <Avatar emoji={seller.emoji} color={seller.color} />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1 break-words text-sm font-bold text-white">
+          <span className="min-w-0">{seller.name}</span>
+          {seller.verified && (
+            <BadgeCheck
+              className="h-4 w-4 shrink-0 text-ls-purple-soft"
+              aria-label="فروشندهٔ تأییدشده"
+            />
+          )}
+        </p>
+        <p className="text-xs text-white/45" dir="ltr">
+          @{seller.handle}
+        </p>
+        {seller.rating != null && (
+          <RatingStars
+            rating={seller.rating}
+            count={seller.ratingsCount ?? undefined}
+          />
+        )}
+      </div>
+      <button
+        onClick={() => toast(`«${seller.name}» فالو شد`)}
+        aria-label={`فالو ${seller.name}`}
+        className="shrink-0 rounded-full border border-ls-purple/50 px-3.5 py-1.5 text-xs font-bold text-ls-purple-soft transition-colors hover:bg-ls-purple/10"
+      >
+        فالو
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════ نمای کاوش ═══════════════════════════════ */
 
 export default function ExploreView() {
   const openShow = useAppStore((s) => s.openShow);
-  /* v1.6.1 — نیت مشترک خانه → کاوش: دستهٔ از پیش انتخاب‌شده + فوکوس جستجو
-     (حداقل تغییر: فقط مصرف نیت هنگام mount — بقیهٔ صفحه دست‌نخورده) */
+  /* نیت مشترک خانه → کاوش: دستهٔ از پیش انتخاب‌شده + فوکوس جستجو */
   const intentCategory = useExploreIntentStore((s) => s.category);
   const intentFocusSearch = useExploreIntentStore((s) => s.focusSearch);
   const consumeIntent = useExploreIntentStore((s) => s.consume);
@@ -127,45 +242,109 @@ export default function ExploreView() {
       ? CATEGORIES.find((c) => c.id === intentCategory) ?? null
       : null
   );
-  /* فاز ۱ — چیپ «فقط لایوها» (پیش‌فرض مثل baseline: فقط زنده‌ها) */
+  /* «فقط لایوها» — کلید نوار ابزار (پیش‌فرض مثل baseline: فقط زنده‌ها) */
   const [liveOnly, setLiveOnly] = useState(true);
-  /* فاز ۱ — شوهای به‌زودی که یادآوری فعال دارند */
+  const [sort, setSort] = useState<SortId>("popular");
+  const [filters, setFilters] = useState<ExploreFilters>(EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  /* یادآوری شوهای به‌زودی + شیت پیش‌نمایش/پیش‌بید */
   const [reminders, setReminders] = useState<Set<string>>(new Set());
-  /* فاز ۳ (P1) — شیت پیش‌بید برای شو به‌زودی */
+  const [previewShow, setPreviewShow] = useState<Show | null>(null);
   const [prebidShow, setPrebidShow] = useState<Show | null>(null);
 
-  /* v1.6.1 — مصرف یک‌بارهٔ نیت: فوکوس روی ورودی جستجو + پاک‌کردن نیت */
+  /* استورهای بیرونی — بدون setState داخل effect */
+  const forcedState = useForcedState();
+  const online = useOnline();
+  const recent = useRecentSearches();
+
+  /* مصرف یک‌بارهٔ نیت: فوکوس ورودی + پاک‌کردن نیت */
   useEffect(() => {
     if (intentFocusSearch) searchInputRef.current?.focus();
     if (intentCategory || intentFocusSearch) consumeIntent();
   }, []);
 
-  const q = query.trim().toLowerCase();
-  const searching = q.length > 0;
+  /* لایهٔ داده — React Query (mock یا API با NEXT_PUBLIC_USE_API) */
+  const categoriesQuery = useCategories();
+  const categories = categoriesQuery.data ?? [];
+  const exploreShowsQuery = useExploreShows(activeCat);
+  const searchQuery = useSearch(query);
 
-  const showResults = searching
-    ? SHOWS.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.category.toLowerCase().includes(q)
-      )
-    : [];
-  const sellerResults = searching
-    ? SELLERS.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.handle.toLowerCase().includes(q)
-      )
-    : [];
+  const searching = normalizeFa(query).length >= 2;
 
-  const liveList = activeCat
-    ? LIVE_SHOWS.filter((s) => s.category === activeCat.label)
-    : LIVE_SHOWS;
-  const upcomingList = activeCat
-    ? UPCOMING_SHOWS.filter((s) => s.category === activeCat.label)
-    : UPCOMING_SHOWS;
-  /* فاز ۱ — حالت ادغام: به‌زودی‌ها هم داخل همان لیستِ شوها می‌آیند */
-  const mergedList = [...liveList, ...upcomingList];
+  /* ── فهرست پیش‌فرض کاوش ── */
+  const showsData = exploreShowsQuery.data;
+  const liveList = useMemo(() => {
+    const base = showsData?.live ?? [];
+    return sortShows(base.filter((s) => filterShow(s, filters)), sort);
+  }, [showsData, filters, sort]);
+  const upcomingList = useMemo(() => {
+    const base = showsData?.upcoming ?? [];
+    return base.filter((s) => filterShow(s, filters));
+  }, [showsData, filters]);
+
+  /* ── نتایج جستجو (پس از فیلتر و مرتب‌سازی) ── */
+  const results: SearchResults = searchQuery.data ?? EMPTY_SEARCH;
+  const liveResults = useMemo(
+    () =>
+      sortShows(
+        results.shows.filter((s) => s.status === "live" && filterShow(s, filters)),
+        sort
+      ),
+    [results.shows, filters, sort]
+  );
+  const upcomingResults = useMemo(
+    () =>
+      results.shows.filter(
+        (s) => s.status === "upcoming" && filterShow(s, filters)
+      ),
+    [results.shows, filters]
+  );
+  const shownUpcomingResults = liveOnly ? [] : upcomingResults;
+  const productResults = useMemo(
+    () =>
+      sortProducts(
+        results.products.filter((p) => filterProductResult(p, filters)),
+        sort
+      ),
+    [results.products, filters, sort]
+  );
+  const sellerResults = useMemo(() => {
+    const arr = [...results.sellers];
+    if (sort === "popular") {
+      arr.sort((a, b) => (b.followers ?? 0) - (a.followers ?? 0));
+    }
+    return arr;
+  }, [results.sellers, sort]);
+  const totalResults =
+    liveResults.length +
+    shownUpcomingResults.length +
+    productResults.length +
+    sellerResults.length;
+
+  /* ── وضعیت نمایشی UI — با کلید mock قابل تحمیل است ── */
+  const uiState: "loading" | "error" | "ready" = useMemo(() => {
+    if (forcedState === "loading") return "loading";
+    if (!searching && exploreShowsQuery.isLoading) return "loading";
+    if (forcedState === "error" || exploreShowsQuery.isError) return "error";
+    return "ready";
+  }, [forcedState, searching, exploreShowsQuery.isLoading, exploreShowsQuery.isError]);
+
+  const searchState: "loading" | "error" | "ready" = useMemo(() => {
+    if (!searching) return "ready";
+    if (searchQuery.isFetching && !searchQuery.data) return "loading";
+    if (searchQuery.isError) return "error";
+    return "ready";
+  }, [searching, searchQuery.isFetching, searchQuery.data, searchQuery.isError]);
+
+  const filterCount = filtersCount(filters);
+  const chips = activeFilterChips(filters);
+
+  /* دستهٔ فعال و خالی‌بودن فهرست پیش‌فرض */
+  const forcedEmpty = forcedState === "empty";
+  const defaultListEmpty = liveOnly
+    ? liveList.length === 0
+    : liveList.length + upcomingList.length === 0;
 
   const toggleReminder = (show: Show) => {
     const next = new Set(reminders);
@@ -179,14 +358,26 @@ export default function ExploreView() {
     setReminders(next);
   };
 
-  const sectionTitle = activeCat
-    ? activeCat.label
-    : liveOnly
-      ? "فقط زنده‌ها"
-      : "همهٔ شوها";
+  /* اجرای جستجو — ثبت در «جستجوهای اخیر» (localStorage try/catch) */
+  const runSearch = (q: string) => {
+    setQuery(q);
+    if (normalizeFa(q).length >= 2) recent.add(q);
+  };
+
+  /* «تلاش دوباره» — پاک‌کردن حالت تحمیلی + refetch کوئری‌ها */
+  const retry = () => {
+    forcedStateStore.clear();
+    void exploreShowsQuery.refetch();
+    if (searching) void searchQuery.refetch();
+  };
+
+  const showDefaultEmpty = uiState === "ready" && (forcedEmpty || defaultListEmpty);
 
   return (
     <div className="flex-1 flex flex-col px-4 pt-4 pb-8 space-y-5">
+      {/* بنر آفلاین */}
+      {!online && <OfflineBanner />}
+
       {/* نوار جستجو */}
       <div className="relative">
         <Search
@@ -197,163 +388,273 @@ export default function ExploreView() {
           ref={searchInputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="جستجوی شو، فروشنده و کالا…"
-          aria-label="جستجوی شو، فروشنده و کالا"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && normalizeFa(query).length >= 2) {
+              recent.add(query.trim());
+            }
+          }}
+          placeholder="جستجوی شو، کالا و فروشنده…"
+          aria-label="جستجوی شو، کالا و فروشنده"
           className="pr-9 bg-ls-card border-white/10 rounded-xl h-10 text-sm placeholder:text-white/35"
         />
+        {query.length > 0 && (
+          <button
+            onClick={() => setQuery("")}
+            aria-label="پاک‌کردن متن جستجو"
+            className="absolute left-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-ls-card-2 text-white/60 transition-colors hover:text-white"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        )}
       </div>
 
-      {/* فاز ۳ (P1) — ردیف جستجوهای ذخیره‌شده (تصویر ۱۴) — فقط اضافه‌شده */}
+      {/* ردیف جستجوهای ذخیره‌شده + «ذخیرهٔ این جستجو» در صفحهٔ نتایج */}
       <SavedSearchesRow
         currentQuery={query.trim() || undefined}
-        onPick={(q) => setQuery(q)}
- />
+        onPick={(q) => runSearch(q)}
+      />
+
+      {/* نوار ابزار: فیلتر + مرتب‌سازی + کلید «فقط لایوها» */}
+      <div
+        role="toolbar"
+        aria-label="ابزارهای فهرست و نتایج"
+        className="flex flex-wrap items-center gap-2"
+      >
+        <button
+          onClick={() => setFilterOpen(true)}
+          aria-label={`فیلترها${filterCount > 0 ? ` — ${faNum(filterCount)} فعال` : ""}`}
+          className="inline-flex items-center gap-1.5 rounded-full bg-ls-card-2 px-3.5 py-2 text-xs font-bold text-white/85 transition-colors hover:bg-ls-line hover:text-white"
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden />
+          فیلتر
+          {filterCount > 0 && (
+            <span
+              className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-ls-purple px-1 text-[10px] font-black text-white tabular-nums"
+              aria-hidden
+            >
+              {faNum(filterCount)}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setSortOpen(true)}
+          aria-label={`مرتب‌سازی — فعال: ${sortLabel(sort)}`}
+          className="inline-flex items-center gap-1.5 rounded-full bg-ls-card-2 px-3.5 py-2 text-xs font-bold text-white/85 transition-colors hover:bg-ls-line hover:text-white"
+        >
+          <ArrowUpDown className="h-4 w-4" aria-hidden />
+          {sortLabel(sort)}
+        </button>
+        <label
+          htmlFor="explore-live-only"
+          className="mr-auto inline-flex cursor-pointer items-center gap-2 rounded-full bg-ls-card-2 py-1.5 pl-2 pr-3 text-[11px] font-bold text-white/80"
+        >
+          فقط لایوها
+          <Switch
+            id="explore-live-only"
+            checked={liveOnly}
+            onCheckedChange={setLiveOnly}
+            aria-label="نمایش فقط شوهای زنده"
+          />
+        </label>
+      </div>
+
+      {/* چیپ‌های فیلتر فعال — قابل حذف */}
+      {chips.length > 0 && (
+        <div
+          className="flex flex-wrap gap-1.5"
+          aria-label="فیلترهای فعال"
+        >
+          {chips.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setFilters((prev) => c.clear(prev))}
+              aria-label={`حذف فیلتر ${c.label}`}
+              className="inline-flex items-center gap-1 rounded-full border border-ls-purple/40 bg-ls-purple/10 py-1 pl-1.5 pr-3 text-xs font-bold text-ls-purple-soft transition-colors hover:bg-ls-purple/20"
+            >
+              {c.label}
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          ))}
+        </div>
+      )}
 
       {searching ? (
-        /* ── حالت نتایج جستجو ── */
-        <>
-          {showResults.length > 0 && (
-            <section aria-label="نتایج شوها">
-              <SectionTitle title="شوها" icon="🎬" />
-              <div className="grid grid-cols-2 gap-3">
-                {showResults.map((show) => (
-                  <ShowCard
-                    key={show.id}
-                    compact
-                    show={show}
-                    onClick={() => openShow(show.id)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+        /* ══ حالت نتایج جستجو ══ */
+        searchState === "loading" ? (
+          <GridSkeleton count={4} />
+        ) : searchState === "error" ? (
+          <ErrorCard onRetry={retry} />
+        ) : totalResults === 0 ? (
+          <EmptyState
+            lucide={SearchX}
+            title="نتیجه‌ای پیدا نشد"
+            desc={`برای «${query.trim()}» چیزی پیدا نکردیم. عبارت دیگری را امتحان کن.`}
+          />
+        ) : (
+          <Tabs defaultValue="shows" dir="rtl" className="gap-4">
+            <TabsList className="grid w-full grid-cols-3 bg-ls-card">
+              <TabsTrigger value="shows" className="text-xs font-bold">
+                شوها ({faNum(liveResults.length + shownUpcomingResults.length)})
+              </TabsTrigger>
+              <TabsTrigger value="products" className="text-xs font-bold">
+                کالاها ({faNum(productResults.length)})
+              </TabsTrigger>
+              <TabsTrigger value="sellers" className="text-xs font-bold">
+                فروشندگان ({faNum(sellerResults.length)})
+              </TabsTrigger>
+            </TabsList>
 
-          {sellerResults.length > 0 && (
-            <section aria-label="نتایج فروشندگان">
-              <SectionTitle title="فروشندگان" icon="🛍️" />
-              <div className="space-y-2">
-                {sellerResults.map((seller) => (
-                  <div
-                    key={seller.id}
-                    className="flex items-center gap-3 bg-ls-card border border-white/5 rounded-2xl p-3"
-                  >
-                    <Avatar emoji={seller.emoji} color={seller.color} />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-sm truncate">
-                        {seller.name}{" "}
-                        {seller.verified && (
-                          <span
-                            className="text-ls-purple-soft"
-                            title="فروشندهٔ تأییدشده"
-                          >
-                            ✓
-                          </span>
-                        )}
-                      </p>
-                      <p
-                        className="text-xs text-white/45 truncate"
-                        dir="ltr"
-                      >
-                        @{seller.handle}
-                      </p>
-                      <RatingStars
-                        rating={seller.rating}
-                        count={seller.ratingsCount}
-                      />
+            {/* تب شوها */}
+            <TabsContent value="shows" className="space-y-4">
+              {liveResults.length + shownUpcomingResults.length === 0 ? (
+                <p className="py-6 text-center text-xs font-bold text-white/45">
+                  در این گروه نتیجه‌ای نبود
+                </p>
+              ) : (
+                <>
+                  {liveResults.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {liveResults.map((show) => (
+                        <LiveGridCard
+                          key={show.id}
+                          show={show}
+                          onClick={() => openShow(show.id)}
+                        />
+                      ))}
                     </div>
-                    <button
-                      onClick={() =>
-                        toast(`«${seller.name}» فالو شد ✓`)
-                      }
-                      aria-label={`فالو ${seller.name}`}
-                      className="shrink-0 rounded-full border border-ls-purple/50 text-ls-purple-soft px-3.5 py-1.5 text-xs font-bold hover:bg-ls-purple/10 transition-colors"
-                    >
-                      فالو
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+                  )}
+                  {shownUpcomingResults.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {shownUpcomingResults.map((show) => (
+                        <UpcomingShowCard
+                          key={show.id}
+                          show={show}
+                          reminderOn={reminders.has(show.id)}
+                          onToggleReminder={toggleReminder}
+                          onClick={() => setPreviewShow(show)}
+                          onPrebid={setPrebidShow}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </TabsContent>
 
-          {showResults.length === 0 && sellerResults.length === 0 && (
-            <EmptyState
-              emoji="🔍"
-              title="نتیجه‌ای پیدا نشد"
-              desc={`برای «${query.trim()}» چیزی پیدا نکردیم. عبارت دیگری را امتحان کن.`}
-            />
-          )}
-        </>
+            {/* تب کالاها */}
+            <TabsContent value="products">
+              {productResults.length === 0 ? (
+                <p className="py-6 text-center text-xs font-bold text-white/45">
+                  در این گروه نتیجه‌ای نبود
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {productResults.map((p) => (
+                    <ProductResultCard
+                      key={p.id}
+                      product={p}
+                      onClick={() => {
+                        if (p.showId) openShow(p.showId);
+                        else toast("این کالا فعلاً در لایوی زنده نیست");
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* تب فروشندگان */}
+            <TabsContent value="sellers">
+              {sellerResults.length === 0 ? (
+                <p className="py-6 text-center text-xs font-bold text-white/45">
+                  در این گروه نتیجه‌ای نبود
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {sellerResults.map((s) => (
+                    <SellerResultRow key={s.id} seller={s} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        )
       ) : (
-        /* ── حالت پیش‌فرض کاوش ── */
+        /* ══ حالت پیش‌فرض کاوش ══ */
         <>
           {activeCat && (
             <button
               onClick={() => setActiveCat(null)}
               aria-label="حذف فیلتر دسته‌بندی"
-              className="self-start inline-flex items-center gap-1.5 rounded-full bg-ls-purple text-white px-3 py-1.5 text-xs font-bold hover:bg-ls-purple-deep transition-colors"
+              className="self-start inline-flex items-center gap-1.5 rounded-full bg-ls-purple px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-ls-purple-deep"
             >
               <CategoryIcon id={activeCat.id} className="h-3.5 w-3.5" />
               {activeCat.label}
-              <X className="w-3.5 h-3.5" aria-hidden />
+              <X className="h-3.5 w-3.5" aria-hidden />
             </button>
           )}
 
+          {/* جستجوی خالی: جستجوهای اخیر + پرطرفدارها — فقط در حالت آماده */}
+          {!activeCat && uiState === "ready" && (
+            <>
+              <RecentSearchesSection onPick={(q) => runSearch(q)} />
+              <section aria-label="پرطرفدارها">
+                <SectionTitle title="پرطرفدارها" lucide={Flame} />
+                <div className="flex flex-wrap gap-1.5">
+                  {POPULAR_QUERIES.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => runSearch(q)}
+                      aria-label={`جستجوی ${q}`}
+                      className="rounded-full bg-ls-card-2 px-3 py-1.5 text-xs font-bold text-white/75 transition-colors hover:bg-ls-line hover:text-white"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* دسته‌بندی‌ها */}
           <section aria-label="دسته‌بندی‌ها">
-            <SectionTitle title="دسته‌بندی‌ها" icon="🧭" />
-            {/* v1.4.1 — کارت‌های کوچک عکس‌دار (بدون ایموجی) در یک ردیف افقی اسکرولی — مثل خانه */}
-            <div className="flex snap-x gap-1.5 overflow-x-auto no-scrollbar pb-1">
-              {CATEGORIES.map((c) => (
-                <CategoryTile
-                  key={c.id}
-                  id={c.id}
-                  label={c.label}
-                  subtitle={`${faNum(c.liveCount)} شو زنده`}
-                  active={activeCat?.id === c.id}
-                  onClick={() => setActiveCat(c)}
-                />
-              ))}
-            </div>
+            <SectionTitle title="دسته‌بندی‌ها" lucide={Compass} />
+            {uiState === "loading" ? (
+              <TilesSkeleton />
+            ) : (
+              <div className="flex snap-x gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                {categories.map((c) => (
+                  <CategoryTile
+                    key={c.id}
+                    id={c.id}
+                    label={c.label}
+                    subtitle={`${faNum(c.liveCount)} شو زنده`}
+                    active={activeCat?.id === c.id}
+                    onClick={() => setActiveCat(c)}
+                  />
+                ))}
+              </div>
+            )}
           </section>
 
-          <section aria-label={sectionTitle}>
-            <SectionTitle
-              title={sectionTitle}
-              icon="🔴"
-              action={
-                /* فاز ۱ — چیپ toggle «فقط لایوها» */
-                <button
-                  onClick={() => setLiveOnly((v) => !v)}
-                  aria-pressed={liveOnly}
-                  aria-label={
-                    liveOnly
-                      ? "نمایش شوهای به‌زودی هم در همین لیست"
-                      : "نمایش فقط شوهای زنده"
-                  }
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors",
-                    liveOnly
-                      ? "bg-ls-purple text-white"
-                      : "bg-ls-card-2 text-white/60 hover:text-white"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "w-1.5 h-1.5 rounded-full",
-                      liveOnly ? "bg-white" : "bg-white/40"
-                    )}
-                    aria-hidden
-                  />
-                  فقط لایوها
-                </button>
-              }
-            />
-            {liveOnly ? (
-              /* حالت پیش‌فرض مثل baseline — فقط لایوها */
+          {/* فهرست شوها — تیتر ثابت (کلید «فقط لایوها» در نوار ابزار است) */}
+          <section aria-label="فهرست شوها">
+            <SectionTitle title="فهرست شوها" lucide={Radio} />
+            {uiState === "loading" ? (
+              <GridSkeleton />
+            ) : uiState === "error" ? (
+              <ErrorCard onRetry={retry} />
+            ) : showDefaultEmpty ? (
+              <EmptyState
+                lucide={Moon}
+                title="الان لایو فعالی در این دسته نیست"
+                desc="به‌زودی شوهای جدید این دسته را از دست نده!"
+              />
+            ) : liveOnly ? (
               liveList.length > 0 ? (
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
                   {liveList.map((show) => (
-                    <ShowCard
+                    <LiveGridCard
                       key={show.id}
                       show={show}
                       onClick={() => openShow(show.id)}
@@ -361,79 +662,97 @@ export default function ExploreView() {
                   ))}
                 </div>
               ) : (
-                <EmptyState
-                  emoji="🛌"
-                  title="الان لایو فعالی در این دسته نیست"
-                  desc="به‌زودی شوهای جدید این دسته را از دست نده!"
-                />
+                <p className="rounded-2xl border border-white/5 bg-ls-card px-4 py-5 text-center text-xs font-bold text-white/50">
+                  لایوی در این فهرست نیست — شوهای به‌زودی را پایین ببین
+                </p>
               )
             ) : (
-              /* فاز ۱ — حالت ادغام: زنده‌ها + به‌زودی‌ها در یک لیست */
-              mergedList.length > 0 ? (
-                <div className="space-y-3">
-                  {mergedList.map((show) =>
-                    show.status === "upcoming" ? (
-                      <ShowCard
-                        key={show.id}
-                        show={show}
-                        onClick={() => openShow(show.id)}
-                        footer={
-                          <UpcomingFooter
-                            show={show}
-                            reminderOn={reminders.has(show.id)}
-                            onToggleReminder={toggleReminder}
-                            onPrebid={setPrebidShow}
-                          />
-                        }
-                      />
-                    ) : (
-                      <ShowCard
-                        key={show.id}
-                        show={show}
-                        onClick={() => openShow(show.id)}
-                      />
-                    )
-                  )}
-                </div>
-              ) : (
-                <EmptyState
-                  emoji="🛌"
-                  title="الان لایو فعالی در این دسته نیست"
-                  desc="به‌زودی شوهای جدید این دسته را از دست نده!"
-                />
-              )
+              /* حالت ادغام: زنده‌ها + به‌زودی‌ها با کارت‌های خانه */
+              <div className="grid grid-cols-2 gap-3">
+                {liveList.map((show) => (
+                  <LiveGridCard
+                    key={show.id}
+                    show={show}
+                    onClick={() => openShow(show.id)}
+                  />
+                ))}
+                {upcomingList.map((show) => (
+                  <UpcomingShowCard
+                    key={show.id}
+                    show={show}
+                    reminderOn={reminders.has(show.id)}
+                    onToggleReminder={toggleReminder}
+                    onClick={() => setPreviewShow(show)}
+                    onPrebid={setPrebidShow}
+                  />
+                ))}
+              </div>
             )}
           </section>
 
-          {/* ردیف به‌زودی — فقط در حالت «فقط لایوها» (در حالت ادغام، داخل لیست بالا می‌آیند) */}
-          {liveOnly && upcomingList.length > 0 && (
-            <section aria-label="شوهای به‌زودی">
-              <SectionTitle title="به‌زودی" icon="🕒" />
-              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 -mb-1">
-                {upcomingList.map((show) => (
-                  <div key={show.id} className="w-[190px] shrink-0">
-                    <ShowCard
-                      compact
-                      show={show}
-                      onClick={() => openShow(show.id)}
-                      footer={
-                        <UpcomingFooter
-                          show={show}
-                          reminderOn={reminders.has(show.id)}
-                          onToggleReminder={toggleReminder}
-                          onPrebid={setPrebidShow}
-                        />
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          {/* ردیف به‌زودی — در حالت «فقط لایوها» (در حالت ادغام داخل لیست بالا) */}
+          {uiState === "ready" &&
+            liveOnly &&
+            upcomingList.length > 0 &&
+            !forcedEmpty && (
+              <section aria-label="شوهای به‌زودی">
+                <SectionTitle title="به‌زودی" lucide={Clock} />
+                <div className="-mb-1 flex snap-x snap-mandatory gap-3 overflow-x-auto no-scrollbar pb-1">
+                  {upcomingList.map((show) => (
+                    <div
+                      key={show.id}
+                      className="w-[80%] max-w-[300px] shrink-0 snap-start"
+                    >
+                      <UpcomingShowCard
+                        show={show}
+                        reminderOn={reminders.has(show.id)}
+                        onToggleReminder={toggleReminder}
+                        onClick={() => setPreviewShow(show)}
+                        onPrebid={setPrebidShow}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
         </>
       )}
 
-      {/* فاز ۳ (P1) — شیت پیش‌بید شو به‌زودی — فقط در حالت مزایده */}
+      {/* شیت‌ها */}
+      {filterOpen && (
+        <FilterSheet
+          key="filter-open"
+          open
+          onOpenChange={setFilterOpen}
+          filters={filters}
+          liveOnly={liveOnly}
+          onApply={(f, lo) => {
+            setFilters(f);
+            setLiveOnly(lo);
+          }}
+        />
+      )}
+      {sortOpen && (
+        <SortSheet
+          key="sort-open"
+          open
+          onOpenChange={setSortOpen}
+          sort={sort}
+          onPick={(s) => {
+            setSort(s);
+            toast(`مرتب‌سازی: ${sortLabel(s)}`);
+          }}
+        />
+      )}
+      <UpcomingPreviewSheet
+        show={previewShow}
+        open={previewShow !== null}
+        onOpenChange={(o) => {
+          if (!o) setPreviewShow(null);
+        }}
+        reminderOn={previewShow ? reminders.has(previewShow.id) : false}
+        onToggleReminder={toggleReminder}
+      />
       {AUCTION_ENABLED && prebidShow && (
         <PreBidSheet
           key={prebidShow.id}

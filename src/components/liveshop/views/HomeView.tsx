@@ -1,23 +1,10 @@
 "use client";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   HomeView — صفحهٔ خانه (بازطراحی v1.6.1)
-   ─ کارت لایو: عنوان ≤۲ خط، قیمت در ردیف جدا و همیشه کامل، نشان موجودی زیر قیمت
-   ─ کاشی دسته‌بندی: لمس → کاوش با همان دستهٔ از پیش انتخاب‌شده (store مشترک)
-     + کاشی «همه»
-   ─ نوار بالا: دکمهٔ جستجو (→ کاوش با فوکوس روی ورودی) + زنگ اعلان با شمارندهٔ
-     ناخوانده از استور صندوق ورودی
-   ─ کارت «به‌زودی»: بدون برچسب «قیمت ثابت» (حداکثر یک برچسب وضعیت مثل «امضادار»)،
-     شمارش معکوس نسبی («۲ ساعت دیگر»)، لمس → شیت پیش‌نمایش (کاور، فروشنده،
-     کالاهای برنامه‌ریزی‌شده با قیمت، یادآوری)، اسکرول افقی snap با دیدن کارت بعد
-   ─ حالت‌ها: skeleton استوری‌ها و کارت‌ها، خطا با «تلاش دوباره»، بنر آفلاین
-     (navigator.onLine)، «الان لایوی نیست» با پیشنهاد شوهای آینده — کلید mock
-     ‏?state=loading|error|empty همه را برای اسکرین‌شات قابل دیدن می‌کند
-   ─ ایموجی‌های عنوان بخش‌ها و EmptyState با آیکون lucide یکدست شده
-   ─ بنر «چطور کار می‌کنه؟» دکمهٔ بستن دارد و بعد از بستن دیگر نمی‌آید
-     (localStorage با try/catch)
-   ─ لایهٔ داده: useLiveShows و useCategories (React Query — cursor pagination
-     با بارگذاری بیشتر هنگام اسکرول؛ NEXT_PUBLIC_USE_API=true → API واقعی)
+   HomeView — صفحهٔ خانه (بازطراحی v1.6.1 + اصلاح‌های v1.6.2)
+   v1.6.2 ─ بنر «چطور کار می‌کنه؟» یک خط فشرده شد با «بیشتر بدانید» (شیت)
+   ─ سربرگ در ?state=error|empty گمراه‌کننده نیست (متن جایگزین)
+   ─ کارت «به‌زودی» مشترک با کاوش (upcoming-card.tsx)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -41,14 +28,25 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useAppStore } from "@/store/app-store";
 import { useInboxStore, selectUnreadCount } from "@/store/inbox-store";
 import { useExploreIntentStore } from "@/store/explore-intent-store";
+import {
+  forcedStateStore,
+  useForcedState,
+  useOnline,
+} from "@/lib/forced-state";
 import { faNum } from "@/lib/format";
 import { UPCOMING_SHOWS, getSeller } from "@/lib/data/shows";
-import { SELLER_PHOTO, SHOW_PHOTO } from "@/lib/data/media";
+import { SELLER_PHOTO } from "@/lib/data/media";
 import {
-  ShowCard,
   LiveGridCard,
   SectionTitle,
   CategoryTile,
@@ -57,65 +55,20 @@ import {
 import { useLiveShows } from "@/hooks/useLiveShows";
 import { useCategories } from "@/hooks/useCategories";
 import UpcomingPreviewSheet from "./home/upcoming-preview-sheet";
+import { UpcomingShowCard } from "./home/upcoming-card";
 import { upcomingStartsAt, relativeStartFa } from "./home/upcoming";
 import type { Show } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
 
 type HomeTab = "forYou" | "following";
-type ForceState = "loading" | "error" | "empty";
 
-/* ── کلید localStorage بنر «چطور کار می‌کنه؟» (v1.6.1) ── */
+/* ── کلید localStorage بنر «چطور کار می‌کنه؟» ── */
 const HOW_IT_WORKS_KEY = "liveshop.how-it-works.dismissed.v1";
 
 /* ─────────────────────────────────────────────────────────────
-   v1.6.1 — استورهای بیرونی کوچک (الگوی useSyncExternalStore):
-   ‏۱) کلید mock ‏?state=  ۲) وضعیت بسته‌شدن بنر (localStorage)
-   ‏۳) آنلاین/آفلاین (navigator.onLine) — بدون setState داخل effect
+   استور بیرونی وضعیت بسته‌شدن بنر «چطور کار می‌کنه؟» (localStorage)
+   (کلید ?state= و آنلاین/آفلاین از lib/forced-state — مشترک با کاوش)
    ───────────────────────────────────────────────────────────── */
-
-const noopSubscribe = () => () => {};
-
-/** mounted؟ — برای متن‌های وابسته به زمان (بدون hydration mismatch):
-    سرور/آب‌رسانی «به‌زودی» می‌بیند و بعد از mount لیبل نسبی واقعی می‌آید */
-function useMounted() {
-  return useSyncExternalStore(
-    noopSubscribe,
-    () => true,
-    () => false
-  );
-}
-
-/** خواندن و پاک‌کردن کلید mock ‏?state= از URL (بدون رفرش صفحه) */
-const forcedStateStore = {
-  listeners: new Set<() => void>(),
-  notify() {
-    this.listeners.forEach((l) => l());
-  },
-  subscribe(cb: () => void) {
-    forcedStateStore.listeners.add(cb);
-    return () => forcedStateStore.listeners.delete(cb);
-  },
-  getSnapshot(): ForceState | null {
-    try {
-      const s = new URLSearchParams(window.location.search).get("state");
-      return s === "loading" || s === "error" || s === "empty" ? s : null;
-    } catch {
-      return null;
-    }
-  },
-  getServerSnapshot(): ForceState | null {
-    return null;
-  },
-  /** پاک‌کردن کلید mock (دکمهٔ «تلاش دوباره») */
-  clear() {
-    try {
-      window.history.replaceState(null, "", window.location.pathname);
-    } catch {
-      /* noop */
-    }
-    forcedStateStore.notify();
-  },
-};
 
 /** بنر «چطور کار می‌کنه؟» — خواندن/نوشتن localStorage با try/catch + اطلاع‌رسانی */
 const howItWorksStore = {
@@ -153,16 +106,6 @@ const howItWorksStore = {
     howItWorksStore.notify();
   },
 };
-
-/** navigator.onLine — الگوی رسمی React برای وضعیت شبکه */
-function subscribeOnline(cb: () => void) {
-  window.addEventListener("online", cb);
-  window.addEventListener("offline", cb);
-  return () => {
-    window.removeEventListener("online", cb);
-    window.removeEventListener("offline", cb);
-  };
-}
 
 /* ─────────────────────────── اجزای کوچک خانه ─────────────────────────── */
 
@@ -225,72 +168,8 @@ function StoryBubble({
   );
 }
 
-/* ── دکمهٔ toggle یادآوری (span نقش‌محور چون ShowCard خودش button است) ── */
-function ReminderToggle({
-  show,
-  on,
-  onToggle,
-}: {
-  show: Show;
-  on: boolean;
-  onToggle: (show: Show) => void;
-}) {
-  return (
-    <span
-      role="button"
-      tabIndex={0}
-      aria-pressed={on}
-      aria-label={`${on ? "حذف یادآوری" : "فعال‌سازی یادآوری"} برای شو ${show.title}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle(show);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          e.stopPropagation();
-          onToggle(show);
-        }
-      }}
-      className={cn(
-        "mt-1.5 flex w-full cursor-pointer select-none items-center justify-center gap-1 rounded-lg py-1.5 text-center text-[11px] font-bold transition-colors",
-        on
-          ? "bg-ls-green text-[#04281e]"
-          : "border border-ls-pink/50 text-ls-pink hover:bg-ls-pink/10"
-      )}
-    >
-      {!on && <Bell className="h-3 w-3" aria-hidden />}
-      {on ? "یادآوری فعال ✓" : "یادآوری"}
-    </span>
-  );
-}
-
-/* ── فوتر کارت شو به‌زودی: شمارش معکوس نسبی + دکمهٔ یادآوری ──
-   v1.6.1 — «شروع: …» با زمان مطلق → شمارش نسبی («۲ ساعت دیگر»)
-   (لیبل نسبی فقط بعد از mount — بدون hydration mismatch) */
-function UpcomingFooter({
-  show,
-  reminderOn,
-  onToggleReminder,
-}: {
-  show: Show;
-  reminderOn: boolean;
-  onToggleReminder: (show: Show) => void;
-}) {
-  const mounted = useMounted();
-  const startLabel = mounted
-    ? relativeStartFa(upcomingStartsAt(show.id))
-    : "به‌زودی";
-  return (
-    <>
-      <div className="mt-1 flex items-center gap-2 rounded-lg bg-ls-card-2 px-2.5 py-1.5 text-[11px]">
-        <Clock className="w-3 h-3 shrink-0 text-ls-pink" aria-hidden />
-        <span className="font-bold text-white/80">{startLabel}</span>
-      </div>
-      <ReminderToggle show={show} on={reminderOn} onToggle={onToggleReminder} />
-    </>
-  );
-}
+/* ── v1.6.2 — toggle یادآوری و فوتر کارت «به‌زودی» به upcoming-card.tsx
+   منتقل شد (مشترک با کاوش — UpcomingShowCard) ── */
 
 /* ── v1.6.1 — اسکلت‌های حالت بارگذاری (استوری‌ها، دسته‌ها، کارت‌ها) ── */
 function StoriesSkeleton() {
@@ -412,50 +291,118 @@ function EmptyLiveState({
   );
 }
 
-/* ── v1.6.1 — بنر «چطور کار می‌کنه؟» با بستن + localStorage (try/catch) ── */
-function HowItWorksBanner({ onDismiss }: { onDismiss: () => void }) {
+/* ── v1.6.2 — خط فشردهٔ «چطور کار می‌کنه؟»: یک خط + «بیشتر بدانید» (شیت)
+   بستن (X) دائمی است — localStorage با try/catch ── */
+function HowItWorksStrip({
+  onDismiss,
+  onOpen,
+}: {
+  onDismiss: () => void;
+  onOpen: () => void;
+}) {
   return (
-    <section
+    <div
       aria-label="چطور کار می‌کنه"
       data-testid="how-it-works"
-      className="relative rounded-2xl p-px bg-gradient-to-l from-ls-purple via-ls-pink to-ls-purple shadow-lg shadow-ls-purple/20"
+      className="flex items-center gap-2 rounded-xl border border-white/10 bg-ls-card py-1.5 pl-1.5 pr-3"
     >
-      <div className="rounded-[calc(1rem-1px)] bg-ls-card p-4 pb-3.5 space-y-3">
-        <button
-          onClick={onDismiss}
-          aria-label="بستن بنر چطور کار می‌کنه"
-          className="absolute left-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-ls-card-2 text-white/60 transition-colors hover:bg-ls-line hover:text-white"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </button>
-        <h2 className="flex items-center gap-2 text-sm font-extrabold pl-9">
-          <Sparkles className="h-4 w-4 shrink-0 text-ls-pink" aria-hidden />
-          چطور کار می‌کنه؟
-        </h2>
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-          <span className="bg-ls-card-2 rounded-lg px-2.5 py-1.5">
-            ۱. شو رو ببین
-          </span>
-          <span className="text-ls-pink" aria-hidden>
-            ←
-          </span>
-          <span className="bg-ls-card-2 rounded-lg px-2.5 py-1.5">
-            ۲. کالای موردعلاقه رو انتخاب کن
-          </span>
-          <span className="text-ls-pink" aria-hidden>
-            ←
-          </span>
-          <span className="bg-ls-card-2 rounded-lg px-2.5 py-1.5 text-ls-green">
-            ۳. همین لحظه بخر!
-          </span>
+      <Sparkles className="h-4 w-4 shrink-0 text-ls-pink" aria-hidden />
+      <p className="min-w-0 flex-1 truncate text-xs font-bold text-white/80">
+        چطور کار می‌کنه؟
+      </p>
+      <button
+        onClick={onOpen}
+        aria-label="بیشتر بدانید — توضیح خرید زنده"
+        className="shrink-0 rounded-full bg-ls-purple px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-ls-purple-deep"
+      >
+        بیشتر بدانید
+      </button>
+      <button
+        onClick={onDismiss}
+        aria-label="بستن بنر چطور کار می‌کنه"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ls-card-2 text-white/60 transition-colors hover:bg-ls-line hover:text-white"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+/* ── v1.6.2 — شیت توضیح «چطور کار می‌کنه؟» (محتوای بنر قدیمی) ── */
+function HowItWorksSheet({
+  open,
+  onOpenChange,
+  onDismiss,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        className="rounded-t-3xl border-white/10 bg-ls-bg px-0 pb-[max(env(safe-area-inset-bottom),12px)] pt-2"
+        aria-describedby={undefined}
+      >
+        <span
+          className="mx-auto mb-1 block h-1 w-10 rounded-full bg-white/20"
+          aria-hidden
+        />
+        <SheetHeader className="px-4 text-right">
+          <SheetTitle className="flex items-center gap-2 text-base font-extrabold text-white">
+            <Sparkles className="h-4 w-4 shrink-0 text-ls-pink" aria-hidden />
+            چطور کار می‌کنه؟
+          </SheetTitle>
+          <SheetDescription className="sr-only">
+            توضیح خرید زنده با قیمت ثابت و پول امانی
+          </SheetDescription>
+        </SheetHeader>
+        <div className="space-y-3 px-4 pb-2 pt-1">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+            <span className="bg-ls-card-2 rounded-lg px-2.5 py-1.5">
+              ۱. شو رو ببین
+            </span>
+            <span className="text-ls-pink" aria-hidden>
+              ←
+            </span>
+            <span className="bg-ls-card-2 rounded-lg px-2.5 py-1.5">
+              ۲. کالای موردعلاقه رو انتخاب کن
+            </span>
+            <span className="text-ls-pink" aria-hidden>
+              ←
+            </span>
+            <span className="bg-ls-card-2 rounded-lg px-2.5 py-1.5 text-ls-green">
+              ۳. همین لحظه بخر!
+            </span>
+          </div>
+          <p className="text-xs leading-6 text-white/65">
+            در شوهای زنده، فروشنده کالا را جلوی دوربین نشان می‌دهد و تو همان
+            لحظه با قیمت ثابت می‌خری. پولت به‌صورت امانی نزد لحظه می‌ماند و
+            بعد از تحویل به فروشنده آزاد می‌شود — خیالت راحت!
+          </p>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => onOpenChange(false)}
+              className="h-11 flex-1 rounded-xl bg-ls-purple text-sm font-bold text-white transition-colors hover:bg-ls-purple-deep"
+            >
+              متوجهم
+            </button>
+            <button
+              onClick={() => {
+                onDismiss();
+                onOpenChange(false);
+              }}
+              aria-label="بستن و دیگر نشان ندادن"
+              className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-ls-card-2 px-4 text-sm font-bold text-white/75 transition-colors hover:text-white"
+            >
+              <X className="h-4 w-4" aria-hidden />
+              دیگر نشان نده
+            </button>
+          </div>
         </div>
-        <p className="text-xs leading-6 text-white/65">
-          در شوهای زنده، فروشنده کالا را جلوی دوربین نشان می‌دهد و تو همان
-          لحظه با قیمت ثابت می‌خری. پولت به‌صورت امانی نزد لحظه می‌ماند و
-          بعد از تحویل به فروشنده آزاد می‌شود — خیالت راحت!
-        </p>
-      </div>
-    </section>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -482,13 +429,9 @@ export default function HomeView() {
   /* شیت پیش‌نمایش شو به‌زودی */
   const [previewShow, setPreviewShow] = useState<Show | null>(null);
 
-  /* استورهای بیرونی — بدون setState داخل effect (v1.6.1) */
+  /* استورهای بیرونی — بدون setState داخل effect */
   /* کلید mock ?state=loading|error|empty برای دیدن و گرفتن عکس همهٔ حالت‌ها */
-  const forcedState = useSyncExternalStore(
-    forcedStateStore.subscribe,
-    forcedStateStore.getSnapshot,
-    forcedStateStore.getServerSnapshot
-  );
+  const forcedState = useForcedState();
   /* بنر «چطور کار می‌کنه؟» — بعد از بستن (localStorage) دیگر نمایش داده نمی‌شود */
   const howItWorksDismissed = useSyncExternalStore(
     howItWorksStore.subscribe,
@@ -496,11 +439,9 @@ export default function HomeView() {
     howItWorksStore.getServerSnapshot
   );
   /* وضعیت آفلاین (navigator.onLine) */
-  const online = useSyncExternalStore(
-    subscribeOnline,
-    () => navigator.onLine,
-    () => true
-  );
+  const online = useOnline();
+  /* شیت توضیح «چطور کار می‌کنه؟» — از خط فشرده باز می‌شود */
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const dismissHowItWorks = () => howItWorksStore.dismiss();
 
@@ -582,7 +523,11 @@ export default function HomeView() {
           <p className="mt-1 text-sm text-white/65">
             {uiState === "loading"
               ? "در حال آماده‌سازی لایوها…"
-              : `امشب ${faNum(shows.length)} شو زنده داریم!`}
+              : uiState === "error"
+                ? "الان نمی‌توانیم لایوها را نشان دهیم"
+                : uiState === "empty"
+                  ? "فعلاً لایوی در جریان نیست — به‌زودی برمی‌گردیم"
+                  : `امشب ${faNum(shows.length)} شو زنده داریم!`}
           </p>
         </div>
         <button
@@ -609,8 +554,14 @@ export default function HomeView() {
         </button>
       </header>
 
-      {/* بنر «چطور کار می‌کنه؟» — بعد از بستن (localStorage) دیگر نمی‌آید */}
-      {!howItWorksDismissed && <HowItWorksBanner onDismiss={dismissHowItWorks} />}
+      {/* v1.6.2 — خط فشردهٔ «چطور کار می‌کنه؟» + دکمهٔ «بیشتر بدانید» (شیت)
+          بعد از بستن (localStorage) دیگر نمی‌آید — صفحهٔ اول بدون اسکرول لایوها را نشان می‌دهد */}
+      {!howItWorksDismissed && (
+        <HowItWorksStrip
+          onDismiss={dismissHowItWorks}
+          onOpen={() => setHowItWorksOpen(true)}
+        />
+      )}
 
       {/* ردیف «همین حالا زنده»: دایره‌های استوری با حلقهٔ رنگی */}
       {uiState !== "error" && uiState !== "empty" && (
@@ -743,43 +694,24 @@ export default function HomeView() {
         )}
       </section>
 
-      {/* به‌زودی — کارت‌ها با شمارش نسبی، بدون برچسب «قیمت ثابت»، snap با دیدن کارت بعد */}
+      {/* به‌زودی — کارت‌ها با شمارش نسبی، بدون برچسب «قیمت ثابت»، snap با دیدن کارت بعد
+          v1.6.2 — همان UpcomingShowCard مشترک با کاوش */}
       <section aria-label="شوهای به‌زودی">
         <SectionTitle title="به‌زودی" lucide={Clock} />
         <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto no-scrollbar pb-1 -mb-1">
-          {UPCOMING_SHOWS.map((raw) => {
-            /* v1.6.1 — حذف برچسب «قیمت ثابت» (و «خرید فوری» حراجی) —
-               حداکثر یک برچسب وضعیت مثل «امضادار» می‌ماند.
-               زمان مطلق (startsAtLabel) هم برمی‌داریم تا با شمارش نسبی فوتر
-               تکراری نشود — نشان کاور به «به‌زودی» برمی‌گردد */
-            const show: Show = {
-              ...raw,
-              startsAtLabel: undefined,
-              tags: raw.tags.filter(
-                (t) => t !== "قیمت ثابت" && t !== "خرید فوری"
-              ),
-            };
-            return (
-              <div
-                key={show.id}
-                className="w-[80%] max-w-[300px] shrink-0 snap-start"
-              >
-                <ShowCard
-                  compact
-                  show={show}
-                  photo={SHOW_PHOTO[show.id]}
-                  onClick={() => setPreviewShow(show)}
-                  footer={
-                    <UpcomingFooter
-                      show={show}
-                      reminderOn={reminders.has(show.id)}
-                      onToggleReminder={toggleReminder}
-                    />
-                  }
-                />
-              </div>
-            );
-          })}
+          {UPCOMING_SHOWS.map((show) => (
+            <div
+              key={show.id}
+              className="w-[80%] max-w-[300px] shrink-0 snap-start"
+            >
+              <UpcomingShowCard
+                show={show}
+                reminderOn={reminders.has(show.id)}
+                onToggleReminder={toggleReminder}
+                onClick={() => setPreviewShow(show)}
+              />
+            </div>
+          ))}
         </div>
       </section>
 
@@ -792,6 +724,13 @@ export default function HomeView() {
         }}
         reminderOn={previewShow ? reminders.has(previewShow.id) : false}
         onToggleReminder={toggleReminder}
+      />
+
+      {/* v1.6.2 — شیت توضیح «چطور کار می‌کنه؟» */}
+      <HowItWorksSheet
+        open={howItWorksOpen}
+        onOpenChange={setHowItWorksOpen}
+        onDismiss={dismissHowItWorks}
       />
     </div>
   );
