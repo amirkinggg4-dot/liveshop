@@ -84,3 +84,24 @@ POST /api/v1/auth/refresh      { "refreshToken": "…" }   → جفت تازه؛
 ## دادهٔ دمو (seed)
 
 ۵ فروشندهٔ تأییدشده (همان‌های mock: سینا/مینا/کلکسیون‌یار/گجت‌بازار/عطر و نگین)، ۱۰ دسته، ۱۰ کالا با ۲۸ واریانت سایز، ۳ شو LIVE + ۱ SCHEDULED + ۱ ENDED (هر شو یک کالای پین‌شده)، و خریدار دمو **۰۹۱۲۱۲۳۴۵۶۷** با کیف پول ۵٬۰۰۰٬۰۰۰ تومانی (دو ردیف دفترکل با `txnId` که جمعشان صفر است).
+
+## سختی‌سازی امنیتی v1.5.1 (فقط `src/lib/server` — UI دست‌نخورده)
+
+| # | اصلاح | جزئیات |
+| --- | --- | --- |
+| ۱ | `devCode` فقط در dev | `requestOtp` در production بدون `KAVENEGAR_API_KEY` قبل از هر نوشتنی در DB با `502 OTP_DELIVERY_FAILED` fail-closed می‌شود؛ پیامش عیناً همان قطعیِ سرویس پیامک است تا چیزی لو نرود. devCode فقط وقتی برگردانده می‌شود که `NODE_ENV !== "production"` و کلید خالی باشد. |
+| ۲ | تلاش‌های OTP اتمیک | هر تلاش با `updateMany({ where: { id, attempts: { lt: 5 } }, data: { attempts: { increment: 1 } } })` ادعا می‌شود؛ `count === 0` → `429 TOO_MANY_ATTEMPTS`. بعد از ادعا، کد مقایسه و در صورت درستی ردیف حذف می‌شود (`deleteMany` idempotent با `codeHash`). |
+| ۳ | پاک‌سازی با پنجرهٔ نرخ | حذف ردیف‌ها فقط `createdAt < now − OTP_RATE_WINDOW_MINUTES` (نه `expiresAt`) — حذفِ بر اساس انقضا شمارندهٔ «۳ در ۱۰ دقیقه» را هر ۲ دقیقه صفر می‌کرد. per-phone و per-IP روی همان پنجره می‌شمارند. |
+| ۴ | `getAuthSecret()` واحد | `src/lib/server/secret.ts` — خالی یا < ۳۲ کاراکتر → خطای بلند. `hashCode` / `hashToken` / `secretKey` همه از آن می‌خوانند؛ هیچ fallback به رشتهٔ خالی وجود ندارد. |
+| ۵ | چرخش refresh اتمیک | `updateMany({ where: { id, revokedAt: null, expiresAt: { gt: now } }, data: { revokedAt: now } })` — `count !== 1` یعنی مسابقهٔ باخته/replay/منقضی → ابطال همهٔ نشست‌های کاربر + `401 INVALID_REFRESH_TOKEN` (فقط یک برنده در هر مسابقه). |
+| ۶ | `clientIp` + `TRUSTED_PROXY` | `x-forwarded-for` فقط وقتی `TRUSTED_PROXY=true` باشد خوانده می‌شود؛ وگرنه نادیده (جعل‌پذیر) و `x-real-ip` سطح اتصال یا `local`. Caddy این هدرها را بازنویسی می‌کند (نه append) — مستند در README و کامنت‌های Caddyfile. |
+
+### تست‌های امنیتی
+
+```bash
+bun run test:server
+```
+
+- ۱۷ تست در `src/lib/server/__tests__/` روی یک **PostgreSQL واقعی** در اسکیمای جداگانهٔ `liveshop_test` (دیتای dev/seed دست‌نخورده می‌ماند)؛ اسکریپت `scripts/test-server.sh` در صورت نیاز Postgres را بالا می‌آورد و اسکیما را sync می‌کند.
+- هر مورد امنیتی یک تست دارد که **قبل از اصلاح شکست می‌خورد و بعد از آن پاس می‌شود**: ۱۰۰ verify هم‌زمان با کد غلط (دقیقاً ۵ تلاش شمرده می‌شود و کد درست بعدش رد می‌شود)، ۴ درخواست کد با فاصلهٔ ۳ دقیقهٔ شبیه‌سازی‌شده در بازهٔ ۱۰ دقیقه (چهارمی بلاک، بعد از ۱۱ دقیقه آزاد)، دو refresh هم‌زمان با یک توکن (فقط یکی موفق)، production بدون کلید پیامک (devCode در پاسخ نیست)، secret ضعیف/ناموجود، جعل `x-forwarded-for` بدون `TRUSTED_PROXY`.
+- شبیه‌سازی زمان: ساعت JS را می‌شود با `setSystemTime` mock کرد اما `createdAt`/`expiresAt` را **دیتابیس** می‌نویسد؛ بنابراین تست، زمان شبیه‌سازی‌شده را با شیفت هر دو ستون در SQL اعمال می‌کند — از دید همهٔ کوئری‌های اپ دقیقاً «۳ دقیقه گذشته» است.

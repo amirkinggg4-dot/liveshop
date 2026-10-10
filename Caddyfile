@@ -1,23 +1,32 @@
+// LiveShop gateway (:81) — single external entry of the sandbox.
+//
+// Security contract (v1.5.1): X-Forwarded-For / X-Real-IP are REWRITTEN with
+// the real socket address ({remote_host}). A client-supplied value is
+// discarded — NEVER appended — so the app can only ever see the address the
+// TCP connection actually came from. The app honors these headers only when
+// TRUSTED_PROXY=true (see README → «IP کاربر و TRUSTED_PROXY»).
 :81 {
-	@transform_port_query {
-		query XTransformPort=*
-	}
+        @transform_port_query {
+                query XTransformPort=*
+        }
 
-	handle @transform_port_query {
-		reverse_proxy localhost:{query.XTransformPort} {
-			header_up Host {host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Real-IP {remote_host}
-		}
-	}
+        handle @transform_port_query {
+                reverse_proxy localhost:{query.XTransformPort} {
+                        header_up Host {host}
+                        # overwrite (not append) — spoofed client chains are dropped:
+                        header_up X-Forwarded-For {remote_host}
+                        header_up X-Forwarded-Proto {scheme}
+                        header_up X-Real-IP {remote_host}
+                }
+        }
 
-	handle {
-		reverse_proxy localhost:3000 {
-			header_up Host {host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Real-IP {remote_host}
-		}
-	}
+        handle {
+                reverse_proxy localhost:3000 {
+                        header_up Host {host}
+                        # overwrite (not append) — spoofed client chains are dropped:
+                        header_up X-Forwarded-For {remote_host}
+                        header_up X-Forwarded-Proto {scheme}
+                        header_up X-Real-IP {remote_host}
+                }
+        }
 }

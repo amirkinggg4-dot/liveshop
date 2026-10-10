@@ -6,12 +6,14 @@
  * max 5 verification attempts, one-time use.
  *
  * SMS delivery: when KAVENEGAR_API_KEY is set the code is sent through the
- * Kavenegar verify/lookup API; otherwise it is printed to the server console
- * and returned as `devCode` (dev mode only — never when a provider exists).
+ * Kavenegar verify/lookup API. Without a key, console delivery (+ `devCode`
+ * in the response) is allowed ONLY in development — production fails closed
+ * with OTP_DELIVERY_FAILED and reveals nothing (fix v1.5.1 #1).
  */
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
 import { ApiError, errors } from "./http";
+import { getAuthSecret } from "./secret";
 
 const OTP_TTL_SECONDS = 120;
 const OTP_MAX_ATTEMPTS = 5;
@@ -31,7 +33,8 @@ export function normalizePhone(input: string): string {
 }
 
 function hashCode(phone: string, code: string): string {
-  return createHmac("sha256", process.env.AUTH_SECRET ?? "").update(`${phone}:${code}`).digest("hex");
+  // fix v1.5.1 #4: the secret (and its strength policy) has exactly one owner.
+  return createHmac("sha256", getAuthSecret()).update(`${phone}:${code}`).digest("hex");
 }
 
 function fixedTimeEqual(a: string, b: string): boolean {
@@ -75,11 +78,18 @@ async function sendSms(phone: string, code: string): Promise<boolean> {
 export type RequestOtpResult = {
   delivery: "sms" | "console";
   expiresInSeconds: number;
-  /** Only present when no SMS provider is configured (development). */
+  /** Only when NODE_ENV !== "production" AND no SMS key is set (fix v1.5.1 #1). */
   devCode?: string;
 };
 
 export async function requestOtp(phone: string, ip: string): Promise<RequestOtpResult> {
+  // fix v1.5.1 #1: fail closed. Production without an SMS provider must never
+  // hand the code to the caller — and must not reveal why. Same message as an
+  // ordinary provider outage, thrown before anything is written to the DB.
+  if (!process.env.KAVENEGAR_API_KEY && process.env.NODE_ENV === "production") {
+    throw new ApiError("OTP_DELIVERY_FAILED", "ارسال پیامک ناموفق بود؛ دوباره تلاش کنید", 502);
+  }
+
   const since = new Date(Date.now() - OTP_RATE_WINDOW_MINUTES * 60 * 1000);
   const [byPhone, byIp] = await Promise.all([
     db.otpCode.count({ where: { phone, createdAt: { gte: since } } }),
@@ -89,9 +99,10 @@ export async function requestOtp(phone: string, ip: string): Promise<RequestOtpR
     throw errors.rateLimited("کد بیش از حد درخواست شده است؛ ۱۰ دقیقهٔ دیگر دوباره تلاش کنید");
   }
 
-  // Hygiene: drop this phone's already-expired rows (kept rows are what the
-  // rate-limit window counts — never delete recent requests here).
-  await db.otpCode.deleteMany({ where: { phone, expiresAt: { lt: new Date() } } });
+  // fix v1.5.1 #3: hygiene only removes rows OLDER THAN THE RATE WINDOW
+  // (createdAt — never expiresAt). Cleaning by expiry rewound the counters
+  // above and let a caller farm a fresh code every 2 minutes.
+  await db.otpCode.deleteMany({ where: { phone, createdAt: { lt: since } } });
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   await db.otpCode.create({
@@ -104,9 +115,12 @@ export async function requestOtp(phone: string, ip: string): Promise<RequestOtpR
   });
 
   const delivered = await sendSms(phone, code);
-  return delivered
-    ? { delivery: "sms", expiresInSeconds: OTP_TTL_SECONDS }
-    : { delivery: "console", expiresInSeconds: OTP_TTL_SECONDS, devCode: code };
+  if (!delivered) {
+    // Console delivery is only reachable when the guard above didn't fire:
+    // no provider key AND not production (fix v1.5.1 #1).
+    return { delivery: "console", expiresInSeconds: OTP_TTL_SECONDS, devCode: code };
+  }
+  return { delivery: "sms", expiresInSeconds: OTP_TTL_SECONDS };
 }
 
 export async function verifyOtp(phone: string, code: string): Promise<void> {
@@ -118,14 +132,24 @@ export async function verifyOtp(phone: string, code: string): Promise<void> {
   if (!otp) {
     throw new ApiError("OTP_EXPIRED", "کدی فعال برای این شماره نیست؛ دوباره درخواست کد بده", 400);
   }
-  if (otp.attempts >= OTP_MAX_ATTEMPTS) {
-    await db.otpCode.delete({ where: { id: otp.id } });
+
+  // fix v1.5.1 #2: claim the attempt atomically. The WHERE clause is checked
+  // by PostgreSQL under a row lock, so the cap is exact even when guesses land
+  // in parallel — the old read-then-increment let every concurrent request
+  // pass the `attempts >= max` check with the same stale value.
+  const claimed = await db.otpCode.updateMany({
+    where: { id: otp.id, attempts: { lt: OTP_MAX_ATTEMPTS } },
+    data: { attempts: { increment: 1 } },
+  });
+  if (claimed.count === 0) {
     throw new ApiError("TOO_MANY_ATTEMPTS", "تلاش‌های شما بیش از حد مجاز بود؛ کد جدید بگیرید", 429);
   }
+
   if (!fixedTimeEqual(hashCode(phone, code), otp.codeHash)) {
-    await db.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
     throw new ApiError("INVALID_OTP", "کد واردشده اشتباه است", 400);
   }
-  // One-time use: burn exactly the verified code row.
-  await db.otpCode.delete({ where: { id: otp.id } });
+
+  // One-time use: burn exactly the verified code row (deleteMany → never a
+  // P2025 when two correct verifications race on the same code).
+  await db.otpCode.deleteMany({ where: { id: otp.id, codeHash: otp.codeHash } });
 }

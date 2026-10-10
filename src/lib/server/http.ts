@@ -76,9 +76,22 @@ export async function parseBody<T>(req: Request, schema: ZodType<T>): Promise<T>
   return result.data;
 }
 
-/** Client IP for rate limiting (behind the Caddy gateway). */
+/**
+ * Client IP for rate limiting.
+ *
+ * Trust model (fix v1.5.1 #6 — see README → «IP کاربر و TRUSTED_PROXY»):
+ *  - TRUSTED_PROXY=true → the app is behind our Caddy gateway, which
+ *    OVERWRITES x-forwarded-for / x-real-ip with the real socket address
+ *    (client-supplied values are discarded, never appended), so the first
+ *    XFF hop is trustworthy.
+ *  - otherwise → x-forwarded-for is attacker-controlled and IGNORED; the
+ *    connection-level header (x-real-ip) is used, falling back to "local"
+ *    for direct un-proxied requests.
+ */
 export function clientIp(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]!.trim();
+  if (process.env.TRUSTED_PROXY === "true") {
+    const fwd = req.headers.get("x-forwarded-for");
+    if (fwd) return fwd.split(",")[0]!.trim();
+  }
   return req.headers.get("x-real-ip") ?? "local";
 }

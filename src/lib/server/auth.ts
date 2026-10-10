@@ -13,16 +13,16 @@ import { createHash, randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { db } from "@/lib/db";
 import { ApiError, errors } from "./http";
+import { getAuthSecret } from "./secret";
 
 export const ACCESS_TTL_SECONDS = 15 * 60; // spec: access 15 min
 const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function secretKey(): Uint8Array {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret || secret.length < 16) {
-    throw new Error("AUTH_SECRET is missing or too short — set it in .env (openssl rand -hex 32)");
-  }
-  return new TextEncoder().encode(secret);
+  // fix v1.5.1 #4: the strength policy lives in ONE place (getAuthSecret) —
+  // previously this function accepted 16-char secrets while hashToken fell
+  // back to "" when AUTH_SECRET was unset.
+  return new TextEncoder().encode(getAuthSecret());
 }
 
 export type SessionUser = {
@@ -71,7 +71,8 @@ async function verifyAccessToken(token: string): Promise<{ sub: string }> {
 // ───────── Refresh tokens (rotating, hashed at rest) ─────────
 
 function hashToken(raw: string): string {
-  return createHash("sha256").update(`${raw}:${process.env.AUTH_SECRET ?? ""}`).digest("hex");
+  // fix v1.5.1 #4: no `?? ""` fallback — an unset secret must fail loudly.
+  return createHash("sha256").update(`${raw}:${getAuthSecret()}`).digest("hex");
 }
 
 /** Issue a new refresh token; returns the RAW value (only the hash is stored). */
@@ -93,8 +94,10 @@ function invalidRefresh(): ApiError {
 
 /**
  * Rotate a refresh token (spec: POST /auth/refresh).
- * If the presented token was already rotated or expired → treat as reuse
- * and revoke every active session of that user, then reject.
+ * fix v1.5.1 #5: the revocation is a single conditional update — exactly ONE
+ * concurrent caller can flip revokedAt null → now (and expiry is re-checked
+ * inside the same WHERE). Any loser (count !== 1) is treated as token reuse:
+ * every active session of that user is revoked, then INVALID_REFRESH_TOKEN.
  */
 export async function rotateSession(raw: string): Promise<{
   refreshToken: string;
@@ -107,7 +110,14 @@ export async function rotateSession(raw: string): Promise<{
   });
   if (!row) throw invalidRefresh();
 
-  if (row.revokedAt || row.expiresAt.getTime() < now.getTime()) {
+  // Atomic single-winner claim (PostgreSQL row lock): a stolen token can no
+  // longer be raced into two live sessions.
+  const claimed = await db.refreshToken.updateMany({
+    where: { id: row.id, revokedAt: null, expiresAt: { gt: now } },
+    data: { revokedAt: now },
+  });
+  if (claimed.count !== 1) {
+    // Lost race / replayed (already rotated) / expired → burn the whole family.
     await db.refreshToken.updateMany({
       where: { userId: row.userId, revokedAt: null },
       data: { revokedAt: now },
@@ -115,7 +125,6 @@ export async function rotateSession(raw: string): Promise<{
     throw invalidRefresh();
   }
 
-  await db.refreshToken.update({ where: { id: row.id }, data: { revokedAt: now } });
   const refreshToken = await issueRefreshToken(row.userId);
   return { refreshToken, user: row.user };
 }
