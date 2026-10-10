@@ -39,6 +39,20 @@ export interface Show {
   itemsSold: number;
   isFollowing: boolean;
   tags: string[];
+  /* ── v1.6.1 — فیلدهای اختیاریِ حالت API واقعی (همه fallback دارند) ──
+     در حالت mock تنظیم نمی‌شوند و UI همان مسیر قبلی (getSeller/SHOW_PHOTO/…)
+     را می‌رود؛ در حالت NEXT_PUBLIC_USE_API=true از پاسخ /shows پر می‌شوند. */
+  /** نام نمایشی فروشنده از API — اگر نبود getSeller(sellerId).name */
+  sellerName?: string;
+  /** آواتار فروشنده از API — اگر نبود SellerAvatar mock */
+  sellerAvatar?: string | null;
+  sellerVerified?: boolean;
+  /** قیمت ثابت کالای پین‌شده از API (کارت لایو) — اگر نبود getPinnedItem */
+  pinnedPrice?: number | null;
+  /** موجودی کالای پین‌شده از API — اگر نبود از variants حساب می‌شود */
+  pinnedStock?: number | null;
+  /** URL کاور از API — اگر نبود SHOW_PHOTO/show.id */
+  photoUrl?: string | null;
 }
 
 export type ItemStatus = "auction" | "up_next" | "buy_now" | "sold";

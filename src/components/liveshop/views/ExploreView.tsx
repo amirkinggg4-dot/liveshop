@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, X, Clock, Gavel } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { useAppStore } from "@/store/app-store";
+import { useExploreIntentStore } from "@/store/explore-intent-store";
 import { faNum } from "@/lib/format";
 import { SHOWS, SELLERS, LIVE_SHOWS, UPCOMING_SHOWS } from "@/lib/data/shows";
 import { CATEGORIES } from "@/lib/data/categories";
@@ -113,14 +114,31 @@ function UpcomingFooter({
 
 export default function ExploreView() {
   const openShow = useAppStore((s) => s.openShow);
+  /* v1.6.1 — نیت مشترک خانه → کاوش: دستهٔ از پیش انتخاب‌شده + فوکوس جستجو
+     (حداقل تغییر: فقط مصرف نیت هنگام mount — بقیهٔ صفحه دست‌نخورده) */
+  const intentCategory = useExploreIntentStore((s) => s.category);
+  const intentFocusSearch = useExploreIntentStore((s) => s.focusSearch);
+  const consumeIntent = useExploreIntentStore((s) => s.consume);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const [query, setQuery] = useState("");
-  const [activeCat, setActiveCat] = useState<Category | null>(null);
+  const [activeCat, setActiveCat] = useState<Category | null>(() =>
+    intentCategory
+      ? CATEGORIES.find((c) => c.id === intentCategory) ?? null
+      : null
+  );
   /* فاز ۱ — چیپ «فقط لایوها» (پیش‌فرض مثل baseline: فقط زنده‌ها) */
   const [liveOnly, setLiveOnly] = useState(true);
   /* فاز ۱ — شوهای به‌زودی که یادآوری فعال دارند */
   const [reminders, setReminders] = useState<Set<string>>(new Set());
   /* فاز ۳ (P1) — شیت پیش‌بید برای شو به‌زودی */
   const [prebidShow, setPrebidShow] = useState<Show | null>(null);
+
+  /* v1.6.1 — مصرف یک‌بارهٔ نیت: فوکوس روی ورودی جستجو + پاک‌کردن نیت */
+  useEffect(() => {
+    if (intentFocusSearch) searchInputRef.current?.focus();
+    if (intentCategory || intentFocusSearch) consumeIntent();
+  }, []);
 
   const q = query.trim().toLowerCase();
   const searching = q.length > 0;
@@ -176,6 +194,7 @@ export default function ExploreView() {
           aria-hidden
         />
         <Input
+          ref={searchInputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="جستجوی شو، فروشنده و کالا…"

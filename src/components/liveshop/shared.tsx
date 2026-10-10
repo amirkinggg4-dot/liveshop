@@ -16,6 +16,7 @@ import {
   Gem,
   Headphones,
   Home as HomeIcon,
+  LayoutGrid,
   Layers,
   Palette,
   Puzzle,
@@ -308,18 +309,26 @@ export function Chip({
 export function SectionTitle({
   title,
   icon,
+  lucide: Lucide,
   action,
   className,
 }: {
   title: string;
+  /** ایموجی (راه قدیمی — برای سازگاری نماهای دیگر حفظ شده) */
   icon?: string;
+  /** v1.6.1 — آیکون lucide یکدست (اولویت دارد؛ جایگزین ایموجی) */
+  lucide?: LucideIcon;
   action?: React.ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn("flex items-center justify-between mb-3", className)}>
       <h2 className="text-base font-extrabold flex items-center gap-2">
-        {icon && <span aria-hidden>{icon}</span>}
+        {Lucide ? (
+          <Lucide className="h-[18px] w-[18px] text-ls-pink" aria-hidden />
+        ) : (
+          icon && <span aria-hidden>{icon}</span>
+        )}
         {title}
       </h2>
       {action}
@@ -376,20 +385,33 @@ export function PageHeader({
 
 export function EmptyState({
   emoji,
+  lucide: Lucide,
   title,
   desc,
   action,
 }: {
-  emoji: string;
+  /** ایموجی (راه قدیمی — برای سازگاری نماهای دیگر حفظ شده) */
+  emoji?: string;
+  /** v1.6.1 — آیکون lucide یکدست (اولویت دارد؛ جایگزین ایموجی) */
+  lucide?: LucideIcon;
   title: string;
   desc?: string;
   action?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-14 px-6 gap-2">
-      <span className="text-5xl mb-2 animate-ls-float" aria-hidden>
-        {emoji}
-      </span>
+      {Lucide ? (
+        <span
+          className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-ls-card-2 ring-1 ring-white/10 animate-ls-float"
+          aria-hidden
+        >
+          <Lucide className="h-8 w-8 text-ls-purple-soft" />
+        </span>
+      ) : (
+        <span className="text-5xl mb-2 animate-ls-float" aria-hidden>
+          {emoji}
+        </span>
+      )}
       <p className="font-bold text-white/90">{title}</p>
       {desc && <p className="text-sm text-white/60 leading-6">{desc}</p>}
       {action && <div className="mt-3">{action}</div>}
@@ -464,7 +486,14 @@ export function ShowCard({
 
 /* ── v1.3.2 — کارت عمودی لایو برای فید دوسطحی خانه (نسبت ۴:۵، عکس تمام‌کارت) ──
    v1.4 — به‌جای «بید فعلی + تایمر»: قیمت ثابت کالای در حال نمایش (پین‌شده) +
-   برچسب «۳ عدد مانده» (زیر ۳ عدد رنگ هشدار). در حالت مزایده همان نمایش قبلی. */
+   برچسب «۳ عدد مانده» (زیر ۳ عدد رنگ هشدار). در حالت مزایده همان نمایش قبلی.
+   v1.6.1 — چیدمان متن کارت:
+   ─ عنوان حداکثر ۲ خط (line-clamp) — تنها متن مجاز به «…»
+   ─ قیمت در ردیف جدا و همیشه کامل (بدون truncate؛ «تومان» کامل، ارقام فارسی)
+   ─ نشان موجودی در ردیف جدا زیر قیمت
+   ─ هیچ متن دیگری با «…» بریده نمی‌شود (اسم فروشنده می‌شکند، نه بریده)
+   ─ اگر Show فیلدهای API (sellerName/pinnedPrice/pinnedStock/photoUrl) داشته
+     باشد اولویت دارند؛ وگرنه همان مسیر mock (getSeller/SHOW_PHOTO/getPinnedItem) */
 export function LiveGridCard({
   show,
   onClick,
@@ -472,17 +501,24 @@ export function LiveGridCard({
   show: Show;
   onClick?: () => void;
 }) {
-  const seller = getSeller(show.sellerId);
-  const photo = SHOW_PHOTO[show.id];
+  const mockSeller = getSeller(show.sellerId);
+  const sellerName = show.sellerName ?? mockSeller.name;
+  const sellerVerified = show.sellerVerified ?? mockSeller.verified;
+  const photo = show.photoUrl ?? SHOW_PHOTO[show.id];
 
-  /* v1.4 — کالای در حال نمایش (پین‌شده) شو */
-  const pinned = getPinnedItem(show.id);
-  const pinnedStock = pinned
-    ? pinned.variants?.length
-      ? pinned.variants.reduce((s, v) => s + v.stock, 0)
-      : pinned.stock
+  /* v1.4 — کالای در حال نمایش (پین‌شده) شو — اولویت با مقادیر API */
+  const mockPinned = getPinnedItem(show.id);
+  const mockStock = mockPinned
+    ? mockPinned.variants?.length
+      ? mockPinned.variants.reduce((s, v) => s + v.stock, 0)
+      : mockPinned.stock
     : 0;
-  const lowStock = pinnedStock > 0 && pinnedStock < 3;
+  const pinnedPrice =
+    show.pinnedPrice !== undefined ? show.pinnedPrice : mockPinned ? mockPinned.price : null;
+  const pinnedStock =
+    show.pinnedStock !== undefined ? show.pinnedStock : mockStock;
+  const hasPinned = pinnedPrice != null;
+  const lowStock = (pinnedStock ?? 0) > 0 && (pinnedStock ?? 0) < 3;
 
   /* حالت مزایده (کد حفظ‌شده) */
   const auction = getAuctionItem(show.id);
@@ -502,12 +538,20 @@ export function LiveGridCard({
       className="group relative block aspect-[4/5] w-full overflow-hidden rounded-2xl border border-white/10 bg-ls-card text-right shadow-lg transition-transform active:scale-[.98] hover:border-ls-purple/40"
     >
       {photo ? (
-        <SmartImg
-          src={photo}
-          alt={`تصویر شو ${show.title}`}
-          sizes="(max-width: 640px) 45vw, 200px"
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+        show.photoUrl ? (
+          <img
+            src={photo}
+            alt={`تصویر شو ${show.title}`}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <SmartImg
+            src={photo}
+            alt={`تصویر شو ${show.title}`}
+            sizes="(max-width: 640px) 45vw, 200px"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        )
       ) : (
         <GradientCover
           cover={show.cover}
@@ -521,27 +565,43 @@ export function LiveGridCard({
         <LiveBadge viewers={show.viewers} className="px-2 py-0.5 text-[10px]" />
       </div>
 
-      {/* گرادیان تیرهٔ پایین + اسم شو + فروشنده + قیمت ثابت پین‌شده + موجودی */}
+      {/* گرادیان تیرهٔ پایین + اسم شو (≤۲ خط) + فروشنده + ردیف قیمت + ردیف موجودی */}
       <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-2.5 pt-10">
-        <p className="truncate text-[12px] font-extrabold leading-5 text-white">
+        {/* v1.6.1 — عنوان: حداکثر ۲ خط — تنها «…» مجاز در کل کارت */}
+        <p className="line-clamp-2 text-[12px] font-extrabold leading-5 text-white">
           {show.title}
         </p>
-        <div className="mt-1 flex min-w-0 items-center gap-1.5">
-          <SellerAvatar sellerId={seller.id} className="h-5 w-5 ring-1 ring-white/25" />
-          <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-white/80">
-            {seller.name}
+        <div className="mt-1 flex min-w-0 items-start gap-1.5">
+          {show.sellerAvatar ? (
+            <span
+              className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full ring-1 ring-white/25"
+              aria-hidden
+            >
+              <img
+                src={show.sellerAvatar}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </span>
+          ) : (
+            <SellerAvatar sellerId={mockSeller.id} className="h-5 w-5 ring-1 ring-white/25" />
+          )}
+          {/* بدون truncate — اسم بلید می‌شکند ولی با «…» بریده نمی‌شود */}
+          <span className="min-w-0 flex-1 break-words text-[10px] font-bold leading-4 text-white/80">
+            {sellerName}
           </span>
-          {seller.verified && (
-            <span className="text-[10px] text-ls-purple-soft" title="فروشندهٔ تأییدشده">✓</span>
+          {sellerVerified && (
+            <span className="shrink-0 text-[10px] text-ls-purple-soft" title="فروشندهٔ تأییدشده">✓</span>
           )}
         </div>
-        <div className="mt-1.5 flex items-center justify-between gap-1">
+        {/* v1.6.1 — ردیف قیمت: همیشه کامل (بدون truncate) — «تومان» کامل، ارقام فارسی */}
+        <div className="mt-1.5">
           {AUCTION_ENABLED ? (
-            /* حالت مزایده — نمایش قبلی (کد حفظ‌شده) */
-            <>
+            /* حالت مزایده — نمایش قبلی (کد حفظ‌شده)، بدون truncate */
+            <div className="flex items-center justify-between gap-1">
               {auction ? (
                 <>
-                  <span className="truncate text-[11px] font-black tabular-nums text-ls-purple-soft">
+                  <span className="text-[11px] font-black tabular-nums text-ls-purple-soft">
                     بید فعلی {toman(auction.currentBid ?? auction.startPrice)}
                   </span>
                   <span
@@ -555,38 +615,38 @@ export function LiveGridCard({
                   </span>
                 </>
               ) : buyNowMin != null ? (
-                <span className="truncate text-[11px] font-black tabular-nums text-ls-green">
+                <span className="text-[11px] font-black tabular-nums text-ls-green">
                   خرید فوری از {toman(buyNowMin)}
                 </span>
               ) : null}
-            </>
+            </div>
           ) : (
-            /* v1.4 — قیمت ثابت کالای پین‌شده + «۳ عدد مانده» */
-            <>
-              <span
-                className="min-w-0 flex-1 truncate text-[11px] font-black tabular-nums text-ls-green"
-                aria-label={`قیمت ثابت کالای در حال نمایش: ${toman(pinned?.price ?? 0)}`}
-              >
-                {pinned ? toman(pinned.price) : "—"}
-              </span>
-              {pinned && (
-                <span
-                  className={cn(
-                    "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[9px] font-bold whitespace-nowrap",
-                    pinnedStock <= 0
-                      ? "border-white/15 bg-white/10 text-white/60"
-                      : lowStock
-                        ? "border-amber-300/40 bg-amber-300/10 text-amber-300"
-                        : "border-ls-green/40 bg-ls-green/10 text-ls-green"
-                  )}
-                  aria-live="polite"
-                >
-                  {stockLabelFa(pinnedStock)}
-                </span>
-              )}
-            </>
+            <span
+              className="block whitespace-nowrap text-[11px] font-black tabular-nums text-ls-green"
+              aria-label={`قیمت ثابت کالای در حال نمایش: ${hasPinned ? toman(pinnedPrice) : "—"}`}
+            >
+              {hasPinned ? toman(pinnedPrice) : "—"}
+            </span>
           )}
         </div>
+        {/* v1.6.1 — نشان موجودی: ردیف جدا زیر قیمت */}
+        {!AUCTION_ENABLED && hasPinned && pinnedStock != null && (
+          <div className="mt-1 flex">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-bold whitespace-nowrap",
+                pinnedStock <= 0
+                  ? "border-white/15 bg-white/10 text-white/60"
+                  : lowStock
+                    ? "border-amber-300/40 bg-amber-300/10 text-amber-300"
+                    : "border-ls-green/40 bg-ls-green/10 text-ls-green"
+              )}
+              aria-live="polite"
+            >
+              {stockLabelFa(pinnedStock)}
+            </span>
+          </div>
+        )}
       </div>
     </button>
   );
@@ -631,6 +691,7 @@ export function CategoryTile({
   onClick,
   active,
   subtitle,
+  icon: IconProp,
 }: {
   id: string;
   label: string;
@@ -638,8 +699,11 @@ export function CategoryTile({
   active?: boolean;
   /** مثلا «۱۲۸ شو زنده» — در خانه مخفی تا کارت کوچک‌تر بماند */
   subtitle?: string;
+  /** v1.6.1 — آیکون دستی (مثل کاشی «همه») — اگر عکس نبود اولویت دارد */
+  icon?: LucideIcon;
 }) {
   const photo = CATEGORY_PHOTO[id];
+  const FallbackIcon = IconProp ?? CATEGORY_ICON[id] ?? LayoutGrid;
   return (
     <button
       onClick={onClick}
@@ -662,7 +726,7 @@ export function CategoryTile({
           />
         ) : (
           <span className="flex h-full w-full items-center justify-center bg-ls-card-2">
-            <CategoryIcon id={id} className="h-6 w-6 text-ls-purple-soft" />
+            <FallbackIcon className="h-6 w-6 text-ls-purple-soft" aria-hidden />
           </span>
         )}
       </span>

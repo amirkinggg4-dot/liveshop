@@ -629,3 +629,25 @@ Stage Summary:
 - docs/screenshots now holds exactly the v1.5.1 set: 240 files + INDEX.md; no app code changed
 - known UI observations recorded in INDEX: quick-checkout success confetti is rendered inside the closing drawer (effectively invisible), latin digits in live-room dock price, buyer settings/addresses rows are toast-only
 - still unreachable without code changes: order timeline stages 4-5, buyer rating dialog, auction UI (gated off), true offline UI
+
+---
+Task ID: v1.6.1-home
+Agent: Z.ai Code (main)
+Task: بازطراحی فقط بخش «خانه» (HomeView و کامپوننت‌های خودش) — ۹ خواستهٔ کاربر + اسکرین‌شات‌های ۹ حالت × موبایل/دسکتاپ + نسخه v1.6.1 + commit/push
+
+Work Log:
+- recon: HomeView قبلی مستقیم به LIVE_SHOWS وصل بود؛ LiveGridCard فقط در خانه استفاده می‌شود (بازسازی آزاد)؛ SectionTitle/EmptyState/CategoryTile مشترک‌اند (فقط پراپ افزودنی)؛ React Query از قبل نصب؛ API v1 ‏(shows/categories) با serializer ‏showCard موجود
+- data layer: ‏src/hooks/useLiveShows.ts (useInfiniteQuery + cursor pagination، mock برش صفحه‌ای ۴تایی با تأخیر ۳۵۰ms، مسیر API با NEXT_PUBLIC_USE_API=true → GET /shows?status=LIVE) و useCategories.ts (useQuery، مپ nameFa→label/liveShowCount→liveCount) — نوع خروجی هر دو حالت یکی (Show[]/Category[])؛ فیلدهای اختیاری Show در types.ts (sellerName/sellerAvatar/sellerVerified/pinnedPrice/pinnedStock/photoUrl)؛ Providers (QueryClientProvider) در page.tsx
+- تست: src/hooks/__tests__/home-api-mapping.test.ts — ۸ تست bun (نمونهٔ seed API → تایپ UI بدون خطا، null-safe، صفحه‌بندی cursor mock، cursor نامعتبر) — همه پاس
+- shared.tsx: LiveGridCard بازطراحی (عنوان line-clamp-2، قیمت ردیف جدا همیشه کامل بدون truncate، نشان موجودی ردیف زیر قیمت، اسم فروشنده می‌شکند نه «…»، پشتیبانی کاور/آواتار خارجی API با img ساده)؛ SectionTitle/EmptyState پراپ lucide اختیاری (مسیر ایموجی بقیهٔ نماهها حفظ)؛ CategoryTile پراپ icon + fallback LayoutGrid
+- HomeView: نوار بالا (جستجو → کاوش با فوکوس، زنگ با شمارندهٔ ناخوانده از inbox-store)، کاشی «همه» + دسته‌ها → explore-intent-store (state/param مشترک)، کارت به‌زودی (حذف برچسب «قیمت ثابت» و «خرید فوری» و startsAtLabel، شمارش نسبی «۲ ساعت دیگر»، snap-x با کارت ۸۰٪ عرض، لمس → شیت پیش‌نمایش با کاور/فروشنده/کالاهای برنامه‌ریزی‌شده با قیمت/یادآوری)، حالت‌ها (skeleton استوری+دسته+گرید، خطا + تلاش دوباره، آفلاین navigator.onLine، «الان لایوی نیست» + پیشنهاد به‌زودی‌ها) با کلید ?state=loading|error|empty، ایموجی‌ها → lucide (Radio/Flame/Clock/Sparkles/Hand/UserRoundPlus...)، بنر «چطور کار می‌کنه؟» با بستن + localStorage (try/catch)
+- نکتهٔ فنی مهم: قانون lint جدید react-hooks/set-state-in-effect سه setState داخل effect را رد کرد → هر سه منبع بیرونی (کلید ?state=، dismissed بنر، navigator.onLine) به useSyncExternalStore مهاجرت کردند؛ باگ subscribe بنر (ثبت‌نشدن listener) در همین راه پیدا و رفع شد
+- hydration mismatch شمارش نسبی (محاسبهٔ زمان در load ماژول سرور ↔ کلاینت) با الگوی useMounted (useSyncExternalStore) رفع شد — لیبل نسبی فقط بعد از mount؛ افست‌های ساعت ثابت (۲/۴۵/۷۸) تا لیبل مستقل از ساعت اجرا باشد
+- ExploreView: فقط مصرف نیت (۲۰ خط افزودنی — دستهٔ از پیش انتخاب‌شده + فوکوس ورودی جستجو)
+- اسکرین‌شات: رانر Playwright خارج از ریپو (home-shots-v161.mjs) — ۹ وضعیت × ۲ اندازه، قبل از هر ذخیره assert متن/موقعیت، بعد از آن hash-جدا بودن هر ۱۸ فایل + حداقل حجم؛ ۳ دور اصلاح قاب (upcoming آخرین سکشن است و با لود صفحهٔ ۲ جابه‌جا می‌شود → صبر برای «همهٔ لایوها را دیدی» + re-scroll + اسکرول افقی ردیف به کارت دوم برای تمایز از bottom)؛ بازبینی چشمی ۱۰+ عکس
+- docs: ۸ عکس کهنهٔ home-* حذف، ۶ نام هم‌نام بازنویسی شدند، INDEX.md (جدول ۱۸ ردیفهٔ v1.6.1 + نگاشت قدیم→جدید + نکته‌های صادقانه)؛ CHANGELOG [v1.6.1]؛ config.ts APP_VERSION + package.json = 1.6.1
+- verify نهایی: lint پاک، tsc فقط ۴ خطای قدیمی vendored خارج از src، ۸/۸ تست پاس، smoke تست مرورگر ۲۱/۲۱ پاس با صفر خطای کنسول، dev.log تمیز
+
+Stage Summary:
+- v1.6.1 کامل: هر ۹ خواسته پیاده شد؛ خانه دیگر به LIVE_SHOWS وصل نیست (useLiveShows/useCategories با cursor pagination)؛ هیچ صفحهٔ دیگری بازطراحی نشد (فقط مصرف نیت در کاوش + پراپ‌های اختیاری مشترک)
+- صادقانه: شمارش نسبی از mock می‌آید (نه scheduledAt واقعی)؛ در حالت API واقعی isFollowing=false و کاور/آواتار به URL واقعی وابسته‌اند (fallback دارد)؛ SoonBadge کاور به‌زودی‌ها همچنان ایموجی 🕒 دارد (کامپوننت مشترک با کاوش — خارج از محدوده)؛ در ?state=error|empty سربرگ تعداد واقعی دیتای mock را نشان می‌دهد؛ حالت API=true فقط با تست mapper پوشش داده شد (نه E2E با دیتابیس پر)؛ عکس‌ها روی dev server گرفته شدند (نه build)
