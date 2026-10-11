@@ -5,7 +5,10 @@ import type { ChatMessage, ShopItem, ShippingMethodId } from "@/lib/data/types";
 import { getShowItems } from "@/lib/data/items";
 import { getShow, getSeller } from "@/lib/data/shows";
 import { CHAT_BY_SHOW } from "@/lib/data/chat";
-import { DEFAULT_ADDRESS, SHIPPING_METHODS, escrowTimeline } from "@/lib/data/orders";
+import { DEFAULT_ADDRESS, SHIPPING_METHODS } from "@/lib/data/orders";
+import { deriveTimeline } from "@/lib/order-state";
+import { calcOrderTotal } from "@/lib/config/fees";
+import { ITEM_PHOTO } from "@/lib/data/media";
 import { useWalletStore } from "@/store/wallet-store";
 import { useOrdersStore, nextOrderId } from "@/store/orders-store";
 import type { Order } from "@/lib/data/types";
@@ -238,34 +241,38 @@ export const useLiveStore = create<LiveState>((set, get) => {
     });
 
     if (iWon) {
-      /* کسر خودکار از کیف پول + ساخت سفارش */
+      /* کسر خودکار از کیف پول + ساخت سفارش امانی (v1.8.0 — مدل جدید) */
       const wallet = useWalletStore.getState();
-      const paid = wallet.spend(total, `برد مزایده — ${item.title}`, "win");
+      const seller = getSeller(
+        /* فروشندهٔ شو از روی آیتم اول مشخص می‌شود */
+        get().showId === "sh1" ? "s1" : get().showId === "sh2" ? "s2" : "s3"
+      );
+      const orderId = nextOrderId();
+      const paid = wallet.spend(total, `برد مزایده — ${item.title}`, "win", orderId);
       if (paid) {
-        const seller = getSeller(
-          /* فروشندهٔ شو از روی آیتم اول مشخص می‌شود */
-          get().showId === "sh1" ? "s1" : get().showId === "sh2" ? "s2" : "s3"
-        );
+        const createdAtMs = Date.now();
         const order: Order = {
-          id: nextOrderId(),
+          id: orderId,
+          status: "PAID_HELD",
+          itemId: item.id,
           itemTitle: item.title,
           itemBrand: item.brand,
           itemEmoji: item.emoji,
           cover: item.cover,
+          photo: ITEM_PHOTO[item.id],
+          sellerId: seller.id,
           sellerName: seller.name,
           sellerEmoji: seller.emoji,
           sellerColor: seller.color,
           itemPrice: price,
+          qty: 1,
           shippingPrice: item.shippingPrice,
           shippingMethod: "tipax",
           total,
           address: DEFAULT_ADDRESS,
-          createdAtLabel: "همین حالا",
-          timeline: [
-            { label: "پرداخت شد", done: true, atLabel: "همین حالا" },
-            { label: "در حال آماده‌سازی", done: false },
-            { label: "ارسال شد", done: false },
-          ],
+          createdAtMs,
+          timeline: deriveTimeline("PAID_HELD", { createdAtMs }),
+          escrow: true,
         };
         useOrdersStore.getState().addOrder(order);
         set({ pendingWin: { itemId: item.id, itemPrice: price, shippingPrice: item.shippingPrice, showId: get().showId ?? "sh1" } });
@@ -618,11 +625,16 @@ export const useLiveStore = create<LiveState>((set, get) => {
         variantLabel = undefined;
       }
 
-      /* ۴) مبلغ — قیمت ثابت × تعداد + ارسال */
+      /* ── ۴) مبلغ — منطق مشترک قیمت+ارسال (calcOrderTotal) ── */
       const method =
         SHIPPING_METHODS.find((m) => m.id === (opts.shippingMethodId ?? "tipax")) ??
         SHIPPING_METHODS[0];
-      const total = item.price * qty + method.price;
+      const totals = calcOrderTotal({
+        unitPrice: item.price,
+        qty,
+        shippingFee: method.price,
+      });
+      const total = totals.total;
 
       const isMe = buyerId === "me";
       if (isMe) {
@@ -678,7 +690,13 @@ export const useLiveStore = create<LiveState>((set, get) => {
       /* ۸) برای خرید من: کسر امانی از کیف پول + ساخت سفارش با تایم‌لاین امانی */
       if (isMe) {
         const wallet = useWalletStore.getState();
-        const paid = wallet.spend(total, `خرید لایو — ${item.title}${qty > 1 ? ` ×${qty}` : ""}`, "purchase");
+        const orderId = nextOrderId();
+        const paid = wallet.spend(
+          total,
+          `خرید لایو — ${item.title}${qty > 1 ? ` ×${qty}` : ""}`,
+          "purchase",
+          orderId
+        );
         if (!paid) {
           /* عملاً رخ نمی‌دهد (چک بالا) — برای اطمینان موجودی برمی‌گردد */
           set((st) => ({
@@ -689,24 +707,29 @@ export const useLiveStore = create<LiveState>((set, get) => {
         const seller = getSeller(
           get().showId === "sh1" ? "s1" : get().showId === "sh2" ? "s2" : "s3"
         );
+        const createdAtMs = Date.now();
         const order: Order = {
-          id: nextOrderId(),
+          id: orderId,
+          status: "PAID_HELD",
+          itemId: item.id,
           itemTitle: item.title,
           itemBrand: item.brand,
           itemEmoji: item.emoji,
           cover: item.cover,
+          photo: ITEM_PHOTO[item.id],
+          sellerId: seller.id,
           sellerName: seller.name,
           sellerEmoji: seller.emoji,
           sellerColor: seller.color,
-          itemPrice: item.price * qty,
+          itemPrice: totals.itemsTotal,
           qty,
           variantLabel,
           shippingPrice: method.price,
           shippingMethod: method.id,
           total,
           address: DEFAULT_ADDRESS,
-          createdAtLabel: "همین حالا",
-          timeline: escrowTimeline(1),
+          createdAtMs,
+          timeline: deriveTimeline("PAID_HELD", { createdAtMs }),
           escrow: true,
         };
         useOrdersStore.getState().addOrder(order);

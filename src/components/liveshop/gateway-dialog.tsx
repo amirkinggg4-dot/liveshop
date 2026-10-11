@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  BadgeCheck,
   CheckCircle2,
   ChevronRight,
   Loader2,
@@ -10,9 +11,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { faNum, toman } from "@/lib/format";
-import type { PaymentGateway } from "@/lib/data/types";
+import { WALLET_CHARGE } from "@/lib/config/fees";
+import type { PaymentGateway, WalletTx } from "@/lib/data/types";
 import { useWalletStore } from "@/store/wallet-store";
-import { Chip, Price } from "@/components/liveshop/shared";
+import { Chip } from "@/components/liveshop/shared";
+import { StepTime } from "@/components/liveshop/order-ui";
 import {
   Dialog,
   DialogContent,
@@ -22,13 +25,13 @@ import {
 } from "@/components/ui/dialog";
 
 /* ─────────────────────────────────────────────────────────────
-   دیالوگ شارژ کیف پول — درگاه شبیه‌سازی‌شده (فاز ۱)
+   دیالوگ شارژ کیف پول — درگاه شبیه‌سازی‌شده
    مرحلهٔ ۱: انتخاب درگاه (زرین‌پال / آیدی‌پی)
-   مرحلهٔ ۲: مبلغ (چیپ‌های پیشنهادی + ورودی دلخواه)
-   مرحلهٔ ۳: پردازش (اسپینر ۱.۲ ثانیه) → رسید موفق
+   مرحلهٔ ۲: مبلغ — کف و سقف از config (WALLET_CHARGE) با پیام فارسی
+   مرحلهٔ ۳: پردازش (۱.۲ ثانیه) → مرحلهٔ ۴: رسید موفق با شناسهٔ مرجع
    ───────────────────────────────────────────────────────────── */
 
-const CHARGE_PRESETS = [500_000, 1_000_000, 2_000_000] as const;
+const CHARGE_PRESETS = [500_000, 1_000_000, 2_000_000, 5_000_000] as const;
 
 type Step = "gateway" | "amount" | "processing" | "success";
 
@@ -37,6 +40,18 @@ function parseAmountInput(s: string): number {
   const latin = s.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
   const digits = latin.replace(/[^\d]/g, "");
   return digits ? Number(digits) : 0;
+}
+
+/** اعتبارسنجی مبلغ شارژ — پیام فارسی برای هر حالت */
+function validateChargeAmount(amount: number): string | null {
+  if (amount <= 0) return "مبلغ شارژ را وارد کن";
+  if (amount < WALLET_CHARGE.minToman) {
+    return `حداقل مبلغ شارژ ${toman(WALLET_CHARGE.minToman)} است`;
+  }
+  if (amount > WALLET_CHARGE.maxToman) {
+    return `حداکثر مبلغ شارژ ${toman(WALLET_CHARGE.maxToman)} است`;
+  }
+  return null;
 }
 
 const GATEWAYS: Array<{ id: PaymentGateway; title: string; desc: string }> = [
@@ -88,8 +103,14 @@ export default function GatewayDialog({
   const [step, setStep] = useState<Step>("gateway");
   const [gateway, setGateway] = useState<PaymentGateway>("زرین‌پال");
   const [amountInput, setAmountInput] = useState("");
+  /** رسید موفق — خروجی charge() با شناسهٔ مرجع */
+  const [receipt, setReceipt] = useState<WalletTx | null>(null);
 
   const parsedAmount = parseAmountInput(amountInput);
+  const amountError = useMemo(
+    () => validateChargeAmount(parsedAmount),
+    [parsedAmount]
+  );
 
   /* تایمر پردازش — در بستن دیالوگ یا unmount لغو می‌شود */
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,6 +129,7 @@ export default function GatewayDialog({
     setStep("gateway");
     setGateway("زرین‌پال");
     setAmountInput("");
+    setReceipt(null);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -116,11 +138,16 @@ export default function GatewayDialog({
   };
 
   const startPayment = () => {
-    if (parsedAmount <= 0) return;
+    const err = validateChargeAmount(parsedAmount);
+    if (err) {
+      toast.error(err);
+      return;
+    }
     setStep("processing");
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      charge(parsedAmount, gateway);
+      const tx = charge(parsedAmount, gateway);
+      setReceipt(tx);
       toast.success("کیف پول شارژ شد");
       setStep("success");
     }, 1200);
@@ -138,9 +165,9 @@ export default function GatewayDialog({
             {step === "gateway" &&
               "درگاه پرداخت را انتخاب کن (پرداخت شبیه‌سازی‌شده است)."}
             {step === "amount" &&
-              "یکی از مبالغ پیشنهادی را انتخاب کن یا مبلغ دلخواه را وارد کن (تومان)."}
+              `مبلغ بین ${toman(WALLET_CHARGE.minToman)} تا ${toman(WALLET_CHARGE.maxToman)} — یکی از پیشنهادی‌ها را انتخاب کن یا مبلغ دلخواه بنویس.`}
             {step === "processing" && "لطفاً چند لحظه صبر کن…"}
-            {step === "success" && "رسید پرداخت"}
+            {step === "success" && "رسید شارژ"}
           </DialogDescription>
         </DialogHeader>
 
@@ -205,7 +232,7 @@ export default function GatewayDialog({
           </div>
         )}
 
-        {/* ── مرحلهٔ ۲: مبلغ ── */}
+        {/* ── مرحلهٔ ۲: مبلغ با اعتبارسنجی کف/سقف ── */}
         {step === "amount" && (
           <div className="space-y-3">
             <button
@@ -246,18 +273,37 @@ export default function GatewayDialog({
               inputMode="numeric"
               placeholder="مبلغ دلخواه به تومان"
               aria-label="مبلغ شارژ به تومان"
-              className="h-11 w-full rounded-xl border border-white/10 bg-ls-card-2 px-3 text-center text-sm font-bold tabular-nums outline-none placeholder:text-white/35 focus:border-ls-purple/60"
+              aria-invalid={Boolean(amountError && parsedAmount > 0)}
+              className={cn(
+                "h-11 w-full rounded-xl border bg-ls-card-2 px-3 text-center text-sm font-bold tabular-nums outline-none placeholder:text-white/35",
+                amountError && parsedAmount > 0
+                  ? "border-ls-pink/60"
+                  : "border-white/10 focus:border-ls-purple/60"
+              )}
             />
 
-            {parsedAmount > 0 && (
-              <p className="text-center text-[11px] text-white/45">
-                معادل: {toman(parsedAmount)}
+            {/* پیام اعتبارسنجی فارسی */}
+            {amountError ? (
+              <p
+                className="text-center text-[11px] font-bold text-ls-pink"
+                role="alert"
+                aria-live="polite"
+              >
+                {parsedAmount > 0
+                  ? amountError
+                  : "مبلغ شارژ را وارد کن"}
               </p>
+            ) : (
+              parsedAmount > 0 && (
+                <p className="text-center text-[11px] text-white/45">
+                  معادل: {toman(parsedAmount)}
+                </p>
+              )
             )}
 
             <button
               onClick={startPayment}
-              disabled={parsedAmount <= 0}
+              disabled={Boolean(amountError)}
               className="h-11 w-full rounded-xl bg-ls-purple text-sm font-extrabold text-white transition-transform active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40"
               aria-label={`پرداخت مبلغ ${toman(parsedAmount)} از طریق درگاه ${gateway}`}
             >
@@ -286,13 +332,54 @@ export default function GatewayDialog({
           </div>
         )}
 
-        {/* ── مرحلهٔ ۴: رسید موفق ── */}
-        {step === "success" && (
-          <div className="flex flex-col items-center gap-2.5 py-3 text-center">
-            <CheckCircle2 className="h-14 w-14 text-ls-green" aria-hidden />
+        {/* ── مرحلهٔ ۴: رسید موفق (شناسهٔ مرجع + زمان) ── */}
+        {step === "success" && receipt && (
+          <div className="flex flex-col items-center gap-2 py-2 text-center">
+            <CheckCircle2 className="h-12 w-12 text-ls-green" aria-hidden />
             <p className="text-lg font-black">پرداخت موفق!</p>
-            <Price amount={parsedAmount} className="text-xl text-ls-green" />
-            <p className="text-[11px] text-white/45">از طریق {gateway}</p>
+            <p
+              className="text-xl font-extrabold tabular-nums text-ls-green"
+              aria-label={`مبلغ شارژ ${toman(parsedAmount)}`}
+            >
+              <bdi>+‎{toman(parsedAmount)}</bdi>
+            </p>
+
+            {/* کاغذ رسید */}
+            <div
+              className="mt-2 w-full space-y-2.5 rounded-2xl border border-white/10 bg-ls-card-2 p-4 text-right"
+              aria-label="رسید شارژ کیف پول"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-white/50">شناسهٔ مرجع</span>
+                <span
+                  className="rounded-lg bg-ls-bg/60 px-2 py-0.5 font-mono text-[11px] text-white/85"
+                  dir="ltr"
+                >
+                  {receipt.refId}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-white/50">درگاه</span>
+                <span className="text-[11px] font-bold text-ls-purple-soft">
+                  {gateway}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-white/50">زمان</span>
+                <StepTime ms={receipt.atMs} className="text-[11px] font-bold text-white/85" />
+              </div>
+              <div className="flex items-center justify-between border-t border-dashed border-white/10 pt-2.5">
+                <span className="text-[11px] text-white/50">وضعیت</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-ls-green/15 border border-ls-green/40 px-2 py-0.5 text-[10px] font-bold text-ls-green">
+                  <BadgeCheck className="h-3 w-3" aria-hidden />
+                  موفق
+                </span>
+              </div>
+              <p className="pt-1 text-center text-[10px] text-white/40 tabular-nums">
+                موجودی جدید: {faNum(useWalletStore.getState().balance)} تومان
+              </p>
+            </div>
+
             <button
               onClick={() => handleOpenChange(false)}
               className="mt-2 h-11 w-full rounded-xl bg-ls-purple text-sm font-extrabold text-white transition-transform active:scale-[.98]"

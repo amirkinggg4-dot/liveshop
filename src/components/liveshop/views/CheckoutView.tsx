@@ -6,6 +6,7 @@ import { Check, MapPin, ShieldCheck, Wallet as WalletIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toman } from "@/lib/format";
 import { getItem, getShowItems, stockLabelFa } from "@/lib/data/items";
+import { calcOrderTotal } from "@/lib/config/fees";
 import {
   DEFAULT_ADDRESS,
   SHIPPING_METHODS,
@@ -56,8 +57,15 @@ export default function CheckoutView() {
   /* v1.4 — کالای زندهٔ اتاق (اگر باز باشد) برای موجودی لحظه‌ای */
   const liveItem = liveItems.find((i) => i.id === item.id);
   const view = liveItem ?? item;
+
+  /* v1.8.0 — منطق مشترک قیمت+ارسال (تک منبع calcOrderTotal) */
+  const totals = calcOrderTotal({
+    unitPrice: view.price,
+    qty: 1,
+    shippingFee: method.price,
+  });
   const itemPrice = view.price;
-  const total = itemPrice + method.price;
+  const total = totals.total;
   const soldOut = view.stock <= 0;
 
   const handlePay = () => {

@@ -6,6 +6,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   calcNetIncome,
+  calcOrderTotal,
   commissionPctFor,
   COMMISSION_TIERS,
   GATEWAY_FEE,
@@ -13,6 +14,9 @@ import {
   SCAN_DEADLINE,
   SHIPPING_DEADLINE_HOURS,
   WITHDRAWAL_DEPOSIT_HOURS,
+  WALLET_CHARGE,
+  ESCROW_AUTO_RELEASE_DAYS,
+  DISPUTE_WINDOW_HOURS,
 } from "./fees";
 
 describe("commissionPctFor — پلکان کمیسیون بر اساس فروش ماهانه", () => {
@@ -105,5 +109,58 @@ describe("تنظیمات مهلت‌ها و ارسال (fees.ts)", () => {
     expect(SHIPPING_PRICES.tipax).toBeGreaterThan(SHIPPING_PRICES.post);
     expect(SHIPPING_PRICES.post).toBeGreaterThan(SHIPPING_PRICES.peyk);
     expect(SHIPPING_PRICES.peyk).toBeGreaterThan(0);
+  });
+});
+
+/* ───────── v1.8.0 — محاسبهٔ واحد جمع سفارش (calcOrderTotal) ─────────
+   تک منطق مشترک تسویه/خرید سریع/موتور خرید */
+describe("calcOrderTotal — منطق مشترک قیمت + ارسال", () => {
+  it("جمع ساده: قیمت واحد × ۱ + ارسال", () => {
+    const r = calcOrderTotal({ unitPrice: 4_600_000, qty: 1, shippingFee: 45_000 });
+    expect(r.itemsTotal).toBe(4_600_000);
+    expect(r.shippingFee).toBe(45_000);
+    expect(r.total).toBe(4_645_000);
+    expect(r.qty).toBe(1);
+  });
+
+  it("تعداد بیش از ۱ به‌درستی ضرب می‌شود", () => {
+    const r = calcOrderTotal({ unitPrice: 690_000, qty: 3, shippingFee: 25_000 });
+    expect(r.itemsTotal).toBe(2_070_000);
+    expect(r.total).toBe(2_095_000);
+  });
+
+  it("تعداد حذف‌شده = ۱ و اعشاری به پایین گرد می‌شود", () => {
+    expect(calcOrderTotal({ unitPrice: 100, shippingFee: 10 }).qty).toBe(1);
+    expect(calcOrderTotal({ unitPrice: 100, qty: 2.9, shippingFee: 10 }).qty).toBe(2);
+    expect(calcOrderTotal({ unitPrice: 100, qty: 0, shippingFee: 10 }).qty).toBe(1);
+    expect(calcOrderTotal({ unitPrice: 100, qty: -5, shippingFee: 10 }).qty).toBe(1);
+  });
+
+  it("ورودی نامعتبر (NaN/منفی) ایمن خنثی می‌شود", () => {
+    const r = calcOrderTotal({
+      unitPrice: Number.NaN,
+      shippingFee: Number.NaN,
+    });
+    expect(r.total).toBe(0);
+    const r2 = calcOrderTotal({ unitPrice: -100, shippingFee: -20 });
+    expect(r2.itemsTotal).toBe(0);
+    expect(r2.shippingFee).toBe(0);
+    expect(r2.total).toBe(0);
+  });
+
+  it("مبلغ اعشاری قیمت/ارسال به صحیح تبدیل می‌شود", () => {
+    const r = calcOrderTotal({ unitPrice: 99.9, qty: 2, shippingFee: 9.4 });
+    expect(r.itemsTotal).toBe(198);
+    expect(r.total).toBe(207);
+  });
+
+  it("هم‌خوانی با محدودیت شارژ کیف پول (کف/سقف تعریف‌شده و منطقی)", () => {
+    expect(WALLET_CHARGE.minToman).toBeGreaterThan(0);
+    expect(WALLET_CHARGE.maxToman).toBeGreaterThan(WALLET_CHARGE.minToman);
+  });
+
+  it("ثابت‌های امانی v1.8.0 (از fees — تک منبع)", () => {
+    expect(ESCROW_AUTO_RELEASE_DAYS).toBeGreaterThan(0);
+    expect(DISPUTE_WINDOW_HOURS).toBe(72);
   });
 });

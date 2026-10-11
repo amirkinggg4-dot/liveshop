@@ -55,6 +55,22 @@ export const SHIPPING_DEADLINE_HOURS = 24;
 /* ── مهلت واریز برداشت به شبا (ساعت) ── */
 export const WITHDRAWAL_DEPOSIT_HOURS = 24;
 
+/* ── v1.8.0 — امانی (escrow) ──
+   آزادسازی خودکار مبلغ: N روز بعد از «تحویل‌شده» اگر خریدار آزادسازی نکرد
+   و اختلافی ثبت نشده بود. */
+export const ESCROW_AUTO_RELEASE_DAYS = 3;
+
+/* ── v1.8.0 — پنجرهٔ ثبت اختلاف (ساعت) ──
+   فقط از لحظهٔ «ارسال‌شده» تا ۷۲ ساعت بعد از «تحویل‌شده»؛
+   قبل از ارسال، دکمهٔ اختلاف دیده نمی‌شود (به‌جایش «لغو سفارش»). */
+export const DISPUTE_WINDOW_HOURS = 72;
+
+/* ── v1.8.0 — سقف و کف شارژ کیف پول (تومان) ── */
+export const WALLET_CHARGE = {
+  minToman: 50_000,
+  maxToman: 50_000_000,
+} as const;
+
 /* ─────────────────────────────────────────────────────────────
    محاسبات خالص — مصرف مشترک UI و تست (بدون وابستگی به استور)
    ───────────────────────────────────────────────────────────── */
@@ -92,4 +108,42 @@ export function calcNetIncome(
     Math.round((safePrice * GATEWAY_FEE.pct) / 100) + GATEWAY_FEE.flatToman;
   const net = safePrice - commission - processing;
   return { price: safePrice, commissionPct, commission, processing, net };
+}
+
+/* ── v1.8.0 — محاسبهٔ واحد جمع سفارش (قیمت + ارسال) ──
+   تک منطق مشترک «تسویه» و «شیت خرید سریع لایو» و موتور خرید —
+   همه از همین تابع می‌خوانند تا هیچ‌جا جمع سفارش جداگانه حساب نشود. */
+export interface OrderTotalsInput {
+  /** قیمت واحد کالا (تومان) */
+  unitPrice: number;
+  /** تعداد — حداقل ۱؛ اعشاری به پایین گرد می‌شود */
+  qty?: number;
+  /** هزینهٔ ارسال روش انتخابی (تومان) */
+  shippingFee: number;
+}
+
+export interface OrderTotals {
+  /** قیمت کل کالا (واحد × تعداد) */
+  itemsTotal: number;
+  /** هزینهٔ ارسال */
+  shippingFee: number;
+  /** جمع قابل پرداخت */
+  total: number;
+  /** تعداد نرمال‌شدهٔ اعمال‌شده */
+  qty: number;
+}
+
+/** ورودی نامعتبر → خطای فارسی؛ خروجی همیشه صحیح و صحیح‌عدد */
+export function calcOrderTotal(input: OrderTotalsInput): OrderTotals {
+  const unitPrice = Number.isFinite(input.unitPrice)
+    ? Math.max(0, Math.floor(input.unitPrice))
+    : 0;
+  const shippingFee = Number.isFinite(input.shippingFee)
+    ? Math.max(0, Math.floor(input.shippingFee))
+    : 0;
+  const rawQty = input.qty ?? 1;
+  const qty =
+    Number.isFinite(rawQty) && rawQty >= 1 ? Math.max(1, Math.floor(rawQty)) : 1;
+  const itemsTotal = unitPrice * qty;
+  return { itemsTotal, shippingFee, total: itemsTotal + shippingFee, qty };
 }

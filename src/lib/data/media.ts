@@ -39,6 +39,9 @@ export const ITEM_PHOTO: Record<string, string> = {
   it8: "/liveshop/item-it8.jpg",
   it9: "/liveshop/item-it9.jpg",
   it10: "/liveshop/item-it10.jpg",
+  /* v1.8.0 — عکس اصلی کالاهای کلکسیونی شو sh3 (برای سفارش‌های seed) */
+  ct1: "/liveshop/item-ct1.jpg",
+  ct2: "/liveshop/item-ct2.jpg",
 };
 
 export const SELLER_PHOTO: Record<string, string> = {

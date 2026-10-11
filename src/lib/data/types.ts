@@ -3,6 +3,8 @@
    همهٔ مبالغ به «تومان» هستند و اعداد در UI فارسی نمایش داده می‌شوند.
    ───────────────────────────────────────────────────────────── */
 
+import type { OrderStatus, OrderStep } from "@/lib/order-state";
+
 export interface Cover {
   from: string;
   to: string;
@@ -130,18 +132,55 @@ export interface ShippingMethod {
   eta: string;
 }
 
-export interface OrderStep {
-  label: string;
-  done: boolean;
-  atLabel?: string;
+/* ── v1.8.0 — مدل سفارش با ماشین وضعیت ──
+   OrderStatus و OrderStep از ماژول خالص order-state می‌آیند
+   (وضعیت‌ها هم‌نام enum پرisma). */
+export type {
+  OrderStatus,
+  OrderStep,
+  TimelineDispute,
+} from "@/lib/order-state";
+
+/** وضعیت اختلاف — هم‌نام enum DisputeStatus پرisma */
+export type OrderDisputeStatus = "OPEN" | "RESOLVED_REFUND" | "RESOLVED_RELEASE";
+
+export interface OrderDispute {
+  reason: string;
+  desc: string;
+  filedAtMs: number;
+  status: OrderDisputeStatus;
+}
+
+/** پیام «تماس با فروشنده» داخل همان سفارش (mock) */
+export interface OrderMessage {
+  id: string;
+  from: "buyer" | "seller";
+  text: string;
+  atMs: number;
+}
+
+/** امتیاز خریدار به فروشنده بعد از آزادسازی */
+export interface OrderRating {
+  stars: number;
+  tags: string[];
+  text?: string;
+  atMs: number;
 }
 
 export interface Order {
   id: string;
+  /** v1.8.0 — هم‌نام با enum OrderStatus در prisma/schema.prisma */
+  status: OrderStatus;
+  /** v1.8.0 — کالای مرجع (برای عکس اصلی و سفارش دوباره) */
+  itemId?: string;
   itemTitle: string;
   itemEmoji: string;
   itemBrand?: string;
   cover: Cover;
+  /** v1.8.0 — عکس اصلی کالا (ITEM_PHOTO) به‌جای ایموجی */
+  photo?: string;
+  /** v1.8.0 — فروشنده (برای سفارش دوباره به فروشگاه) */
+  sellerId?: string;
   sellerName: string;
   sellerEmoji: string;
   sellerColor: string;
@@ -154,12 +193,26 @@ export interface Order {
   shippingMethod: ShippingMethodId;
   total: number;
   address: string;
-  createdAtLabel: string;
+  /** v1.8.0 — زمان‌های واقعی هر مرحله (ms) */
+  createdAtMs: number;
+  readyAtMs?: number | null;
+  shippedAtMs?: number | null;
+  deliveredAtMs?: number | null;
+  releasedAtMs?: number | null;
+  canceledAtMs?: number | null;
+  refundedAtMs?: number | null;
+  /** تایم‌لاین مشتق‌شده (تک منبع: deriveTimeline در order-state) */
   timeline: OrderStep[];
   trackingCode?: string;
   rated?: boolean;
+  /** v1.8.0 — امتیاز ثبت‌شدهٔ خریدار */
+  rating?: OrderRating;
   /** v1.4 — پرداخت به‌صورت امانی (escrow) نگه داشته شده است */
   escrow?: boolean;
+  /** v1.8.0 — اختلاف ثبت‌شده (اگر هست) */
+  dispute?: OrderDispute;
+  /** v1.8.0 — پیام‌های «تماس با فروشنده» */
+  messages?: OrderMessage[];
 }
 
 export type WalletTxKind = "charge" | "purchase" | "win" | "refund";
@@ -173,7 +226,14 @@ export interface WalletTx {
   /** مثبت = واریز، منفی = برداشت */
   amount: number;
   gateway?: PaymentGateway;
-  atLabel: string;
+  /** v1.8.0 — زمان واقعی (ms) — نمایش شمسی */
+  atMs: number;
+  /** v1.8.0 — شناسهٔ مرجع (شیت جزئیات) */
+  refId: string;
+  /** v1.8.0 — وضعیت تراکنش (فعلاً همه موفق) */
+  status?: "موفق";
+  /** v1.8.0 — سفارش مرتبط (لینک در شیت جزئیات) */
+  orderId?: string;
 }
 
 export interface Category {

@@ -11,6 +11,11 @@
    ───────────────────────────────────────────────────────────── */
 
 import { useSyncExternalStore } from "react";
+import {
+  ORDER_STAGE_KEY_TO_STATUS,
+  type OrderStageKey,
+  type OrderStatus,
+} from "@/lib/order-state";
 
 export type ForceState = "loading" | "error" | "empty";
 
@@ -80,5 +85,65 @@ export function useOnline(): boolean {
     subscribeOnline,
     () => navigator.onLine,
     () => true
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────
+   v1.8.0 — کلید دموی سفارش‌ها: ?orderStage=ready|shipped|delivered|
+   released|disputed|canceled — فهرست و جزئیات را به آن مرحله قفل
+   می‌کند تا همهٔ مرحله‌ها قابل عکس‌گرفتن باشند. در حالت عادی (بدون
+   کلید) پیشروی فقط با دکمه‌های واقعی انجام می‌شود.
+   ───────────────────────────────────────────────────────────── */
+
+const ORDER_STAGE_KEYS = [
+  "paid",
+  "ready",
+  "shipped",
+  "delivered",
+  "released",
+  "disputed",
+  "canceled",
+] as const;
+
+/** خواندن مستقیم کلید (برای استورها/شرط‌های غیر-هوکی) */
+export function getForcedOrderStage(): OrderStageKey | null {
+  try {
+    const s = new URLSearchParams(window.location.search).get("orderStage");
+    return s && (ORDER_STAGE_KEYS as readonly string[]).includes(s)
+      ? (s as OrderStageKey)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** وضعیتِ متناظر با کلید دمو (null = حالت عادی) */
+export function getForcedOrderStatus(): OrderStatus | null {
+  const key = getForcedOrderStage();
+  return key ? ORDER_STAGE_KEY_TO_STATUS[key] : null;
+}
+
+export const forcedOrderStageStore = {
+  listeners: new Set<() => void>(),
+  notify() {
+    this.listeners.forEach((l) => l());
+  },
+  subscribe(cb: () => void) {
+    forcedOrderStageStore.listeners.add(cb);
+    return () => forcedOrderStageStore.listeners.delete(cb);
+  },
+  getSnapshot(): OrderStageKey | null {
+    return getForcedOrderStage();
+  },
+  getServerSnapshot(): OrderStageKey | null {
+    return null;
+  },
+};
+
+export function useForcedOrderStage(): OrderStageKey | null {
+  return useSyncExternalStore(
+    forcedOrderStageStore.subscribe,
+    forcedOrderStageStore.getSnapshot,
+    forcedOrderStageStore.getServerSnapshot
   );
 }

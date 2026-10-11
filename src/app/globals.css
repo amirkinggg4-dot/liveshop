@@ -264,3 +264,13 @@
 .animate-ls-bid-pop {
   animation: ls-bid-pop 380ms ease-out;
 }
+
+/* ── v1.8.0 — چاپ رسید سفارش: فقط کاغذ سفید، بدون قاب تیرهٔ اپ ── */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+}

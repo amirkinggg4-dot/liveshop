@@ -747,3 +747,28 @@ Stage Summary:
 - fees.ts تک منبع کارمزد است؛ ماشین‌حساب و UI از همان می‌خوانند (خالص شو تفکیک آخرین شو هم از همان فرمول: ۱۹٬۱۲۶٬۵۰۰).
 - نسخه → 1.7.1، CHANGELOG و INDEX اسکرین‌شات به‌روز.
 - ناکامل‌ها (صادقانه): عکس‌های اضافهٔ دیالوگ ویرایش mock و فقط در حافظهٔ دیالوگ؛ «خالص شو» از fees حساب می‌شود ولی دو فیلد نمایشی processingPct/Flat در lastShow مقدار ثابت دارند؛ grep «بید» بدون مرز واژه (بردها را نمی‌گیرد — دستی بررسی شد)؛ فقط موبایل برای صفحات جدید v1.7.1.
+
+---
+Task ID: v1.8.0
+Agent: main (Z.ai Code)
+Task: نسخهٔ v1.8.0 — فقط «سفارش‌ها» و «کیف پول» (نمای خریدار) و صفحهٔ تسویه — ماشین وضعیت هم‌نام enum OrderStatus پرisma (PAID_HELD, READY_TO_SHIP, SHIPPED, DELIVERED, RELEASED, DISPUTED, REFUNDED, CANCELED) + تست واحد کامل + اسکرین‌شات موبایل/دسکتاپ + نسخه/مستندات
+
+Work Log:
+- ماشین وضعیت خالص src/lib/order-state.ts: جدول ORDER_TRANSITIONS + transition با پیام فارسی (لغو فقط قبل از ارسال؛ تحویل فقط از SHIPPED؛ آزادسازی از DELIVERED/DISPUTED؛ نتیجهٔ اختلاف فقط REFUNDED/RELEASED؛ وضعیت‌های پایانی بسته) + مهلت‌ها با nowMs صریح (پنجرهٔ اختلاف ۷۲h از fees تا ۷۲ ساعت بعد از تحویل — مرز دقیق باز؛ آزادسازی خودکار ESCROW_AUTO_RELEASE_DAYS=3 روز) + refundAmount=کل مبلغ + آزادسازی idempotent + deriveTimeline (تک منبع تایم‌لاین: مسیر عادی/لغو با یادداشت بازگشت وجه/اختلاف با نتیجه) + availableActions (تک منبع دکمه‌های UI) + ORDER_TABS/برچسب‌های فارسی/نگاشت کلید دمو
+- fees.ts: ESCROW_AUTO_RELEASE_DAYS، DISPUTE_WINDOW_HOURS، WALLET_CHARGE (۵۰k تا ۵۰M) و calcOrderTotal (منطق مشترک قیمت+ارسال با تست)
+- استورها: orders-store بازنویسی (cancelOrder→بازگشت فوری مبلغ به کیف پول، confirmDelivery، releaseEscrow idempotent، openDispute، resolveDispute REFUND/RELEASE + تراکنش بازگشت، setRated با دادهٔ امتیاز، sendOrderMessage با پاسخ mock ۱٫۴s، autoReleaseTick؛ advance عمومی حذف شد)؛ wallet-store: refund + refId/atMs/orderId برای هر تراکنش + seed هماهنگ با سفارش‌ها
+- دیتا: SEED_ORDERS جدید — ۸ سفارش پوشش همهٔ ۸ وضعیت با زمان ms واقعی، عکس ITEM_PHOTO، sellerId، dispute (باز/حل‌شده-بازپرداخت)، پیام‌های seed؛ دو عکس تولیدشده برای ct1/ct2 (پوکمون/فانکو) به ITEM_PHOTO اضافه شد؛ types.ts: Order با status/stamps/dispute/messages/rating + WalletTx با refId/status/orderId
+- UI سفارش‌ها: OrdersView (عکس کالا، عنوان ۲ خط بدون «…»، تاریخ شمسی، ۴ تب با شمارش، جستجوی شماره/نام با نرمال‌سازی فارسی، بنر حالت دمو، EmptyState لوسید) + order-ui.tsx مشترک (بج وضعیت با آیکون، StepTime/DayLabel با suppressHydrationWarning، faDurationLeft)
+- OrderDetailView بازنویسی: بج وضعیت همیشه بالای صفحه؛ دکمه‌های وضعیت‌محور (لغو/تحویل گرفتم/آزادسازی/گزارش مشکل با شمارش پنجره/امتیاز/سفارش دوباره)؛ قبل از ارسال اختلاف مخفی به‌جایش لغو؛ تایم‌لاین زمان‌دار با یادداشت؛ «پیگیری اختلاف»؛ بنر آزادسازی خودکار با شمارش معکوس؛ دریافت رسید → نمای چاپی جدید orderReceipt (کاغذ سفید + window.print + @media print .no-print)؛ تماس با فروشنده → order-contact-sheet (پیام در خود سفارش + پاسخ mock)؛ دیالوگ امتیاز order-rating-dialog (۵ ستاره + ۵ برچسب آماده + متن اختیاری) + خلاصهٔ امتیاز ثبت‌شده
+- DisputeSheet به orders-store وصل شد (ثبت اختلاف → DISPUTED + پروندهٔ ضمانت مثل قبل)؛ ⚖️/🛡 → آیکون lucide
+- WalletView: علامت امن RTL (signedToman با LRM داخل <bdi>) سبز/صورتی، عنوان ۲ خط، فیلترهای همه/شارژ/خرید/بازگشت وجه با شمارش، شیت wallet-tx-sheet (شناسهٔ مرجع کپی‌شدنی، وضعیت «موفق»، زمان شمسی، لینک مشاهدهٔ سفارش)، GatewayDialog با کف/سقف فارسی + چیپ ۵M + رسید موفق با شناسهٔ مرجع/درگاه/زمان/موجودی جدید
+- CheckoutView + quick-checkout-sheet + live-store.purchaseItem همه از calcOrderTotal؛ live-store سفارش جدید را با مدل جدید می‌سازد (PAID_HELD + عکس + لینک تراکنش)؛ WinView سازگار ماند
+- کلید دمو ?orderStage=paid|ready|shipped|delivered|released|disputed|canceled در forced-state (قفل فهرست+جزئیات با بنر دمو)؛ در حالت عادی هیچ پیشروی خودکاری نیست
+- تست: order-state.test.ts — ۳۸ تست (هر انتقال مجاز/غیرمجاز، مرز ۷۲h±۱ms و ۳ روز با زمان mock، مبلغ بازپرداخت، idempotent آزادسازی، تایم‌لاین ۶ حالت، availableActions، تب‌ها و نگاشت کلید دمو) + ۷ تست calcOrderTotal/ثابت‌ها در fees.test.ts — جمع ۱۵۰ تست lib/hooks سبز؛ tsc صفر (پروژه)؛ lint پاک
+- مرورگر واقعی: لغو → موجودی ۲٫۵M→۷٫۷۴۵M و تراکنش لینک‌دار؛ تحویل→آزادسازی→امتیاز→سفارش دوباره (صفحهٔ فروشنده)؛ اختلاف→DISPUTED+پیگیری؛ رسید؛ گفتگو با پاسخ mock؛ شارژ با خطا/رسید؛ خرید لایو→سفارش تازه PAID_HELD؛ دسکتاپ 1280 سالم — باگ واقعی getSnapshot-loop (آرایهٔ نو در selector شیت گفتگو) پیدا و با EMPTY_MESSAGES ثابت رفع شد
+- اسکرین‌شات: scripts/v180-shots.mts — ۳۳ عکس (موبایل ۳۹۰: ۴ تب فهرست+جستجو+خالی+۶ مرحله+لغو/تحویل/امتیاز/اختلاف+رسید+گفتگو+کیف پول ۴ حالت+تسویه+خرید سریع؛ دسکتاپ ۱۲۸۰: فهرست/جزئیات/کیف پول/رسید/تسویه) — هر عکس با assert محتوایی (۱۰۰٪ سبز)؛ ۳۶ عکس قدیمی سفارش/کیف پول/تسویه حذف و INDEX.md (بخش v1.8.0 + نکته‌های صادقانه) به‌روز شد؛ CHANGELOG [v1.8.0]؛ نسخه → 1.8.0
+
+Stage Summary:
+- v1.8.0 کامل: وضعیت‌ها دقیقاً هم‌نام enum پرisma؛ تک منطق برای انتقال‌ها/تایم‌لاین/دکمه‌ها/جمع سفارش؛ پیشروی فقط با دکمه‌های واقعی + کلید دمو برای عکس
+- نکته برای ایجنت‌های بعدی: وضعیت و زمان‌های سفارش در Order (stamps ms) است و تایم‌لاین هرگز دستی ساخته نمی‌شود — deriveTimeline منبع است؛ گذارهای فروشنده‌محور (READY_TO_SHIP/SHIPPED) در ماشین آماده‌اند ولی UI فروشنده هنوز به این استور وصل نیست (seller-store جدا)
+- صادقانه: دیتا mock حافظه‌ای (رفرش=ریست)؛ نتیجهٔ اختلاف فقط از seed؛ آزادسازی خودکار ۳ روزه در دمو رخ نمی‌دهد؛ چاپ واقعی تست‌پذیر نبود؛ ادمین/کارشناس وجود ندارد

@@ -10,6 +10,7 @@ export type ViewName =
   | "checkout"
   | "orders"
   | "orderDetail"
+  | "orderReceipt"
   | "wallet"
   | "profile"
   | "sellerDashboard"

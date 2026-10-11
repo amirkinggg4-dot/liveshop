@@ -21,6 +21,7 @@ import ProductView from "./views/ProductView";
 import CheckoutView from "./views/CheckoutView";
 import OrdersView from "./views/OrdersView";
 import OrderDetailView from "./views/OrderDetailView";
+import OrderReceiptView from "./views/OrderReceiptView";
 import WalletView from "./views/WalletView";
 import ProfileView from "./views/ProfileView";
 import SellerDashboardView from "./views/SellerDashboardView";
@@ -51,6 +52,7 @@ const VIEW_COMPONENTS: Record<ViewName, () => ReactNode> = {
   checkout: CheckoutView,
   orders: OrdersView,
   orderDetail: OrderDetailView,
+  orderReceipt: OrderReceiptView,
   wallet: WalletView,
   profile: ProfileView,
   sellerDashboard: SellerDashboardView,

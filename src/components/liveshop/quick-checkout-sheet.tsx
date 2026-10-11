@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { faNum, toman } from "@/lib/format";
+import { calcOrderTotal } from "@/lib/config/fees";
 import { stockLabelFa } from "@/lib/data/items";
 import { DEFAULT_ADDRESS, SHIPPING_METHODS } from "@/lib/data/orders";
 import type { ShopItem, ShippingMethodId } from "@/lib/data/types";
@@ -82,8 +83,14 @@ export default function QuickCheckoutSheet({
   const selectedVariant =
     current.variants?.find((v) => v.label === variant) ?? null;
   const maxQty = selectedVariant ? selectedVariant.stock : current.stock;
-  const itemTotal = current.price * qty;
-  const total = itemTotal + method.price;
+  /* v1.8.0 — منطق مشترک قیمت+ارسال (تک منبع calcOrderTotal با تسویه) */
+  const totals = calcOrderTotal({
+    unitPrice: current.price,
+    qty,
+    shippingFee: method.price,
+  });
+  const itemTotal = totals.itemsTotal;
+  const total = totals.total;
   const short = balance < total;
 
   const changeQty = (next: number) => {

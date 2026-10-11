@@ -20,6 +20,14 @@ export function toman(n: number, withUnit = true): string {
   return withUnit ? `${s} تومان` : s;
 }
 
+/** v1.8.0 — مبلغ علامت‌دار امن در RTL
+    علامت + / − با LRM (‎) از عدد جدا نمی‌شود و در متن راست‌به‌چپ
+    سر جای درست می‌نشیند. در UI داخل <bdi> رندر می‌شود. */
+export function signedToman(amount: number, withUnit = true): string {
+  const sign = amount >= 0 ? "+" : "−";
+  return `${sign}\u200E${toman(Math.abs(amount), withUnit)}`;
+}
+
 /** زمان mm:ss با ارقام فارسی — faClock(45) → «۰۰:۴۵» */
 export function faClock(totalSec: number): string {
   const s = Math.max(0, Math.floor(totalSec));

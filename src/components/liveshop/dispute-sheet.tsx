@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Send, ShieldCheck } from "lucide-react";
+import { Check, Send, Scale, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { toFa, toman } from "@/lib/format";
 import { PROTECTION_REASONS } from "@/lib/data/rewards-p1";
 import { useProtectionStore } from "@/store/protection-store";
+import { useOrdersStore } from "@/store/orders-store";
 import {
   Drawer,
   DrawerContent,
@@ -50,6 +51,8 @@ export default function DisputeSheet({
   const cases = useProtectionStore((s) => s.cases);
   const openCase = useProtectionStore((s) => s.openCase);
   const addMessage = useProtectionStore((s) => s.addMessage);
+  /* v1.8.0 — ثبت اختلاف وضعیت سفارش را هم به DISPUTED می‌برد */
+  const openDispute = useOrdersStore((s) => s.openDispute);
 
   const [reason, setReason] = useState<string | null>(null);
   const [desc, setDesc] = useState("");
@@ -70,6 +73,13 @@ export default function DisputeSheet({
     }
     if (desc.trim().length < 10) {
       toast.error("توضیح را کامل بنویس (حداقل ۱۰ کاراکتر)");
+      return;
+    }
+    /* v1.8.0 — اول اعتبارسنجی ماشین وضعیت، بعد ساخت پرونده */
+    const res = openDispute(orderId, reason, desc.trim());
+    if (!res.ok) {
+      toast.error(res.error ?? "ثبت اختلاف انجام نشد");
+      handleOpenChange(false);
       return;
     }
     openCase({ orderId, itemTitle, amount, reason, desc: desc.trim() });
@@ -203,10 +213,11 @@ export default function DisputeSheet({
           {/* ── پرونده‌های من ── */}
           <div className="h-px bg-white/10" />
           <p
-            className="text-sm font-extrabold flex items-center gap-2"
+            className="flex items-center gap-2 text-sm font-extrabold"
             aria-label="پرونده‌های من"
           >
-            ⚖️ پرونده‌های من
+            <Scale className="h-4 w-4 text-ls-purple-soft" aria-hidden />
+            پرونده‌های من
           </p>
 
           {cases.map((c) => {
@@ -330,8 +341,9 @@ export default function DisputeSheet({
             );
           })}
 
-          <p className="text-center text-[10px] text-white/35">
-            تا حل اختلاف، مبلغ سفارش نزد LiveShop امانت می‌ماند 🛡
+          <p className="flex items-center justify-center gap-1.5 text-center text-[10px] text-white/35">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-ls-green" aria-hidden />
+            تا حل اختلاف، مبلغ سفارش نزد LiveShop امانت می‌ماند
           </p>
         </div>
       </DrawerContent>
