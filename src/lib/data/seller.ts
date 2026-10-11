@@ -219,7 +219,7 @@ export const SELLER_ORDERS: SellerOrder[] = [
     scanByLabel: "به‌موقع اسکن شد",
     urgency: "ok",
     trackingCode: "TPX-479920",
-    reviewLabel: "خریدار ۵ ستاره ثبت کرد ★",
+    reviewLabel: "خریدار ۵ ستاره ثبت کرد",
     createdAtLabel: "۳ روز پیش",
   },
   {
@@ -376,7 +376,7 @@ export const READY_ROOM = {
   latencyMs: 45,
   remindersSent: 1204,
   followersNotified: 512,
-  queueShowTitle: "شب کتونی‌های کمیاب 🔥",
+  queueShowTitle: "شب کتونی‌های کمیاب",
 } as const;
 
 /* ── آمار هاب فروشنده ── */

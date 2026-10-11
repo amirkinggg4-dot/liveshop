@@ -35,7 +35,7 @@ export interface CohostCandidate {
 export const RAID_TARGETS: RaidTarget[] = [
   {
     showId: "sh1",
-    title: "شب کتونی‌های کمیاب 🔥",
+    title: "شب کتونی‌های کمیاب",
     sellerName: "کفش‌خانهٔ سینا",
     sellerEmoji: "👟",
     sellerColor: "#FF3B8B",

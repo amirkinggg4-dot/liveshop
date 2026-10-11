@@ -80,7 +80,7 @@ export const GET = handle(
           price: v.priceOverride ?? p.price,
         })),
       })),
-      shows: shows.map(showCard),
+      shows: shows.map((s) => showCard(s)),
     });
   },
 );

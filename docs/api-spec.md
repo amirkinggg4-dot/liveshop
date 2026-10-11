@@ -15,10 +15,10 @@ Errors: `{ "error": { "code": "OUT_OF_STOCK", "message": "فارسی برای ک
 
 ## 2. Discovery (public)
 | GET | /categories | with live-show counts |
-| GET | /shows?status=LIVE\|SCHEDULED&category=&cursor= | cards: pinned item price + stock |
+| GET | /shows?status=LIVE\|SCHEDULED&category=&cursor=&limit=&sort=&minPrice=&maxPrice=&size=&brand=&condition= | cards: pinned item price + stock; v1.6.3: `sort=popular\|newest\|price_asc\|price_desc` (keyset cursor per sort), `startsAt` on SCHEDULED cards, item filters (price on pinned item; size/brand/condition on any item); with a valid Bearer token each seller gains `isFollowed` (field omitted for anonymous) |
 | GET | /shows/:id | show + items + seller + pinned item |
 | GET | /sellers/:slug | storefront |
-| GET | /search?q= | shows, sellers, products |
+| GET | /search?q=&minPrice=&maxPrice=&size=&brand=&condition= | shows, sellers, products; v1.6.3: q and filters normalized with the shared `normalizeFa`, matched ILIKE on normalized `searchText` columns (pg_trgm); products carry `showId`+`showTitle` (LIVE host, else nearest upcoming SCHEDULED), `sizes[]` (in-stock variants) and `condition` (NEW\|USED) |
 | POST/DELETE | /sellers/:id/follow | |
 
 ## 3. Live room

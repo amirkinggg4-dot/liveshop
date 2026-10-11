@@ -28,6 +28,7 @@ const SAMPLE_SEARCH_RESPONSE: ApiSearchResponse = {
       status: "LIVE",
       scheduledAt: null,
       startedAt: "2025-01-10T18:00:00.000Z",
+      startsAt: null,
       viewers: 248,
       category: { slug: "sneakers", nameFa: "کتونی و کفش" },
       seller: {
@@ -52,6 +53,7 @@ const SAMPLE_SEARCH_RESPONSE: ApiSearchResponse = {
       status: "SCHEDULED",
       scheduledAt: "2025-01-12T21:00:00.000Z",
       startedAt: null,
+      startsAt: "2025-01-12T18:00:00.000Z",
       viewers: 0,
       category: { slug: "sneakers", nameFa: "کتونی و کفش" },
       seller: {
@@ -70,6 +72,7 @@ const SAMPLE_SEARCH_RESPONSE: ApiSearchResponse = {
       status: "ENDED",
       scheduledAt: null,
       startedAt: "2025-01-01T18:00:00.000Z",
+      startsAt: null,
       viewers: 0,
       category: null,
       seller: {
@@ -101,6 +104,10 @@ const SAMPLE_SEARCH_RESPONSE: ApiSearchResponse = {
       price: 6500000,
       seller: { shopName: "کفش‌خانهٔ سینا", slug: "sina-sneaks" },
       totalStock: 5,
+      showId: "show-live-1",
+      showTitle: "شب کتونی نایاب",
+      sizes: ["۴۱", "۴۲"],
+      condition: "NEW",
     },
     {
       id: "clx9f2prod002",
@@ -110,6 +117,10 @@ const SAMPLE_SEARCH_RESPONSE: ApiSearchResponse = {
       price: 900000,
       seller: { shopName: "گجت‌بازار", slug: "gadget-bazaar" },
       totalStock: 0,
+      showId: null,
+      showTitle: null,
+      sizes: [],
+      condition: "USED",
     },
   ],
 };
@@ -141,13 +152,20 @@ describe("apiSearchToUi — پاسخ نمونهٔ /search به تایپ UI", () 
     expect(p1.stock).toBe(5);
     expect(p1.brand).toBe("نایک");
     expect(p1.image).toBe("https://cdn.example.com/items/it1.jpg");
-    /* API فعلی showId برگشت نمی‌دهد */
-    expect(p1.showId).toBeNull();
-    expect(p1.showTitle).toBeNull();
+    /* v1.6.3 — «در لایوی فلان» در حالت API هم هست (deep-link به شو) */
+    expect(p1.showId).toBe("show-live-1");
+    expect(p1.showTitle).toBe("شب کتونی نایاب");
+    /* v1.6.3 — سایز/وضعیت برای فیلترها در حالت API هم می‌آید */
+    expect(p1.size).toBe("۴۱");
+    expect(p1.variantLabels).toEqual(["۴۱", "۴۲"]);
+    expect(p1.condition).toBe("نو");
     expect(p2.brand).toBe("");
     expect(p2.image).toBeNull();
+    expect(p2.showId).toBeNull();
+    expect(p2.showTitle).toBeNull();
     expect(p2.size).toBeNull();
-    expect(p2.condition).toBeNull();
+    expect(p2.variantLabels).toEqual([]);
+    expect(p2.condition).toBe("کارکرده");
   });
 
   test("فروشندگان: rating ناموجود → null و handle از slug می‌آید", () => {

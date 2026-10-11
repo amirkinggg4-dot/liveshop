@@ -17,6 +17,16 @@ import { cn } from "@/lib/utils";
 import { useMounted } from "@/lib/forced-state";
 import { upcomingStartsAt, relativeStartFa } from "./upcoming";
 
+/* ── v1.6.3 — منبع زمان شروع: در حالت API فیلد واقعی startsAt شو؛
+   در mock همان جدول افقت upcoming.ts ── */
+function showStartsAt(show: Show): Date | null {
+  if (show.startsAt) {
+    const d = new Date(show.startsAt);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return upcomingStartsAt(show.id);
+}
+
 /* ── دکمهٔ toggle یادآوری (span نقش‌محور چون ShowCard خودش button است) ── */
 export function ReminderToggle({
   show,
@@ -73,7 +83,7 @@ export function UpcomingFooter({
 }) {
   const mounted = useMounted();
   const startLabel = mounted
-    ? relativeStartFa(upcomingStartsAt(show.id))
+    ? relativeStartFa(showStartsAt(show))
     : "به‌زودی";
   return (
     <>
@@ -137,7 +147,9 @@ export function UpcomingShowCard({
     <ShowCard
       compact
       show={cleaned}
-      photo={SHOW_PHOTO[show.id]}
+      /* v1.6.3 — در حالت API کاور واقعی شو (photoUrl) اولویت دارد؛
+         mock همان SHOW_PHOTO قبلی */
+      photo={show.photoUrl ?? SHOW_PHOTO[show.id]}
       onClick={onClick}
       footer={
         <UpcomingFooter

@@ -12,6 +12,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { LIVE_SHOWS, UPCOMING_SHOWS } from "@/lib/data/shows";
 import type { Show } from "@/lib/data/types";
+import type { SortId } from "@/components/liveshop/views/explore/filters";
 import {
   apiShowToUiShow,
   USE_LIVE_API,
@@ -40,16 +41,25 @@ export async function fetchMockExploreShows(
   };
 }
 
-/** حالت API — دو درخواست موازی LIVE + SCHEDULED با slug دسته */
+/** حالت API — دو درخواست موازی LIVE + SCHEDULED با slug دسته.
+    v1.6.3 — sort به سرور پاس می‌شود (popular|newest|price_asc|price_desc) */
+const API_SORT: Record<SortId, string> = {
+  popular: "popular",
+  newest: "newest",
+  cheapest: "price_asc",
+  expensive: "price_desc",
+};
+
 async function fetchApiExploreShows(
-  categorySlug: string | null
+  categorySlug: string | null,
+  sort: SortId
 ): Promise<ExploreShowsPage> {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ sort: API_SORT[sort] });
   if (categorySlug) params.set("category", categorySlug);
-  const base = params.toString();
+  const qs = params.toString();
   const [liveRes, schedRes] = await Promise.all([
-    fetch(`/api/v1/shows?status=LIVE${base ? `&${base}` : ""}`),
-    fetch(`/api/v1/shows?status=SCHEDULED${base ? `&${base}` : ""}`),
+    fetch(`/api/v1/shows?status=LIVE&${qs}`),
+    fetch(`/api/v1/shows?status=SCHEDULED&${qs}`),
   ]);
   if (!liveRes.ok || !schedRes.ok) {
     throw new Error(
@@ -68,20 +78,25 @@ async function fetchApiExploreShows(
 /**
  * هوک فهرست شوهای کاوش — زنده‌ها و به‌زودی‌ها جدا (UI همان کارت‌های
  * خانه را می‌گذارد: LiveGridCard برای زنده، کارت «به‌زودی» برای آینده).
+ * v1.6.3 — sort اختیاری: در حالت API به سرور پاس می‌شود.
  */
-export function useExploreShows(category: {
-  id: string;
-  label: string;
-} | null) {
+export function useExploreShows(
+  category: {
+    id: string;
+    label: string;
+  } | null,
+  sort: SortId = "popular"
+) {
   return useQuery<ExploreShowsPage, Error>({
     queryKey: [
       "explore-shows",
       USE_LIVE_API ? "api" : "mock",
       category?.id ?? null,
+      USE_LIVE_API ? sort : "client-side",
     ],
     queryFn: () =>
       USE_LIVE_API
-        ? fetchApiExploreShows(category?.id ?? null)
+        ? fetchApiExploreShows(category?.id ?? null, sort)
         : fetchMockExploreShows(category?.label ?? null),
   });
 }

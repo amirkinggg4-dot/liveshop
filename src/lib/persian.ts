@@ -1,30 +1,13 @@
 /* ─────────────────────────────────────────────────────────────
-   v1.6.2 — نرمال‌سازی متن فارسی برای جستجوی کاوش
-   ─ ی/ي (و ی‌های عربی) → ی
-   ─ ك عربی → ک
-   ─ ارقام فارسی (۰-۹) و عربی (٠-٩) → لاتین
-   ─ حذف نیم‌فاصله و اعراب — مقایسهٔ بدون حساسیت به بزرگ/کوچکی
-   مصرف‌کننده: useSearch (mock) و تست‌ها
+   نرمال‌سازی متن فارسی برای جستجو — v1.6.3
+   پیاده‌سازی به src/lib/normalize.ts منتقل شد (ماژول مشترک UI/سرور/seed)
+   تا سرور و کلاینت از «یک تابع» استفاده کنند؛ این فایل فقط re-export
+   می‌کند تا importهای موجود نشکنند.
    ───────────────────────────────────────────────────────────── */
 
-const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
-const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+import { normalizeFa } from "./normalize";
 
-/** یکدست‌سازی حروف و ارقام فارسی/عربی برای مقایسه */
-export function normalizeFa(input: string): string {
-  return input
-    .replace(/[يىѐﻯﻰﻲ]/g, "ی")
-    .replace(/ك/g, "ک")
-    .replace(/[ۀة]/g, "ه")
-    .replace(/[أإآٱ]/g, "ا")
-    .replace(/[۰-۹]/g, (d) => String(FA_DIGITS.indexOf(d)))
-    .replace(/[٠-٩]/g, (d) => String(AR_DIGITS.indexOf(d)))
-    /* نیم‌فاصله + اعراب و علامت‌های کشیدگی */
-    .replace(/[\u200c\u064b-\u0652\u0640\u0670]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export { normalizeFa };
 
 /** حاوی‌بودن بدون حساسیت به ی/ي، ک/ك و ارقام فارسی/لاتین */
 export function faIncludes(haystack: string, needle: string): boolean {

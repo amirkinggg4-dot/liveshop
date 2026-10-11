@@ -39,6 +39,11 @@ export interface Show {
   itemsSold: number;
   isFollowing: boolean;
   tags: string[];
+  /* ── v1.6.3 — شو «داغ» (نشان lucide Flame روی کارت، جای ایموجی داخل عنوان) ── */
+  hot?: boolean;
+  /* ── v1.6.3 — شروع واقعی شو به‌زودی از API (ISO) — شمارش معکوس نسبی
+     در حالت API از همین فیلد خوانده می‌شود؛ mock از upcoming.ts ── */
+  startsAt?: string | null;
   /* ── v1.6.1 — فیلدهای اختیاریِ حالت API واقعی (همه fallback دارند) ──
      در حالت mock تنظیم نمی‌شوند و UI همان مسیر قبلی (getSeller/SHOW_PHOTO/…)
      را می‌رود؛ در حالت NEXT_PUBLIC_USE_API=true از پاسخ /shows پر می‌شوند. */

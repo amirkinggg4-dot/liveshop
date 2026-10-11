@@ -23,7 +23,13 @@
      → GET /search?q= و GET /shows?status=LIVE|SCHEDULED، spec §2)؛ پیش‌فرض mock
    ═══════════════════════════════════════════════════════════════════════════ */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ArrowUpDown,
   BadgeCheck,
@@ -125,7 +131,7 @@ function TilesSkeleton() {
 
 function GridSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-3" aria-hidden>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-hidden>
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
@@ -134,6 +140,33 @@ function GridSkeleton({ count = 4 }: { count?: number }) {
           <Skeleton className="aspect-[4/5] w-full rounded-none" />
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ── v1.6.3 — گرید نتیجهٔ جستجو (علت باگ قبلی و درمانش):
+   قبل: زنده‌ها و به‌زودی‌ها در «دو گرید جدا»ی grid-cols-2 بودند؛ با نتایج کم،
+   هر گرید فقط خانهٔ راست (شروع RTL) را پر می‌کرد → «یک ستونِ نیم‌عرض در راست
+   با چپ خالی». حالا همهٔ نتایج در یک گرید واکنش‌گرا می‌نشینند:
+   موبایل ۲ ستون (مثل خانه)، دسکتاپ ۳ تا ۴ ستون.
+   تک‌نتیجه: کارت کل ردیف را نمی‌گیرد (کشیده نمی‌شود) و هم‌قد خانهٔ گرید
+   هم نیست (ریز نمی‌شود) — با سقف عرض معقول در سمت شروع (راست) می‌نشیند. */
+function ResultGrid({
+  count,
+  children,
+}: {
+  count: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {count === 1 ? (
+        <div className="col-span-full max-w-[280px] justify-self-start">
+          {children}
+        </div>
+      ) : (
+        children
+      )}
     </div>
   );
 }
@@ -267,8 +300,10 @@ export default function ExploreView() {
   /* لایهٔ داده — React Query (mock یا API با NEXT_PUBLIC_USE_API) */
   const categoriesQuery = useCategories();
   const categories = categoriesQuery.data ?? [];
-  const exploreShowsQuery = useExploreShows(activeCat);
-  const searchQuery = useSearch(query);
+  /* v1.6.3 — در حالت API مرتب‌سازی و فیلتر به سرور هم پاس داده می‌شود
+     (سمت کلاینت هم همان منطق قبلی اعمال می‌شود — نتیجه یکسان می‌ماند) */
+  const exploreShowsQuery = useExploreShows(activeCat, sort);
+  const searchQuery = useSearch(query, filters);
 
   const searching = normalizeFa(query).length >= 2;
 
@@ -504,40 +539,32 @@ export default function ExploreView() {
               </TabsTrigger>
             </TabsList>
 
-            {/* تب شوها */}
+            {/* تب شوها — زنده‌ها و به‌زودی‌ها در یک گرید (رفع باگ ستونِ نیم‌عرض) */}
             <TabsContent value="shows" className="space-y-4">
               {liveResults.length + shownUpcomingResults.length === 0 ? (
                 <p className="py-6 text-center text-xs font-bold text-white/45">
                   در این گروه نتیجه‌ای نبود
                 </p>
               ) : (
-                <>
-                  {liveResults.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {liveResults.map((show) => (
-                        <LiveGridCard
-                          key={show.id}
-                          show={show}
-                          onClick={() => openShow(show.id)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {shownUpcomingResults.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {shownUpcomingResults.map((show) => (
-                        <UpcomingShowCard
-                          key={show.id}
-                          show={show}
-                          reminderOn={reminders.has(show.id)}
-                          onToggleReminder={toggleReminder}
-                          onClick={() => setPreviewShow(show)}
-                          onPrebid={setPrebidShow}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
+                <ResultGrid count={liveResults.length + shownUpcomingResults.length}>
+                  {liveResults.map((show) => (
+                    <LiveGridCard
+                      key={show.id}
+                      show={show}
+                      onClick={() => openShow(show.id)}
+                    />
+                  ))}
+                  {shownUpcomingResults.map((show) => (
+                    <UpcomingShowCard
+                      key={show.id}
+                      show={show}
+                      reminderOn={reminders.has(show.id)}
+                      onToggleReminder={toggleReminder}
+                      onClick={() => setPreviewShow(show)}
+                      onPrebid={setPrebidShow}
+                    />
+                  ))}
+                </ResultGrid>
               )}
             </TabsContent>
 
@@ -548,7 +575,7 @@ export default function ExploreView() {
                   در این گروه نتیجه‌ای نبود
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <ResultGrid count={productResults.length}>
                   {productResults.map((p) => (
                     <ProductResultCard
                       key={p.id}
@@ -559,18 +586,18 @@ export default function ExploreView() {
                       }}
                     />
                   ))}
-                </div>
+                </ResultGrid>
               )}
             </TabsContent>
 
-            {/* تب فروشندگان */}
+            {/* تب فروشندگان — دسکتاپ چند ستونه، موبایل ردیف کامل (اسم کامل + فالو) */}
             <TabsContent value="sellers">
               {sellerResults.length === 0 ? (
                 <p className="py-6 text-center text-xs font-bold text-white/45">
                   در این گروه نتیجه‌ای نبود
                 </p>
               ) : (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {sellerResults.map((s) => (
                     <SellerResultRow key={s.id} seller={s} />
                   ))}
@@ -652,7 +679,7 @@ export default function ExploreView() {
               />
             ) : liveOnly ? (
               liveList.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {liveList.map((show) => (
                     <LiveGridCard
                       key={show.id}
@@ -668,7 +695,7 @@ export default function ExploreView() {
               )
             ) : (
               /* حالت ادغام: زنده‌ها + به‌زودی‌ها با کارت‌های خانه */
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {liveList.map((show) => (
                   <LiveGridCard
                     key={show.id}

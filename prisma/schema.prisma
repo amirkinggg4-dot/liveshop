@@ -98,6 +98,8 @@ model SellerProfile {
   iban           String? // sheba, for payouts
   ratingAvg      Float        @default(0)
   ratingCount    Int          @default(0)
+  /** v1.6.3 — normalized (normalizeFa) shopName + slug; /search matches here */
+  searchText     String       @default("")
   products       Product[]
   shows          Show[]
   followers      Follow[]     @relation("Followed")
@@ -114,6 +116,11 @@ model Follow {
 }
 
 // ───────── Catalog ─────────
+enum Condition {
+  NEW
+  USED
+}
+
 model Category {
   id       String    @id @default(cuid())
   slug     String    @unique
@@ -133,6 +140,10 @@ model Product {
   brand       String?
   images      String[] // object-storage keys
   price       Int // fixed price, Toman
+  /** v1.6.3 — نو / دست‌دوم (default NEW) */
+  condition   Condition     @default(NEW)
+  /** v1.6.3 — normalized (normalizeFa) title + brand + category; /search matches here */
+  searchText  String        @default("")
   weightGram  Int?
   isDraft     Boolean       @default(true)
   variants    Variant[]
@@ -175,6 +186,8 @@ model Show {
   endedAt     DateTime?
   livekitRoom String?       @unique
   peakViewers Int           @default(0)
+  /** v1.6.3 — normalized (normalizeFa) title + category; /search matches here */
+  searchText  String        @default("")
   items       ShowItem[]
   messages    ChatMessage[]
   createdAt   DateTime      @default(now()) // stable keyset ordering for /shows feed

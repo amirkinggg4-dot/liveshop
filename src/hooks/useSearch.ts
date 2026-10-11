@@ -1,12 +1,14 @@
 "use client";
 
 /* ─────────────────────────────────────────────────────────────
-   v1.6.2 — لایهٔ دادهٔ جستجوی کاوش: useSearch (React Query)
+   لایهٔ دادهٔ جستجوی کاوش: useSearch (React Query)
    ─ NEXT_PUBLIC_USE_API=true → GET /api/v1/search?q=
      (قرارداد docs/api-spec.md §2 — شوها، فروشندگان، کالاها)
    ─ در غیر این صورت جستجوی mock روی همان دیتای محلی با نرمال‌سازی
-     فارسی (ی/ي، ک/ك، ارقام فارسی/لاتین) — src/lib/persian.ts
+     فارسی — ماژول مشترک src/lib/normalize.ts (ی/ي، ک/ك، ارقام)
    ─ نوع خروجی هر دو حالت یکی است: SearchResults
+   v1.6.3 — پاسخ API حالا showId/showTitle («در لایوی فلان»)، sizes[]
+   و condition دارد + فیلترها به سرور هم پاس داده می‌شوند.
    پیش‌فرض: flag خاموش (mock). حداقل ۲ نویسه (مطابق قرارداد API).
    ───────────────────────────────────────────────────────────── */
 
@@ -14,13 +16,16 @@ import { useQuery } from "@tanstack/react-query";
 import { ALL_ITEMS } from "@/lib/data/items";
 import { ITEM_PHOTO } from "@/lib/data/media";
 import { SHOWS, SELLERS, getShow } from "@/lib/data/shows";
-import { faIncludes, normalizeFa } from "@/lib/persian";
+import { faIncludes } from "@/lib/persian";
+import { normalizeFa } from "@/lib/normalize";
 import type { Show } from "@/lib/data/types";
 import {
   apiShowToUiShow,
   USE_LIVE_API,
+  getStoredAccessToken,
   type ApiShowCard,
 } from "./useLiveShows";
+import type { ExploreFilters } from "@/components/liveshop/views/explore/filters";
 
 /* ── تایپ‌های UI (خروجی یکسان mock/API) ── */
 
@@ -32,10 +37,10 @@ export interface ProductResult {
   image: string | null;
   price: number;
   stock: number;
-  /** شو میزبان (mock همیشه دارد؛ API فعلی showId برنمی‌گرداند → null) */
+  /** شو میزبان (LIVE یا نزدیک‌ترین به‌زودی که کالا در آن است) */
   showId: string | null;
   showTitle: string | null;
-  /* برای فیلتر سایز/وضعیت — API فعلی این‌ها را ندارد → null */
+  /* برای فیلتر سایز/وضعیت — در هر دو حالت پر می‌شود */
   size: string | null;
   variantLabels: string[];
   condition: string | null;
@@ -46,7 +51,7 @@ export interface SellerResult {
   name: string;
   handle: string;
   verified: boolean;
-  /** API فعلی rating برنمی‌گرداند → null یعنی مخفی */
+  /** API: ratingAvg پاسخ (v1.6.3)؛ نبود → null یعنی مخفی */
   rating: number | null;
   ratingsCount: number | null;
   followers: number | null;
@@ -80,6 +85,8 @@ export interface ApiSearchResponse {
     avatarUrl: string | null;
     verified: boolean;
     followersCount: number;
+    ratingAvg?: number;
+    ratingCount?: number;
   }[];
   products: {
     id: string;
@@ -89,10 +96,23 @@ export interface ApiSearchResponse {
     price: number;
     seller: { shopName: string; slug: string };
     totalStock: number;
+    /** v1.6.3 — شو میزبان (LIVE یا نزدیک‌ترین به‌زودی) */
+    showId: string | null;
+    showTitle: string | null;
+    /** v1.6.3 — سایزهای موجود (از واریانت‌های با موجودی) */
+    sizes: string[];
+    /** v1.6.3 — وضعیت کالا */
+    condition: "NEW" | "USED";
   }[];
 }
 
-/** تبدیل پاسخ /search به تایپ UI — بدون خطا روی فیلدهای null */
+/** NEW/USED → برچسب فارسیِ سازگار با منطق فیلتر UI (filterProductResult) */
+export function apiConditionToFa(condition: "NEW" | "USED"): string {
+  return condition === "USED" ? "کارکرده" : "نو";
+}
+
+/** تبدیل پاسخ /search به تایپ UI — بدون خطا روی فیلدهای null
+    v1.6.3 — «در لایوی فلان» و فیلتر سایز/وضعیت در حالت API هم کار می‌کند */
 export function apiSearchToUi(raw: ApiSearchResponse): SearchResults {
   return {
     shows: raw.shows
@@ -105,19 +125,19 @@ export function apiSearchToUi(raw: ApiSearchResponse): SearchResults {
       image: p.image ?? null,
       price: p.price,
       stock: p.totalStock ?? 0,
-      showId: null,
-      showTitle: null,
-      size: null,
-      variantLabels: [],
-      condition: null,
+      showId: p.showId ?? null,
+      showTitle: p.showTitle ?? null,
+      size: p.sizes?.[0] ?? null,
+      variantLabels: p.sizes ?? [],
+      condition: p.condition ? apiConditionToFa(p.condition) : null,
     })),
     sellers: raw.sellers.map((s) => ({
       id: s.id,
       name: s.shopName,
       handle: s.slug,
       verified: s.verified,
-      rating: null,
-      ratingsCount: null,
+      rating: s.ratingAvg ?? null,
+      ratingsCount: s.ratingCount ?? null,
       followers: s.followersCount ?? null,
       emoji: "🛍️",
       color: "#6C5CFF",
@@ -174,11 +194,28 @@ async function fetchMockSearch(query: string): Promise<SearchResults> {
   return searchMock(query);
 }
 
-/* ── حالت API واقعی ── */
+/* ── حالت API واقعی: GET /search?q=… (+فیلترهای مشترک v1.6.3) ── */
 
-async function fetchApiSearch(query: string): Promise<SearchResults> {
+export function searchFilterParams(filters?: ExploreFilters): string {
+  if (!filters) return "";
+  const p = new URLSearchParams();
+  if (filters.minPrice != null) p.set("minPrice", String(filters.minPrice));
+  if (filters.maxPrice != null) p.set("maxPrice", String(filters.maxPrice));
+  if (filters.sizes.length > 0) p.set("size", normalizeFa(filters.sizes[0]));
+  if (filters.brands.length > 0) p.set("brand", filters.brands[0]);
+  if (filters.condition) p.set("condition", filters.condition === "new" ? "NEW" : "USED");
+  const s = p.toString();
+  return s ? `&${s}` : "";
+}
+
+async function fetchApiSearch(
+  query: string,
+  filters?: ExploreFilters
+): Promise<SearchResults> {
+  const token = getStoredAccessToken();
   const res = await fetch(
-    `/api/v1/search?q=${encodeURIComponent(query.trim())}`
+    `/api/v1/search?q=${encodeURIComponent(query.trim())}${searchFilterParams(filters)}`,
+    token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
   );
   if (!res.ok) throw new Error(`GET /search failed: ${res.status}`);
   const data = (await res.json()) as ApiSearchResponse;
@@ -188,14 +225,21 @@ async function fetchApiSearch(query: string): Promise<SearchResults> {
 /**
  * هوک جستجوی کاوش — فعال از ۲ نویسه به بعد (مطابق قرارداد API).
  * کلید کوئری با متنِ نرمال‌شده است تا «كتاب» و «کتاب» یک کش داشته باشند.
+ * filters در حالت API به سرور هم پاس داده می‌شود (فیلتر سمت سرور)؛
+ * در حالت mock همان فیلترِ سمت کلاینتِ قبلی اعمال می‌شود.
  */
-export function useSearch(query: string) {
+export function useSearch(query: string, filters?: ExploreFilters) {
   const normalized = normalizeFa(query);
   const enabled = normalized.length >= 2;
   return useQuery<SearchResults, Error>({
-    queryKey: ["search", USE_LIVE_API ? "api" : "mock", normalized],
+    queryKey: [
+      "search",
+      USE_LIVE_API ? "api" : "mock",
+      normalized,
+      USE_LIVE_API ? (filters ? JSON.stringify(filters) : "none") : "client-side",
+    ],
     queryFn: () =>
-      USE_LIVE_API ? fetchApiSearch(query) : fetchMockSearch(query),
+      USE_LIVE_API ? fetchApiSearch(query, filters) : fetchMockSearch(query),
     enabled,
     /* حین تایپ نتایج قبلی می‌ماند — پرش چشمک‌زا ندارد */
     placeholderData: (prev) => prev,

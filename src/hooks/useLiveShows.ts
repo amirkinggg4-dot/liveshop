@@ -32,6 +32,8 @@ export interface ApiShowCard {
   status: "LIVE" | "SCHEDULED" | "ENDED" | "CANCELED";
   scheduledAt: string | null;
   startedAt: string | null;
+  /** v1.6.3 — شروع واقعی شوهای SCHEDULED (پایهٔ شمارش معکوس نسبی) */
+  startsAt: string | null;
   viewers: number;
   category: { slug: string; nameFa: string } | null;
   seller: {
@@ -40,6 +42,8 @@ export interface ApiShowCard {
     shopName: string;
     avatarUrl: string | null;
     verified: boolean;
+    /** v1.6.3 — فقط وقتی درخواست توکن معتبر دارد وجود دارد */
+    isFollowed?: boolean;
   };
   pinnedItem: {
     showItemId: string;
@@ -65,7 +69,8 @@ export function apiShowStatusToUi(
 }
 
 /** تبدیل پاسخ API به تایپ UI (Show) — بدون خطا روی فیلدهای null
-    v1.6.2 — وضعیت قابل override است (SCHEDULED → upcoming برای کاوش) */
+    v1.6.2 — وضعیت قابل override است (SCHEDULED → upcoming برای کاوش)
+    v1.6.3 — startsAt واقعی + isFollowed → isFollowing («دنبال‌شده‌ها» خانه) */
 export function apiShowToUiShow(
   raw: ApiShowCard,
   status: Show["status"] = apiShowStatusToUi(raw.status)
@@ -81,8 +86,11 @@ export function apiShowToUiShow(
     cover: { from: "#6C5CFF", to: "#FF3B8B", emoji: "🛍️" },
     itemsTotal: 0,
     itemsSold: 0,
-    isFollowing: false,
+    /* v1.6.3 — فالو واقعی کاربر (توکن اختیاری)؛ بی‌توکن false مثل قبل */
+    isFollowing: raw.seller.isFollowed ?? false,
     tags: [],
+    /* v1.6.3 — شروع واقعی شو به‌زودی → شمارش نسبی بدون دادهٔ mock */
+    startsAt: raw.startsAt ?? raw.scheduledAt ?? null,
     photoUrl: raw.coverUrl ?? null,
     sellerName: raw.seller.shopName,
     sellerAvatar: raw.seller.avatarUrl,
@@ -95,6 +103,21 @@ export function apiShowToUiShow(
 /** flag — پیش‌فرض خاموش؛ فقط با NEXT_PUBLIC_USE_API="true" روشن می‌شود */
 export const USE_LIVE_API = process.env.NEXT_PUBLIC_USE_API === "true";
 
+/* ── v1.6.3 — توکن اختیاری برای فیلد isFollowed ──
+   رابط کاربری فعلاً صفحهٔ ورود ندارد؛ هر وقت جریان لاگین توکن دسترسی را در
+   localStorage بنویسد، درخواست‌های /shows و /search همان را به‌صورت
+   Bearer می‌فرستند و «دنبال‌شده‌ها» از سرور می‌آید. (try/catch — حافظهٔ
+   محلی ممکن است در حالت‌های حریم خصوصی نباشد) */
+const ACCESS_TOKEN_KEY = "liveshop.accessToken";
+
+export function getStoredAccessToken(): string | null {
+  try {
+    return localStorage.getItem(ACCESS_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
 /* ── حالت API واقعی: GET /api/v1/shows?status=LIVE&limit=&cursor= ── */
 
 async function fetchApiLiveShowsPage(
@@ -105,7 +128,10 @@ async function fetchApiLiveShowsPage(
     limit: String(LIVE_SHOWS_PAGE_SIZE),
   });
   if (cursor) params.set("cursor", cursor);
-  const res = await fetch(`/api/v1/shows?${params.toString()}`);
+  const token = getStoredAccessToken();
+  const res = await fetch(`/api/v1/shows?${params.toString()}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   if (!res.ok) {
     throw new Error(`GET /shows failed: ${res.status}`);
   }

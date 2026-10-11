@@ -12,6 +12,7 @@ import {
   BookOpen,
   ChevronRight,
   Clock,
+  Flame,
   Footprints,
   Gem,
   Headphones,
@@ -568,6 +569,16 @@ export function LiveGridCard({
       {/* نشان زنده + تعداد بیننده — بالا */}
       <div className="absolute inset-x-2 top-2 z-10 flex items-start">
         <LiveBadge viewers={show.viewers} className="px-2 py-0.5 text-[10px]" />
+        {/* v1.6.3 — شو «داغ»: نشان lucide Flame (جایگزین ایموجی 🔥 داخل عنوان) */}
+        {show.hot && (
+          <span
+            className="ms-auto inline-flex items-center gap-0.5 rounded-full bg-black/45 px-1.5 py-0.5 text-[10px] font-bold text-orange-400 backdrop-blur-sm"
+            aria-label="شوی داغ"
+          >
+            <Flame className="h-3 w-3" aria-hidden />
+            داغ
+          </span>
+        )}
       </div>
 
       {/* گرادیان تیرهٔ پایین + اسم شو (≤۲ خط) + فروشنده + ردیف قیمت + ردیف موجودی */}

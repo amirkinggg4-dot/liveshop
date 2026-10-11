@@ -9,6 +9,7 @@
  * Run:  bun run db:seed   (requires a reachable DATABASE_URL)
  */
 import { PrismaClient } from "@prisma/client";
+import { buildSearchText } from "../src/lib/normalize";
 
 const db = new PrismaClient();
 
@@ -46,6 +47,7 @@ async function main() {
     ).map(([slug, nameFa]) => db.category.create({ data: { slug, nameFa } })),
   );
   const cat = Object.fromEntries(categories.map((c) => [c.slug, c.id]));
+  const catName = Object.fromEntries(categories.map((c) => [c.slug, c.nameFa]));
 
   // ───────── Sellers (mirrors src/lib/data/shows.ts) ─────────
   console.log("→ sellers & users …");
@@ -112,6 +114,8 @@ async function main() {
         status: "APPROVED",
         ratingAvg: s.ratingAvg,
         ratingCount: s.ratingCount,
+        // v1.6.3 — ستون جستجو با همان normalizeFa مشترک UI/سرور پر می‌شود
+        searchText: buildSearchText([s.shopName, s.slug]),
       },
     });
     sellers.push({ sellerId: profile.id, slug: profile.slug });
@@ -144,6 +148,8 @@ async function main() {
     description: "رنگ‌بندی مشکی‌وسفید محبوب‌ترین دانک چند سال اخیر؛ اورجینال با جعبهٔ سالم.",
     images: ["/liveshop/item-it1.jpg"],
     price: 7_950_000,
+    condition: "NEW",
+    searchText: buildSearchText(["نایک دانک لو پاندا", "Nike", catName.sneakers]),
     weightGram: 1100,
     isDraft: false,
     variants: {
@@ -159,6 +165,8 @@ async function main() {
     description: "سامبا اوگ با زیرهٔ صمغی؛ کلاسیک همیشه‌جوان.",
     images: ["/liveshop/item-it2.jpg"],
     price: 6_480_000,
+    condition: "NEW",
+    searchText: buildSearchText(["آدیداس سامبا اوگ", "adidas", catName.sneakers]),
     weightGram: 980,
     isDraft: false,
     variants: { create: shoeVariants("SMB-OG", [1, 3, 5, 2, 0]) },
@@ -172,6 +180,9 @@ async function main() {
     description: "نسخهٔ شیکاگو با پچ قرمز؛ یکی‌درمیان.",
     images: ["/liveshop/item-it3.jpg"],
     price: 14_900_000,
+    // v1.6.3 — یکی‌درمیان → دست‌دوم (برای فیلتر وضعیت و تست‌ها)
+    condition: "USED",
+    searchText: buildSearchText(["جردن ۱ شیکاگو", "Jordan", catName.sneakers]),
     weightGram: 1200,
     isDraft: false,
     variants: { create: shoeVariants("AJ1-CHI", [0, 1, 2, 1, 0]) },
@@ -185,6 +196,8 @@ async function main() {
     description: "سبک و راحت برای استفادهٔ روزمره؛ مش نقره‌ای.",
     images: ["/liveshop/item-it4.jpg"],
     price: 5_890_000,
+    condition: "NEW",
+    searchText: buildSearchText(["نیوبالانس ۵۳۰", "New Balance", catName.sneakers]),
     weightGram: 850,
     isDraft: false,
     variants: { create: shoeVariants("NB-530", [3, 4, 4, 2, 1]) },
@@ -198,6 +211,8 @@ async function main() {
     description: "بوتهٔ پنج‌برگی با ریشهٔ هوایی؛ با خزانهٔ ویژهٔ گیاه ارسال می‌شود.",
     images: ["/liveshop/item-it5.jpg"],
     price: 2_450_000,
+    condition: "NEW",
+    searchText: buildSearchText(["مونسترا وراگتهٔ ابلق", "—", catName.plants]),
     weightGram: 2500,
     isDraft: false,
     variants: {
@@ -216,6 +231,8 @@ async function main() {
     description: "ارتفاع ۱۲۰ سانتی؛ مناسب نور غیرمستقیم پنجره.",
     images: ["/liveshop/item-it6.jpg"],
     price: 1_850_000,
+    condition: "NEW",
+    searchText: buildSearchText(["فیکوس بنجامین تاج‌دار", "—", catName.plants]),
     weightGram: 4200,
     isDraft: false,
     variants: { create: [{ label: "تک‌تنه ۱۲۰ سانتی", sku: "FIC-120", stock: 3 }] },
@@ -229,6 +246,8 @@ async function main() {
     description: "گرید PSA ۹؛ همراه قاب ضد UV.",
     images: ["/liveshop/cat-cards.jpg"],
     price: 9_800_000,
+    condition: "NEW",
+    searchText: buildSearchText(["کارت پیکاچو وَو — پرمیوم", "Pokémon TCG", catName.cards]),
     weightGram: 120,
     isDraft: false,
     variants: { create: [{ label: "تک‌کارت قاب‌دار", sku: "PKM-001", stock: 1 }] },
@@ -242,6 +261,8 @@ async function main() {
     description: "مقیاس ۱:۶ با قطعات جایگزین؛ جعبهٔ اوریجینال.",
     images: ["/liveshop/cat-toys.jpg"],
     price: 18_500_000,
+    condition: "NEW",
+    searchText: buildSearchText(["فیگور آیرون‌من مارک ۸۵", "Hot Toys", catName.toys]),
     weightGram: 1900,
     isDraft: false,
     variants: { create: [{ label: "استاندارد", sku: "HT-IM85", stock: 2 }] },
@@ -255,6 +276,8 @@ async function main() {
     description: "۴۰ ساعت شارژدهی؛ ضمانت ۱۸ماههٔ گجت‌بازار.",
     images: ["/liveshop/cat-tech.jpg"],
     price: 4_320_000,
+    condition: "NEW",
+    searchText: buildSearchText(["هدفون بی‌سیم نویزکنسلینگ X7", "SoundPeak", catName.tech]),
     weightGram: 520,
     isDraft: false,
     variants: {
@@ -273,6 +296,8 @@ async function main() {
     description: "رایحهٔ چوبی گرم با ماندگاری ۱۲ ساعت؛ اورجینال با سیل.",
     images: ["/liveshop/cat-beauty.jpg"],
     price: 3_650_000,
+    condition: "NEW",
+    searchText: buildSearchText(["ادکلن عود سلطنتی ۱۰۰ میلی", "Royal Oud", catName.beauty]),
     weightGram: 400,
     isDraft: false,
     variants: { create: [{ label: "۱۰۰ میلی‌لیتر", sku: "RO-100", stock: 4 }] },
@@ -301,6 +326,7 @@ async function main() {
       status: "LIVE",
       startedAt: minutes(-48),
       peakViewers: 1240,
+      searchText: buildSearchText(["شب کتونی نایاب — همه با قیمت ثابت", catName.sneakers]),
     },
   });
   await addItems(sh1.id, [
@@ -319,6 +345,7 @@ async function main() {
       status: "LIVE",
       startedAt: minutes(-22),
       peakViewers: 862,
+      searchText: buildSearchText(["گلخانهٔ زندهٔ مینا — تک‌گیاه‌های نادر", catName.plants]),
     },
   });
   await addItems(sh2.id, [
@@ -335,6 +362,7 @@ async function main() {
       status: "LIVE",
       startedAt: minutes(-95),
       peakViewers: 521,
+      searchText: buildSearchText(["کلکسیون‌یار تهران — کارت و فیگور", catName.cards]),
     },
   });
   await addItems(sh3.id, [
@@ -350,6 +378,7 @@ async function main() {
       coverUrl: "/liveshop/live-sh1.jpg",
       status: "SCHEDULED",
       scheduledAt: days(1),
+      searchText: buildSearchText(["پیش‌فروش آخر هفته — جردن و نیوبالانس", catName.sneakers]),
     },
   });
   await addItems(sh4.id, [
@@ -367,6 +396,7 @@ async function main() {
       startedAt: days(-2),
       endedAt: days(-2),
       peakViewers: 934,
+      searchText: buildSearchText(["گجت‌بازار — هدفون و لوازم جانبی", catName.tech]),
     },
   });
   await addItems(sh5.id, [{ productId: products.ancHeadphone, pinned: true, soldCount: 9 }]);

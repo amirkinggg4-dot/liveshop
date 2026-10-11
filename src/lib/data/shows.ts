@@ -88,10 +88,12 @@ export function getSeller(id: string): Seller {
 export const SHOWS: Show[] = [
   {
     id: "sh1",
-    title: "شب کتونی‌های کمیاب 🔥",
+    title: "شب کتونی‌های کمیاب",
     sellerId: "s1",
     category: "کتونی و کفش",
     status: "live",
+    /* v1.6.3 — ایموجی 🔥 از عنوان حذف شد؛ نشان «داغ» حالا lucide Flame است */
+    hot: true,
     viewers: 248,
     cover: { from: "#FF3B8B", to: "#6C5CFF", emoji: "👟" },
     itemsTotal: 24,

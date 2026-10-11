@@ -25,6 +25,7 @@ const SAMPLE_SEED_RESPONSE: ApiShowsResponse = {
       status: "LIVE",
       scheduledAt: null,
       startedAt: "2025-01-10T18:00:00.000Z",
+      startsAt: null,
       viewers: 248,
       category: { slug: "sneakers", nameFa: "کتونی و کفش" },
       seller: {
@@ -49,6 +50,7 @@ const SAMPLE_SEED_RESPONSE: ApiShowsResponse = {
       status: "LIVE",
       scheduledAt: null,
       startedAt: "2025-01-10T19:30:00.000Z",
+      startsAt: null,
       viewers: 139,
       category: null,
       seller: {

@@ -83,6 +83,13 @@ const NAV_ITEMS: {
   { view: "profile", label: "حساب", icon: User },
 ];
 
+/* v1.6.3 — عرض ستون اصلی per-view:
+   کاوش در دسکتاپ عریض‌تر می‌شود تا گرید نتیجه‌ها ۳ تا ۴ ستون ببیند؛
+   بقیهٔ صفحه‌ها همان max-w-md قبلی‌اند (بدون هیچ تغییر بصری). */
+const VIEW_MAX_WIDTH: Partial<Record<ViewName, string>> = {
+  explore: "max-w-md sm:max-w-2xl lg:max-w-4xl",
+};
+
 export default function AppShell() {
   const stack = useAppStore((s) => s.stack);
   const setRoot = useAppStore((s) => s.setRoot);
@@ -93,10 +100,16 @@ export default function AppShell() {
   const View = VIEW_COMPONENTS[current.view];
   const showTopBar = current.view === "home" || current.view === "explore" || current.view === "orders" || current.view === "profile";
   const showNav = NAV_VIEWS.includes(current.view);
+  const containerWidth = VIEW_MAX_WIDTH[current.view] ?? "max-w-md";
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#12101f] via-ls-bg to-[#0a0812]">
-      <div className="w-full max-w-md mx-auto min-h-screen flex flex-col border-x border-white/5 shadow-2xl shadow-black/50">
+      <div
+        className={cn(
+          "w-full mx-auto min-h-screen flex flex-col border-x border-white/5 shadow-2xl shadow-black/50",
+          containerWidth
+        )}
+      >
         {showTopBar && (
           <header className="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 bg-ls-bg/85 backdrop-blur-md border-b border-white/5">
             <div className="flex items-center gap-2">
