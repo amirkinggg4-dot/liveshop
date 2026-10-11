@@ -43,6 +43,15 @@ import SellerStorefrontView from "./views/SellerStorefrontView";
 import SellerSettingsView from "./views/SellerSettingsView";
 import SellerOnboardingView from "./views/SellerOnboardingView";
 import SellerLiveReportView from "./views/SellerLiveReportView";
+// v1.9.0 — حساب و ورود
+import ProfileEditView from "./views/ProfileEditView";
+import AddressesView from "./views/AddressesView";
+import SettingsView from "./views/SettingsView";
+import FaqView from "./views/FaqView";
+import TermsView from "./views/TermsView";
+import PrivacyView from "./views/PrivacyView";
+import SupportView from "./views/SupportView";
+import LoginSheet from "./login-sheet";
 
 const VIEW_COMPONENTS: Record<ViewName, () => ReactNode> = {
   home: HomeView,
@@ -76,6 +85,14 @@ const VIEW_COMPONENTS: Record<ViewName, () => ReactNode> = {
   // v1.7.0 — فروش: onboarding + گزارش پایان لایو
   sellerOnboarding: SellerOnboardingView,
   sellerLiveReport: SellerLiveReportView,
+  // v1.9.0 — حساب و ورود
+  profileEdit: ProfileEditView,
+  addresses: AddressesView,
+  settings: SettingsView,
+  faq: FaqView,
+  terms: TermsView,
+  privacy: PrivacyView,
+  support: SupportView,
 };
 
 const NAV_ITEMS: {
@@ -147,6 +164,9 @@ export default function AppShell() {
         )}
 
         <main className="flex-1 flex flex-col">{View ? <View /> : null}</main>
+
+        {/* v1.9.0 — شیت ورود سراسری (خودش از استور auth باز/بسته می‌شود) */}
+        <LoginSheet />
 
         {showNav && (
           <nav

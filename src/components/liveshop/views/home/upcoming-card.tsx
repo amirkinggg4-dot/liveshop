@@ -10,6 +10,7 @@
 
 import { Bell, Clock, Gavel } from "lucide-react";
 import { AUCTION_ENABLED } from "@/lib/config";
+import { useAuth } from "@/store/auth-store";
 import { SHOW_PHOTO } from "@/lib/data/media";
 import type { Show } from "@/lib/data/types";
 import { ShowCard } from "@/components/liveshop/shared";
@@ -27,7 +28,8 @@ function showStartsAt(show: Show): Date | null {
   return upcomingStartsAt(show.id);
 }
 
-/* ── دکمهٔ toggle یادآوری (span نقش‌محور چون ShowCard خودش button است) ── */
+/* ── دکمهٔ toggle یادآوری (span نقش‌محور چون ShowCard خودش button است) ──
+   v1.9.0 — گیت مهمان: یادآوری فقط با ورود؛ بعد از ورود همان toggle ادامه می‌یابد */
 export function ReminderToggle({
   show,
   on,
@@ -37,21 +39,23 @@ export function ReminderToggle({
   on: boolean;
   onToggle: (show: Show) => void;
 }) {
+  const { requireAuth } = useAuth();
+  const guardedToggle = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    requireAuth(() => onToggle(show));
+  };
   return (
     <span
       role="button"
       tabIndex={0}
       aria-pressed={on}
       aria-label={`${on ? "حذف یادآوری" : "فعال‌سازی یادآوری"} برای شو ${show.title}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle(show);
-      }}
+      onClick={guardedToggle}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           e.stopPropagation();
-          onToggle(show);
+          requireAuth(() => onToggle(show));
         }
       }}
       className={cn(

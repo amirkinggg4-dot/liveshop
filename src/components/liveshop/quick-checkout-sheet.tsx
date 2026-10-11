@@ -25,13 +25,15 @@ import {
   Wallet as WalletIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { faNum, toman } from "@/lib/format";
+import { faNum, toman, toFa } from "@/lib/format";
 import { calcOrderTotal } from "@/lib/config/fees";
 import { stockLabelFa } from "@/lib/data/items";
-import { DEFAULT_ADDRESS, SHIPPING_METHODS } from "@/lib/data/orders";
+import { SHIPPING_METHODS } from "@/lib/data/orders";
 import type { ShopItem, ShippingMethodId } from "@/lib/data/types";
 import { useLiveStore } from "@/store/live-store";
 import { useAppStore } from "@/store/app-store";
+import { useAuth } from "@/store/auth-store";
+import { useAddressesStore, selectDefaultAddress } from "@/store/addresses-store";
 import { useWalletStore } from "@/store/wallet-store";
 import { GradientCover, Price } from "@/components/liveshop/shared";
 import Confetti from "@/components/liveshop/confetti";
@@ -97,7 +99,16 @@ export default function QuickCheckoutSheet({
     setQty(Math.min(Math.max(1, next), Math.max(1, Math.min(maxQty, 5))));
   };
 
-  const pay = () => {
+  /* v1.9.0 — گیت مهمان: پرداخت فقط با ورود؛ بعد از ورود همان پرداخت ادامه می‌یابد */
+  const { requireAuth } = useAuth();
+  const defaultAddress = useAddressesStore(selectDefaultAddress);
+  /* تغییر آدرس: بستن شیت و رفتن به صفحهٔ آدرس‌ها */
+  const openAddresses = () => {
+    onOpenChange(false);
+    push("addresses");
+  };
+  const pay = () =>
+    requireAuth(() => {
     if (soldOut) {
       toast.error("کالا تمام شد — موجودی این کالا به پایان رسید");
       return;
@@ -130,7 +141,7 @@ export default function QuickCheckoutSheet({
     setCelebrate((k) => k + 1);
     toast.success("خرید شما ثبت شد — پول تا لحظهٔ تحویل امانت است");
     onOpenChange(false);
-  };
+  });
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -261,16 +272,21 @@ export default function QuickCheckoutSheet({
               </p>
               <button
                 type="button"
-                onClick={() => toast("ویرایش آدرس (دمو)")}
+                onClick={() => openAddresses()}
                 className="text-[11px] font-bold text-ls-purple-soft hover:underline"
-                aria-label="ویرایش آدرس"
+                aria-label="تغییر آدرس تحویل"
               >
-                ویرایش
+                تغییر
               </button>
             </div>
-            <p className="whitespace-pre-line text-[11px] leading-5 text-white/60">
-              {DEFAULT_ADDRESS}
-            </p>
+            {defaultAddress ? (
+              <div className="text-[11px] leading-5 text-white/60">
+                <p className="font-bold text-white/85">{defaultAddress.recipient} · <span dir="ltr">{toFa(defaultAddress.phone)}</span></p>
+                <p className="mt-0.5">{defaultAddress.province}، {defaultAddress.city} — {defaultAddress.line}</p>
+              </div>
+            ) : (
+              <p className="text-[11px] leading-5 text-white/50">آدرسی نداری — از صفحهٔ حساب ← آدرس‌ها اضافه کن.</p>
+            )}
           </div>
 
           {/* ── روش ارسال ── */}

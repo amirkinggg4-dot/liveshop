@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { faNum } from "@/lib/format";
@@ -10,11 +11,23 @@ import { useAppStore } from "@/store/app-store";
 import { useInboxStore, selectUnreadCount } from "@/store/inbox-store";
 import { AUCTION_ENABLED } from "@/lib/config";
 import { EmptyState, PageHeader } from "@/components/liveshop/shared";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /* ─────────────────────────────────────────────────────────────
    صندوق ورودی — فاز ۳ (Atlas تصویر ۲۰)
    اعلان‌های خریدار با فیلتر دسته‌ای (همه/مزایده‌ها/سفارش‌ها/فالو/سیستم)،
-   نقطهٔ ناخواندهٔ سبز، خواندن با کلیک و «خواندن همه».
+   نقطهٔ ناخواندهٔ سبز، خواندن با کلیک، «خواندن همه»
+   و حذف تک‌اعلان با تأیید (AlertDialog + toast).
    ───────────────────────────────────────────────────────────── */
 
 type FilterId = "all" | "auction" | "orders" | "follow" | "system";
@@ -45,9 +58,11 @@ export default function InboxView() {
   const notifications = useInboxStore((s) => s.notifications);
   const markRead = useInboxStore((s) => s.markRead);
   const markAllRead = useInboxStore((s) => s.markAllRead);
+  const deleteNotification = useInboxStore((s) => s.deleteNotification);
   const unreadCount = useInboxStore(selectUnreadCount);
 
   const [filter, setFilter] = useState<FilterId>("all");
+  const [deleteTarget, setDeleteTarget] = useState<InboxNotification | null>(null);
 
   const countOf = (f: FilterId) =>
     notifications.filter((n) => matchesFilter(n, f)).length;
@@ -60,6 +75,13 @@ export default function InboxView() {
     }
     markAllRead();
     toast.success("همهٔ اعلان‌ها خوانده شد");
+  };
+
+  const onConfirmDelete = () => {
+    if (!deleteTarget) return;
+    deleteNotification(deleteTarget.id);
+    setDeleteTarget(null);
+    toast.success("اعلان حذف شد");
   };
 
   return (
@@ -130,55 +152,97 @@ export default function InboxView() {
               const meta = getInboxKindMeta(n.kind);
               return (
                 <li key={n.id}>
-                  <button
-                    type="button"
-                    onClick={() => markRead(n.id)}
+                  <div
                     className={cn(
-                      "flex w-full items-start gap-3 rounded-2xl border p-3.5 text-right transition-colors hover:bg-white/5",
+                      "flex items-center gap-1 rounded-2xl border p-2 transition-colors",
                       n.unread
                         ? "border-ls-purple/30 bg-ls-card"
                         : "border-white/5 bg-ls-card"
                     )}
-                    aria-label={`${n.unread ? "اعلان ناخوانده" : "اعلان"}: ${n.title} — دستهٔ ${meta.label}`}
                   >
-                    <span
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
-                      style={{ backgroundColor: `${n.color}22` }}
-                      aria-hidden
+                    {/* دکمهٔ اصلی خواندن — همان رفتار قبل */}
+                    <button
+                      type="button"
+                      onClick={() => markRead(n.id)}
+                      className="flex min-w-0 flex-1 items-start gap-3 rounded-xl p-1.5 text-right transition-colors hover:bg-white/5"
+                      aria-label={`${n.unread ? "اعلان ناخوانده" : "اعلان"}: ${n.title} — دستهٔ ${meta.label}`}
                     >
-                      {n.emoji}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          className={cn(
-                            "truncate text-xs",
-                            n.unread ? "font-black" : "font-bold text-white/80"
-                          )}
-                        >
-                          {n.title}
-                        </span>
-                        {n.unread && (
+                      <span
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
+                        style={{ backgroundColor: `${n.color}22` }}
+                        aria-hidden
+                      >
+                        {n.emoji}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
                           <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-ls-green"
-                            aria-label="ناخوانده"
-                          />
-                        )}
+                            className={cn(
+                              "truncate text-xs",
+                              n.unread ? "font-black" : "font-bold text-white/80"
+                            )}
+                          >
+                            {n.title}
+                          </span>
+                          {n.unread && (
+                            <span
+                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-ls-green"
+                              aria-label="ناخوانده"
+                            />
+                          )}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-white/60 line-clamp-2">
+                          {n.body}
+                        </span>
+                        <span className="mt-1 block text-[10px] text-white/35">
+                          {n.atLabel}
+                        </span>
                       </span>
-                      <span className="mt-1 block text-xs leading-5 text-white/60 line-clamp-2">
-                        {n.body}
-                      </span>
-                      <span className="mt-1 block text-[10px] text-white/35">
-                        {n.atLabel}
-                      </span>
-                    </span>
-                  </button>
+                    </button>
+
+                    {/* دکمهٔ حذف — برادر مجزا، کلیکش به خواندن نشت نمی‌کند */}
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(n)}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/35 transition-colors hover:bg-white/5 hover:text-red-400"
+                      aria-label={`حذف اعلان: ${n.title}`}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+
+      {/* ═══ دیالوگ تأیید حذف اعلان ═══ */}
+      <AlertDialog
+        open={deleteTarget != null}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+      >
+        <AlertDialogContent className="rounded-2xl border-white/10 bg-ls-card sm:max-w-sm">
+          <AlertDialogHeader className="text-right sm:text-right">
+            <AlertDialogTitle>این اعلان حذف شود؟</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs leading-5">
+              اعلان حذف‌شده برگشت‌پذیر نیست.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2 sm:justify-start">
+            <AlertDialogAction
+              onClick={onConfirmDelete}
+              className={buttonVariants({ variant: "destructive" })}
+              aria-label="تأیید حذف اعلان"
+            >
+              حذف کن
+            </AlertDialogAction>
+            <AlertDialogCancel className="border-white/15 bg-transparent text-white/70">
+              منصرف شدم
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

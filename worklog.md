@@ -812,3 +812,83 @@ Work Log:
 
 Stage Summary:
 - origin/main = 23cbf31 (v1.8.0 + worklog) — مخزن گیت‌هاب همگام با محلی است؛ توکن نگهداری نشده و برای pushهای بعدی باید دوباره از کاربر گرفته شود
+---
+Task ID: 190-2c
+Agent: general-purpose
+Task: حذف اعلان در صندوق ورودی + اسکن واژه‌های حراج حالت ثابت
+
+Work Log:
+- قدم صفر: worklog (بخش‌های v1.7.1 و v1.8.0) + InboxView.tsx / inbox-store.ts / buyer-p1.ts (تایپ‌ها و دو واریانت INBOX_NOTIFICATIONS) / config.ts (AUCTION_ENABLED=false) / forbidden-words.test.ts (نگهبان) / نمونهٔ AlertDialog در SellerInventoryView و product-edit-dialog / ui/alert-dialog.tsx خوانده شد.
+- الف) inbox-store.ts — فقط یک افزودن: اکشن deleteNotification(id) با فیلتر immutable (s.notifications.filter) + تایپش در InboxState؛ هیچ اکشن/seed/سلکتور دیگری تغییر نکرد.
+- ب) InboxView.tsx — ردیف اعلان بازسازی شد: li شامل div flex (border و bg قبلی کارت روی خود div) با دو دکمهٔ برادر مجزا: دکمهٔ اصلی خواندن (flex-1، همان onClick={markRead} و aria-label قبلی) + دکمهٔ حذف با آیکون lucide Trash2، هدف لمسی h-11 w-11 (۴۴px)، text-white/35 hover:text-red-400، aria-label=`حذف اعلان: {n.title}` — چون برادر مجزاست کلیک حذف به خواندن نشت نمی‌کند.
+- ب) دیالوگ تأیید shadcn AlertDialog کنترل‌شده با state محلی deleteTarget: عنوان «این اعلان حذف شود؟»، توضیح «اعلان حذف‌شده برگشت‌پذیر نیست.»، لغو «منصرف شدم»، دکمهٔ خطر «حذف کن» با buttonVariants({variant:"destructive"}) (توکن destructive تم)؛ تأیید → deleteNotification(id) + setDeleteTarget(null) + toast.success(«اعلان حذف شد»). الگو دقیقاً هم‌شکل دیالوگ حذف کالای SellerInventoryView (footer flex-row-reverse، rounded-2xl bg-ls-card).
+- ب) EmptyState موجود برای «همهٔ اعلان‌های فیلتر حذف شد» دست نخورد (visible.length===0)؛ شمارنده‌های چیپ‌ها و «ناخوانده»ها از state می‌آیند و خودکار آپدیت می‌شوند؛ «خواندن همه» و خواندن تک‌تک بدون تغییر؛ ایموجی جدیدی اضافه نشد (فقط Trash2) و n.emoji دیتا دست‌نخورده ماند.
+- ج) اسکن واژه‌های حراج: bun test src/lib/forbidden-words.test.ts از ابتدا سبز بود (۹/۹) — هیچ leakی در متن‌های نمایشی حالت ثابت نبود؛ بنابراین هیچ‌کدام از ۵ فایل مجاز بخش ج دست نخورد و واریانتهای فلگ‌دار حفظ شدند. رشته‌های جدید من (این اعلان حذف شود؟/اعلان حذف‌شده برگشت‌پذیر نیست./منصرف شدم/حذف کن/اعلان حذف شد) همه از واژه‌های ممنوع دورند و توسط همان تست دوباره تأیید شدند.
+- صحت‌سنجی: bun test src/lib src/hooks → ۱۶۰ pass / ۹ fail که هر ۹ با baseline بدون تغییرات من (git stash) یکسان‌اند — سرور بدون Postgres/env: ۳ در auth.security + ۵ در otp.security + ۱ در search-discovery (تقسیم failهای شناخته‌شدهٔ محیطی؛ صفر مرتبط با این تسک)؛ bunx tsc --noEmit | grep 'InboxView|inbox-store' → صفر (تنها ۴ خطای vendored خارج src: examples/websocket و skills — پیش‌موجود)؛ bun run lint → exit 0. smoke مرورگری طبق دستور انجام نشد (dev روی ۳۰۰0 در حال اجراست).
+
+Stage Summary:
+- حذف تک‌اعلان با تأیید کامل شد: استور یک اکشن immutable اضافه کرد، ردیف‌ها به li>div با دو دکمهٔ مستقل (خواندن/حذف) بازسازی شدند و دیالوگ فارسی + توست موفقیت اضافه شد؛ رفتارهای قبلی (خواندن تک‌تک، خواندن همه، فیلترها/شمارنده‌ها، EmptyState) دست‌نخورده ماندند.
+- اسکن حراج: مجموعه از قبل تمیز بود — leakی پیدا نشد و چیزی در بخش ج اصلاح نشد؛ فقط ۲ فایل مجاز (inbox-store.ts و InboxView.tsx) تغییر کرد.
+
+---
+Task ID: 190-1a
+Agent: general-purpose
+Task: ماژول خالص ماشین OTP + اعتبارسنجی موبایل/کدپستی + دیتای استان‌ها + تست
+
+Work Log:
+- قراردادهای پروژه خوانده شد (worklog تا v1.8.0-push) و الگوها برداشته شد: order-state.ts (توابع خالص با nowMs صریح)، order-state.test.ts (زمان mock با T0)، fa-number.ts (latinDigits)، normalize.ts، fees.ts و سرور src/lib/server/otp.ts (TTL=120s، MAX_ATTEMPTS=5، RATE=3/600s، پیام‌های فارسی خطا) — هیچ فایل موجودی تغییر نکرد (فقط ۵ فایل جدید + این append).
+- src/lib/otp-state.ts: ماشین وضعیت خالص بدون هیچ import از React/zustand/سرور — فازهای idle/sending/sent/verifying/locked/authenticated (OTP_PHASES)؛ ثابت‌های CODE_TTL_SECONDS=120 و RESEND_COOLDOWN_SECONDS=120 و MAX_ATTEMPTS=5 و RATE_LIMIT=3 و RATE_WINDOW_SECONDS=600 با کامنت فارسی؛ OtpErrorCode + نقشهٔ OTP_ERROR_MESSAGE با ۵ پیام فارسی دقیق قرارداد؛ OtpState (phone/expectedCode دمو/sentAtMs/codeExpiresAtMs/resendAvailableAtMs/attemptsLeft/sentTimestampsMs/lockedUntilMs/error)؛ توابع خالص initialOtpState/withPhone/requestOtp/submitCode/resetToIdle/logout + helperهای codeSecondsLeft و resendSecondsLeft و lockedSecondsLeft و canSubmit و canResend — همه با nowMs صریح.
+- منطق requestOtp: اول پنجرهٔ ۳/۶۰۰s (timestampهای قدیمی‌تر از پنجره از آرایه دور ریخته می‌شوند؛ سقف → RATE_LIMITED)، بعد cooldown ارسال دوباره (resendAvailableAtMs در آینده → همان RATE_LIMITED طبق تصمیم تسک؛ شمارش دقیق در UI با resendSecondsLeft)؛ درخواست ردشده timestamp اضافه نمی‌کند؛ موفق → phase=sent و همهٔ زمان‌ها از nowMs و تلاش‌ها صفر و قفل پاک (کد دمو از opts.expectedCode یا random ۶ رقمی — فقط ماک).
+- منطق submitCode (ترتیب قواعد): قفل (phase=locked یا lockedUntilMs در آینده) → TOO_MANY_ATTEMPTS حتی با کد درست؛ فاز غیر sent یا انقضا → CODE_EXPIRED (شرط nowMs >= codeExpiresAtMs دقیقاً آینهٔ expiresAt > now سرور — مرز ۱۲۰٬۰۰۰ms منقضی است)؛ کد غلط → attemptsLeft−1 و INVALID_CODE؛ صفر شدن تلاش‌ها → phase=locked با lockedUntilMs=nowMs+600000 و TOO_MANY_ATTEMPTS؛ کد درست (مقایسهٔ رشته‌ای با expectedCode) → authenticated و error=null.
+- src/lib/account-validate.ts: normalizePhoneFa آینهٔ سرور ولی بدون throw (latinDigits از fa-number + حذف فاصله/تیره/پرانتز + پسوندهای +98/0098/989 → 0 → فقط «09xxxxxxxxx» وگرنه null)؛ validatePhoneFa با پیام واحد «شمارهٔ موبایل معتبر نیست؛ نمونهٔ صحیح: ۰۹۱۲۱۲۳۴۵۶۷»؛ validatePostalCodeFa (فاصله/تیره نادیده، حروف → «کدپستی معتبر نیست»، طول ≠۱۰ → «کدپستی باید ۱۰ رقم باشد»، شروع با صفر → «کدپستی نمی‌تواند با صفر شروع شود»، همه یکسان → «کدپستی معتبر نیست»)؛ validateRequiredFa → «{label} را وارد کن» با خروجی trim.
+- src/lib/data/provinces.ts: ۳۱ استان واقعی با مرکز اول + ۲ تا ۵ شهر واقعی هر استان (تهران: تهران/شهریار/ورامین/اسلامشهر/قدس؛ البرز: کرج/هشتگرد/نظرآباد/فردیس/ماهدشت؛ فارس: شیراز/مرودشت/جهرم/کازرون/لار و …) + تایپ Province + citiesOf با غلط‌گیری نام از normalizeFa (نام ناشناخته → []).
+- تست: otp-state.test.ts — ۲۵ تست (مسیر خوش‌حال کامل، نقشهٔ پیام‌ها، مرز دقیق انقضا ۱۱۹٬۹۹۹/۱۲۰٬۰۰۰ms، قفل ۵ تلاش غلط + رد تلاش ششم با کد درست + پاک‌شدن قفل با کد جدید بعد از سررسید، سقف ۳/۶۰۰s و افتادن timestamp قدیمی در T0+600001، cooldown قبل/بعد ۱۲۰s، attemptsLeft، resetToIdle/logout، همهٔ helperها) و account-validate.test.ts — ۲۷ تست (موبایل ۱۱ + validatePhoneFa ۲ + کدپستی ۸ + required ۲ + استان‌ها ۴ شامل ۳۱تایی/یکتایی id و نام/مرکز اول/شهرهای نمونه/citiesOf با حروف عربی).
+- صحت‌سنجی: bun test دو فایل → ۵۲ pass / ۰ fail (۲۳۴ expect)؛ bun test src/lib src/hooks → ۲۱۲ pass / ۹ fail که هر ۹ تست server است بدون Postgres (auth/otp/discovery — baseline قبلی، هیچ مورد تازه‌ای شکست نخورد)؛ bunx tsc --noEmit | grep 'otp-state|account-validate|provinces' → صفر خطا (فقط خطاهای vendored examples/skills پیش‌موجود)؛ bun run lint → exit 0.
+
+Stage Summary:
+- ۵ فایل جدید ساخته شد: src/lib/otp-state.ts و src/lib/otp-state.test.ts و src/lib/account-validate.ts و src/lib/account-validate.test.ts و src/lib/data/provinces.ts — هیچ فایل UI/استور/مشترک دیگری تغییر نکرد.
+- ۵۲ تست جدید همگی سبز (otp-state: ۲۵، account-validate: ۲۷ شامل ۴ تست استان‌ها)؛ قراردادهای خطا و ثابت‌ها دقیقاً هم‌شکل سرور src/lib/server/otp.ts است.
+- تصمیم‌های طراحی: ردشدن cooldown هم با همان OtpErrorCode=RATE_LIMITED (طبق تصمیم تسک؛ تفکیک نمایشی فقط با resendSecondsLeft)؛ مرز انقضا با nowMs >= codeExpiresAtMs تا با شرط gt سرور یکی باشد و تست ۱۲۰٬۰۰۰ms منقضی شود؛ ترتیب قواعد submitCode قفل را قبل از CODE_EXPIRED چک می‌کند تا تلاش ششم همیشه TOO_MANY_ATTEMPTS بدهد؛ باPhone برای ست‌کردن شمارهٔ نرمال اضافه شد چون requestOtp طبق امضا شماره نمی‌گیرد؛ فازهای sending/verifying فقط در تایپ‌اند (فازهای in-flight برای اتصال واقعی API) و ماشین ماک از آن‌ها عبور نمی‌کند.
+
+---
+Task ID: 190-2a
+Agent: general-purpose
+Task: صفحهٔ آدرس‌ها (استور CRUD + UI فهرست/فرم/حذف/پیش‌فرض)
+
+Work Log:
+- قدم صفر: worklog (v1.8.0 تا 190-1a) + account-validate.ts / provinces.ts / orders.ts (DEFAULT_ADDRESS) / ProfileView (MenuRow/کارت) / SellerInventoryView (AlertDialog حذف و فرم) / shared.tsx (PageHeader/EmptyState) / seller-inventory-store (الگوی CRUD) / ui: alert-dialog, select, textarea, switch / app-store (back) / sheet.tsx و filter-sheet (الگوی Sheet bottom) خوانده شد.
+- الف) src/store/addresses-store.ts (فایل جدید): تایپ Address + AddressInput (Omit id/isDefault) + AddressErrors + AddressValidation؛ seed دو آدرس — addr-1 پیش‌فرض دقیقاً دموی فعلی (گیرنده «علی رضایی»، موبایل لاتین 09121234567، تهران/تهران، «خیابان ولیعصر، کوچهٔ یاس، پلاک ۶۴، واحد ۳»، کدپستی 1965843157) و addr-2 غیرپیش‌فرض اصفهان/اصفهان با گیرندهٔ دیگر؛ اکشن‌ها: addAddress (id از شمارندهٔ addr-user-N؛ اگر لیست خالی باشد خودکار پیش‌فرض)، updateAddress، deleteAddress (حذف پیش‌فرض → اولین باقی‌مانده = قدیمی‌ترین پیش‌فرض می‌شود)، setDefault (id ناموجود بی‌اثر تا همیشه یک پیش‌فرض بماند) + سلکتور خالص selectDefaultAddress(state) که هم به‌شکل useAddressesStore(selectDefaultAddress) و هم getState() مصرف می‌شود.
+- الف) validateAddress تابع خالص خارج از استور: اجباری‌ها (گیرنده/استان/شهر/نشانی) با validateRequiredFa («{label} را وارد کن»)، موبایل با validatePhoneFa → نرمال لاتین 09xxxxxxxxx، کدپستی اختیاری (فقط اگر پر شده باشد validatePostalCodeFa → لاتین ۱۰ رقمی)، شهر باید از citiesOf(استان) باشد وگرنه «شهر را از فهرست استان انتخاب کن» (ثابت CITY_NOT_IN_PROVINCE_MESSAGE)؛ خروجی موفق همهٔ متن‌ها trim و موبایل/کدپستی نرمال لاتین.
+- ب) AddressesView.tsx بازنویسی کامل: PageHeader «آدرس‌ها» + شمارنده + onBack={back} از useAppStore؛ کارت هر آدرس = گیرنده بولد + بج سبز «پیش‌فرض» (استایل StatusChip سبز bg-ls-green) + نشانی city + line با line-clamp-2 + موبایل dir=ltr با فاصله‌گذاری ۴-۳-۴ و ارقام فارسی (09121234567 → ۰۹۱۲ ۱۲۳ ۴۵۶۷) + دو دکمهٔ آیکونی ۴۴px (Pencil / Trash2 قرمز border-red-400/20) + دکمهٔ Star «انتخاب پیش‌فرض» فقط برای غیرپیش‌فرض با toast «آدرس پیش‌فرض شد»؛ دکمهٔ ثابت sticky bottom-4 «افزودن آدرس جدید» (Plus، h-12، bg-ls-purple)؛ حالت خالی = EmptyState با lucide MapPin + دکمهٔ افزودن.
+- ب) فرم افزودن/ویرایش در Sheet side="bottom" (الگوی filter-sheet: rounded-t-3xl bg-ls-bg max-h-88dvh دستهٔ drag) با فیلدها: گیرنده (Input)، موبایل (dir=ltr، placeholder ۰۹۱۲۱۲۳۴۵۶۷، inputMode tel)، استان (Select از PROVINCES)، شهر (Select وابسته با citiesOf — تغییر استان city را ریست می‌کند و Select شهر تا انتخاب استان disabled با placeholder «اول استان را انتخاب کن»)، نشانی (Textarea سه‌ردیفی)، کدپستی (dir=ltr، inputMode numeric، اختیاری)؛ ذخیره → validateAddress → خطاها قرمز (text-red-400 role=alert) زیر هر فیلد + aria-invalid؛ موفق → toast «آدرس ذخیره شد» و بستن شیت (ویرایش همان id را update می‌کند).
+- ب) حذف با AlertDialog کنترل‌شده (state محلی deleteTargetId): «این آدرس حذف شود؟» / «آدرس حذف‌شده برگشت‌پذیر نیست.» / لغو «منصرف شدم» / «حذف کن» با bg-destructive (توکن #ff3b5c تم) + toast «آدرس حذف شد» — الگوی footer flex-row-reverse هم‌شکل دیالوگ انبار.
+- صحت‌سنجی: tsc --noEmit | grep 'AddressesView|addresses-store' → صفر خطا (خطاهای موجود src متعلق به فایل‌های نیمه‌کارهٔ تسک‌های موازی: AppShell→ProfileEdit/Settings/… و login-sheet/auth-store — پیش از تغییر من هم بودند)؛ bun run lint → exit 0؛ bun test src/lib src/hooks → ۲۱۲ pass / ۹ fail دقیقاً baseline بدون-Postgres (auth/otp/discovery — هیچ مورد تازه‌ای نه)؛ smoke اسکریپت موقت (bun، خارج از پروژه): seed، سلکتور، addAddress روی لیست خالی→پیش‌فرض خودکار، پیام‌های خطای فارسی، نرمال‌سازی +98/ارقام فارسی، حذف پیش‌فرض→قدیمی‌ترین، setDefault و بی‌اثری id ناموجود — همه درست؛ مرور مرورگر طبق دستور انجام نشد (dev روی ۳۰۰۰).
+
+Stage Summary:
+- دو فایل تحویل شد: src/store/addresses-store.ts (استور CRUD + validateAddress خالص + سلکتور پیش‌فرض) و src/components/liveshop/views/AddressesView.tsx (فهرست/فرم/حذف/پیش‌فرض/حالت خالی) — هیچ فایل دیگری تغییر نکرد؛ app-store/AppShell/Checkout دست‌نخورده.
+- تصمیم‌های مهم: کدپستی اختیاری است چون فهرست اجباری‌ها در قرارداد فقط گیرنده/استان/شهر/نشانی بود؛ موبایل/کدپستی همیشه لاتین ذخیره و فقط در UI فارسی نمایش داده می‌شوند (۰۹۱۲ ۱۲۳ ۴۵۶۷)؛ ترتیب آرایه = قدیمی→جدید پس «قدیمی‌ترین» همان اول فهرست است؛ setDefault با id ناموجود عمداً بی‌اثر است تا هرگز حالت بدون پیش‌فرض رخ ندهد (بجز لحظهٔ خالی بودن لیست).
+- یکپارچه‌سازی Checkout/quick-checkout با selectDefaultAddress عمداً به تسک بعدی واگذار شد.
+
+---
+Task ID: v1.9.0
+Agent: main (Z.ai Code) + ۳ ایجنت موازی (190-1a، 190-2c، 190-2a)
+Task: نسخهٔ v1.9.0 — فقط «حساب» و ورود — OTP طبق api-spec §1 + آدرس‌ها + پروفایل/تنظیمات + اعتماد/پشتیبانی + صندوق ورودی (حذف اعلان) + اسکرین‌شات + push
+
+Work Log:
+- recon: api-spec §1، سرور OTP موجود (otp.ts با نرخ ۳/۱۰m و ۵ تلاش و HMAC)، routeهای auth آماده، ProfileView/AppShell/InboxView
+- 190-1a (ایجنت): otp-state.ts خالص (فازها + پنجرهٔ نرخ + انقضای ۱۲۰s مرز دقیق + cooldown + قفل ۵ تلاشی + پیام‌های فارسی) — ۲۵ تست با زمان mock؛ account-validate.ts (موبایل ۰۹/+989/۰۰۹۸۹/۹۸۹ با ارقام فارسی + کدپستی ۱۰ رقمی) — ۲۷ تست؛ provinces.ts (۳۱ استان واقعی) — ۵۲ تست سبز
+- 190-2c (ایجنت): deleteNotification + دکمهٔ حذف ۴۴px با AlertDialog + toast؛ اسکن واژه‌های حراج — ۹/۹ نگهبان سبز، leak نبود
+- 190-2a (ایجنت): addresses-store (CRUD + پیش‌فرض + validateAddress با پیام فارسی + seed هم‌راستای دموی قبلی) + AddressesView (فهرست/فرم شیت با استان→شهر وابسته/حذف با تأیید/خالی lucide)
+- 1-b (من): auth-store (mock با کاربر seed علی رضایی + حالت API /auth/otp/request|verify|refresh|me — توکن‌ها فقط در حافظهٔ ماژول، هرگز localStorage) + useAuth واحد + requireAuth/pendingAction + LoginSheet (۶ ورودی جدا با paste و پرش، شمارش ۲:۰۰، ارسال دوباره، خطای inline، قفل با شمارش، کد دمو با برچسب) + mount سراسری در AppShell
+- گیت مهمان در ۶ نقطه: پرداخت تسویه + پرداخت خرید سریع + خرید فوری/محصول (رفتن به تسویه) + فالو فروشگاه + چت لایو (نام/آواتار کاربر واقعی در پیام) + یادآوری شو — همه با ادامهٔ همان کار بعد از ورود
+- ProfileView auth-aware (مهمان/لاگین + خروج با تأیید + منوی جدید: آدرس‌ها/FAQ/قوانین/حریم خصوصی/پشتیبانی/تنظیمات) + ProfileEditView (آواتارهای mock + قاعدهٔ username) + SettingsView (۴ اعلان + حریم خصوصی با localStorage + حذف حساب دومرحله‌ای) + FaqView/TermsView/PrivacyView/SupportView با بج «پیش‌نویس — نیاز به بازبینی حقوقی» + TrustBadgePlaceholder
+- یکپارچه‌سازی: تسویه و خرید سریع از selectDefaultAddress می‌خوانند + دکمهٔ «تغییر» → صفحهٔ آدرس‌ها (DEFAULT_ADDRESS ثابت حذف شد)
+- باگ‌های گرفته‌شده: شمارش معکوس فریز به‌خاطر snapshot mount (resync ناهمزمان بعد از خطای lint react-hooks/set-state-in-effect)، شکستن آکولاد pay هنگام requireAuth (tsc)، TS18047 فیلدهای nullable ماشین
+- عکس: scripts/v190-shots.mts — ۲۹ عکس (۲۴ موبایل ۳۹۰ + ۵ دسکتاپ) با assert محتوایی — ۲۲ عکس قدیمی حساب حذف؛ نکتهٔ رانر: نام دسترس‌پذیری «ورود یا ثبت‌نام» ≠ متن «ورود / ثبت‌نام» (strict-mode)؛ ۲ مرور تکراری تا ۲۹/۲۹
+- verify: ۲۱۲ تست lib/hooks سبز (۹ fail شناخته‌شدهٔ سرورِ بدون-Postgres) + ۳۸ سرور روی Postgres واقعی + tsc صفر + lint پاک + مرور واقعی: خروج→مهمان، خرید مهمان→شیت ورود→شمارهٔ نامعتبر/معتبر→کد دمو→کد غلط→کد درست→ادامهٔ خرید (خطای موجودی درست)، آدرس CRUD با خطاهای فرم، حذف اعلان، خواندن همه، حذف حساب دومرحله‌ای، FAQ آکاردئون، شمارش ۲:۰۰ بعد از فیکس
+- docs: INDEX.md (بخش v1.9.0 + حذف ۲۲ ردیف)، CHANGELOG [v1.9.0] با بخش «صادقانه انجام‌نشده»، README (چرایی حافظه‌بودن refreshToken + راهکار httpOnly cookie + گام‌های سرور)، نسخه → 1.9.0
+
+Stage Summary:
+- v1.9.0 کامل: ورود OTP با همان قواعد سرور (نرخ/انقضا/قفل)، مهمان با ادامهٔ اقدام، آدرس‌ها واقعی مشترک بین تسویه/خرید سریع، تنظیمات با ماندگاری، اعتماد/پشتیبانی پیش‌نویس‌دار، حذف اعلان
+- نکته برای ایجنت‌های بعدی: auth-store با کاربر seed شروع می‌شود تا صفحات قبلی بدون رگرسیون کار کنند — «خروج» مهمان واقعی می‌سازد؛ requireAuth تنها راه گیت است (pendingAction بعد از verify اجرا می‌شود)
+- صادقانه: حالت API ورود E2E واقعی با SMS نشده (فقط مسیر/نقشه)؛ refreshToken با رفرش می‌پرد (README راهکار httpOnly)؛ عکس پروفایل آپلود واقعی نیست؛ حذف حساب mock است؛ متن‌های حقوقی پیش‌نویس‌اند؛ فیلتر «مزایده‌ها» صندوق پشت فلگ ماند

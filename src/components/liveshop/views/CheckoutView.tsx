@@ -4,17 +4,18 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Check, MapPin, ShieldCheck, Wallet as WalletIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toman } from "@/lib/format";
+import { toman, toFa } from "@/lib/format";
 import { getItem, getShowItems, stockLabelFa } from "@/lib/data/items";
 import { calcOrderTotal } from "@/lib/config/fees";
 import {
-  DEFAULT_ADDRESS,
   SHIPPING_METHODS,
   getShippingMethod,
 } from "@/lib/data/orders";
 import { getSeller, getShow } from "@/lib/data/shows";
 import type { ShippingMethodId } from "@/lib/data/types";
 import { useAppStore } from "@/store/app-store";
+import { useAuth } from "@/store/auth-store";
+import { useAddressesStore, selectDefaultAddress } from "@/store/addresses-store";
 import { useWalletStore } from "@/store/wallet-store";
 import { useLiveStore } from "@/store/live-store";
 import {
@@ -68,7 +69,11 @@ export default function CheckoutView() {
   const total = totals.total;
   const soldOut = view.stock <= 0;
 
-  const handlePay = () => {
+  /* v1.9.0 — گیت مهمان: پرداخت فقط با ورود؛ بعد از ورود همان پرداخت ادامه می‌یابد */
+  const { requireAuth } = useAuth();
+  const defaultAddress = useAddressesStore(selectDefaultAddress);
+  const handlePay = () =>
+    requireAuth(() => {
     if (soldOut) {
       toast.error("کالا تمام شد — موجودی این کالا به پایان رسید");
       return;
@@ -86,7 +91,7 @@ export default function CheckoutView() {
     }
     toast.success("پرداخت امانی موفق! سفارش ثبت شد");
     setRoot("orders");
-  };
+  });
 
   return (
     <div className="flex-1 flex flex-col" aria-label="تسویهٔ سفارش">
@@ -137,16 +142,24 @@ export default function CheckoutView() {
               آدرس تحویل
             </p>
             <button
-              onClick={() => toast("ویرایش آدرس (دمو)")}
+              onClick={() => push("addresses")}
               className="text-xs font-bold text-ls-purple-soft hover:underline"
-              aria-label="ویرایش آدرس"
+              aria-label="تغییر آدرس تحویل"
             >
-              ویرایش
+              تغییر
             </button>
           </div>
-          <p className="whitespace-pre-line text-xs leading-6 text-white/70">
-            {DEFAULT_ADDRESS}
-          </p>
+          {defaultAddress ? (
+            <div className="text-xs leading-6 text-white/70">
+              <p className="font-bold text-white/85">{defaultAddress.recipient} · <span dir="ltr">{toFa(defaultAddress.phone)}</span></p>
+              <p className="mt-0.5">{defaultAddress.province}، {defaultAddress.city} — {defaultAddress.line}</p>
+              {defaultAddress.postalCode && (
+                <p className="mt-0.5 text-white/45">کدپستی: <span dir="ltr" className="tabular-nums">{toFa(defaultAddress.postalCode)}</span></p>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs leading-6 text-white/55">هنوز آدرسی نداری — از صفحهٔ آدرس‌ها اضافه کن.</p>
+          )}
         </div>
 
         {/* ── روش ارسال ── */}

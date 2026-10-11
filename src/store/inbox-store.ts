@@ -16,6 +16,8 @@ interface InboxState {
   markAllRead: () => void;
   /** v1.7.0 — افزودن اعلان (مثل پیام لغو شو به فالوورها) */
   pushNotification: (n: Omit<InboxNotification, "id" | "unread">) => void;
+  /** حذف اعلان — فیلتر immutable از آرایه (با تأیید AlertDialog در UI) */
+  deleteNotification: (id: string) => void;
 }
 
 /* ── seed (کپی مستقل از دیتای static) ── */
@@ -54,5 +56,10 @@ export const useInboxStore = create<InboxState>((set) => ({
         { ...n, id: `nb-${++inboxCounter}`, unread: true },
         ...s.notifications,
       ],
+    })),
+
+  deleteNotification: (id) =>
+    set((s) => ({
+      notifications: s.notifications.filter((n) => n.id !== id),
     })),
 }));

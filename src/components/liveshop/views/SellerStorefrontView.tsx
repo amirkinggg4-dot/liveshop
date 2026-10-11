@@ -9,6 +9,7 @@ import { SELLER_SCHEDULED_SHOWS } from "@/lib/data/seller";
 import { SHIPPING_PRICES } from "@/lib/config/fees";
 import { getSeller } from "@/lib/data/shows";
 import { useAppStore } from "@/store/app-store";
+import { useAuth } from "@/store/auth-store";
 import {
   Avatar,
   GradientCover,
@@ -28,6 +29,15 @@ export default function SellerStorefrontView() {
   const back = useAppStore((s) => s.back);
   const seller = getSeller(STOREFRONT.sellerId);
   const [following, setFollowing] = useState(false);
+  /* v1.9.0 — گیت مهمان: فالو فقط با ورود؛ بعد از ورود همان فالو انجام می‌شود */
+  const { requireAuth } = useAuth();
+  const toggleFollow = () =>
+    requireAuth(() => {
+      setFollowing((f) => {
+        toast.success(f ? "فالو لغو شد" : `فروشندهٔ ${seller.name} را دنبال کردی`);
+        return !f;
+      });
+    });
 
   const sellerCover = {
     from: seller.color,
@@ -210,7 +220,7 @@ export default function SellerStorefrontView() {
         {/* ── دکمهٔ فالو ── */}
         <button
           type="button"
-          onClick={() => setFollowing((f) => !f)}
+          onClick={toggleFollow}
           aria-label={following ? "لغو فالو فروشنده" : "فالو فروشنده"}
           className={cn(
             "h-12 w-full rounded-2xl text-sm font-extrabold transition-all active:scale-[.98]",

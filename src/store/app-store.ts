@@ -31,7 +31,14 @@ export type ViewName =
   | "sellerMarketing"
   | "sellerRates"
   | "sellerStorefront"
-  | "sellerSettings";
+  | "sellerSettings"
+  | "profileEdit"
+  | "addresses"
+  | "settings"
+  | "faq"
+  | "terms"
+  | "privacy"
+  | "support";
 
 export interface StackEntry {
   view: ViewName;

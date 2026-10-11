@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { toFa, faNum, toman, faClock } from "@/lib/format";
 import { AUCTION_ENABLED } from "@/lib/config";
 import { useAppStore } from "@/store/app-store";
+import { useAuth } from "@/store/auth-store";
 import { useLiveStore, bidderLabel, BOTS } from "@/store/live-store";
 import { getShow, getSeller, LIVE_SHOWS, UPCOMING_SHOWS } from "@/lib/data/shows";
 import { stockLabelFa } from "@/lib/data/items";
@@ -406,17 +407,21 @@ function LiveChatOverlay({ className }: { className?: string }) {
     return () => clearInterval(iv);
   }, []);
 
+  /* v1.9.0 — گیت مهمان: ارسال پیام فقط با ورود؛ بعد از ورود همان پیام ارسال می‌شود */
+  const { requireAuth, user } = useAuth();
   const send = () => {
     const t = text.trim();
     if (!t) return;
-    pushChat({
-      author: "علی",
-      emoji: "🧑‍💻",
-      color: "#6C5CFF",
-      text: t,
-      kind: "normal",
+    requireAuth(() => {
+      pushChat({
+        author: user?.name ?? "علی",
+        emoji: user?.avatarEmoji ?? "🧑‍💻",
+        color: user?.avatarColor ?? "#6C5CFF",
+        text: t,
+        kind: "normal",
+      });
+      setText("");
     });
-    setText("");
   };
 
   const now = Date.now();

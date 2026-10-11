@@ -147,3 +147,18 @@ npm run start          # اجرای سرور standalone روی همان اسکر
 ## 🧱 تکنولوژی
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · shadcn/ui · zustand · Prisma (SQLite) · Vazirmatn (RTL) · رنگ‌های برند: بنفش `#6C5CFF` / صورتی `#FF3B8B` / سبز `#00C896`
+
+## 🔐 احراز هویت (v1.9.0) — ورود با پیامک و امنیت توکن
+
+ورود با شمارهٔ موبایل + کد یک‌بارمصرف ۶ رقمی است (api-spec §1). یک hook واحد `useAuth` دارد:
+- **حالت دمو** (`NEXT_PUBLIC_USE_API` نامعتبر/`false`): همه‌چیز mock در حافظه — کد دمو داخل شیت با برچسب «کد دمو» نشان داده می‌شود، ماشین وضعیت OTP (`src/lib/otp-state.ts`) همان قواعد سرور را شبیه‌سازی می‌کند (۳ کد در ۱۰ دقیقه، انقضای ۲ دقیقه، ۵ تلاش → قفل).
+- **حالت API** (`NEXT_PUBLIC_USE_API=true`): `POST /api/v1/auth/otp/request`، `/verify`، `/refresh` و `GET/PATCH /me` واقعی.
+
+### چرا refreshToken در localStorage نیست؟
+فعلاً **refresh token فقط در حافظهٔ ماژول** (`src/store/auth-store.ts`) نگه داشته می‌شود و با رفرش صفحه پاک می‌شود (باید دوباره وارد شد). عمدی است: localStorage در برابر XSS حمله‌های اسکریپت‌محور بی‌دفاع است و نشت refresh token یعنی ربایش حساب.
+
+**برای حالت واقعی چه باید کرد؟**
+1. سرور باید refresh token را در **cookie با `httpOnly` + `Secure` + `SameSite=Lax/Strict`** و مسیر محدود (`Path=/api/v1/auth/refresh`) برگرداند و در `/auth/refresh` آن را از cookie بخواند (نه از body).
+2. سمت سرور هم چرخش توکن با تشخیص استفادهٔ مجدد (reuse detection) از قبل پیاده شده (`rotateSession`) — کافی است پاسخ `/verify` و `/refresh` cookie ست کند و کلاینت `credentials: "include"` بفرستد.
+3. کلاینت فقط access token کوتاه‌عمر (۱۵ دقیقه) را در حافظه نگه می‌دارد؛ در 401، یک‌بار `/auth/refresh` و تکرار درخواست.
+4. endpointهای `/me/addresses` (spec §1) آمادهٔ اتصال است — فعلاً آدرس‌ها mock هستند.

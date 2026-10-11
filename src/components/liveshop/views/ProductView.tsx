@@ -10,6 +10,7 @@ import { getShippingMethod } from "@/lib/data/orders";
 import { getSeller, getShow } from "@/lib/data/shows";
 import { stockLabelFa } from "@/lib/data/items";
 import { useAppStore } from "@/store/app-store";
+import { useAuth } from "@/store/auth-store";
 import {
   GradientCover,
   Avatar,
@@ -33,6 +34,9 @@ export default function ProductView() {
   const currentShowId = useAppStore((s) => s.currentShowId);
   const back = useAppStore((s) => s.back);
   const push = useAppStore((s) => s.push);
+  /* v1.9.0 — گیت مهمان: بدون ورود، شیت ورود باز می‌شود و بعد از ورود همان رفتن به تسویه ادامه می‌یابد */
+  const { requireAuth } = useAuth();
+  const requireCheckout = (itemId: string) => requireAuth(() => push("checkout", itemId));
   const openShow = useAppStore((s) => s.openShow);
 
   const item =
@@ -210,7 +214,7 @@ export default function ProductView() {
             </button>
             {item.buyNowPrice != null && (
               <button
-                onClick={() => push("checkout", item.id)}
+                onClick={() => requireCheckout(item.id)}
                 className="h-12 shrink-0 rounded-xl border border-ls-green/60 px-4 text-sm font-extrabold text-ls-green hover:bg-ls-green/10 transition-colors"
                 aria-label={`خرید فوری به مبلغ ${toman(item.buyNowPrice)}`}
               >
@@ -226,7 +230,7 @@ export default function ProductView() {
             item.status !== "up_next" &&
             item.status !== "auction")) && (
           <button
-            onClick={() => push("checkout", item.id)}
+            onClick={() => requireCheckout(item.id)}
             disabled={item.stock <= 0}
             className={cn(
               "w-full h-12 rounded-xl text-sm font-black transition-transform active:scale-[.98]",
