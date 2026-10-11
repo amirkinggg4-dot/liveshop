@@ -8,6 +8,7 @@ import { faNum, toFa, toman } from "@/lib/format";
 import { SHIPPING_METHODS } from "@/lib/data/orders";
 import type { SellerOrder } from "@/lib/data/seller";
 import { HUB_STATS } from "@/lib/data/seller";
+import { ITEM_PHOTO } from "@/lib/data/media";
 import { useAppStore } from "@/store/app-store";
 import { useSellerStore } from "@/store/seller-store";
 import {
@@ -177,6 +178,7 @@ function PrintLabelDialog({
                 cover={order.cover}
                 className="h-10 w-10 shrink-0 rounded-lg"
                 emojiClassName="text-base"
+                photo={ITEM_PHOTO[order.itemId ?? ""]}
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-bold">{order.itemTitle}</p>
@@ -469,12 +471,13 @@ export default function SellerOrdersView() {
                     )}
                   </div>
 
-                  {/* کالا و خریدار */}
+                  {/* کالا و خریدار — v1.7.0: عکس اصلی کالا (fallback = گرادیان) */}
                   <div className="mt-2.5 flex items-center gap-2.5">
                     <GradientCover
                       cover={o.cover}
                       className="h-11 w-11 shrink-0 rounded-xl"
                       emojiClassName="text-lg"
+                      photo={ITEM_PHOTO[o.itemId ?? ""]}
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-bold">

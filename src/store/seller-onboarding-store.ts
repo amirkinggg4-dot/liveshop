@@ -100,7 +100,9 @@ export const useSellerOnboardingStore = create<OnboardingState>((set) => ({
     set({ status: "none", application: { ...SEED_APPLICATION, termsAccepted: false, idPhotoAccepted: false } }),
 }));
 
-/* ── گیت صفحات فروشنده — تا تأیید نشدن، شروع لایو/لیستینگ غیرفعال ── */
+/* ── گیت صفحات فروشنده — تا تأیید نشدن، شروع لایو/لیستینگ غیرفعال ──
+   v1.7.0 — کلید دموی ?seller= هم در گیت لحاظ می‌شود تا وضعیت‌های
+   فرم/در انتظار/رد/تعلیق بدون دست‌کاری استور قابل نمایش باشند. */
 
 export interface SellerGate {
   approved: boolean;
@@ -110,7 +112,9 @@ export interface SellerGate {
 }
 
 export function useSellerGate(): SellerGate {
-  const status = useSellerOnboardingStore((s) => s.status);
+  const storeStatus = useSellerOnboardingStore((s) => s.status);
+  const forced = useForcedSellerStatus();
+  const status: SellerOnboardingStatus = forced ?? storeStatus;
   const reason = (() => {
     switch (status) {
       case "none":
@@ -129,7 +133,9 @@ export function useSellerGate(): SellerGate {
 }
 
 /* ── کلید دموی وضعیت (?seller=none|pending|rejected|suspended) ──
-   الگوی ?state= نماهای دیگر — برای اسکرین‌شات و تست دستی وضعیت‌ها. */
+   الگوی ?state= نماهای دیگر — برای اسکرین‌شات و تست دستی وضعیت‌ها.
+   وقتی کلید هست، وضعیت فرم هم از همان الگو پیروی می‌کند (نمای onboarding
+   کارت همان وضعیت را نشان می‌دهد). */
 
 export type ForcedSellerStatus = "none" | "pending" | "rejected" | "suspended";
 

@@ -20,6 +20,8 @@ export type ViewName =
   | "sellerListing"
   | "sellerOrders"
   | "sellerRevenue"
+  | "sellerOnboarding"
+  | "sellerLiveReport"
   | "activity"
   | "rewards"
   | "inbox"

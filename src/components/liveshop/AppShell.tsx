@@ -40,6 +40,8 @@ import SellerMarketingView from "./views/SellerMarketingView";
 import SellerRatesView from "./views/SellerRatesView";
 import SellerStorefrontView from "./views/SellerStorefrontView";
 import SellerSettingsView from "./views/SellerSettingsView";
+import SellerOnboardingView from "./views/SellerOnboardingView";
+import SellerLiveReportView from "./views/SellerLiveReportView";
 
 const VIEW_COMPONENTS: Record<ViewName, () => ReactNode> = {
   home: HomeView,
@@ -69,6 +71,9 @@ const VIEW_COMPONENTS: Record<ViewName, () => ReactNode> = {
   sellerRates: SellerRatesView,
   sellerStorefront: SellerStorefrontView,
   sellerSettings: SellerSettingsView,
+  // v1.7.0 — فروش: onboarding + گزارش پایان لایو
+  sellerOnboarding: SellerOnboardingView,
+  sellerLiveReport: SellerLiveReportView,
 };
 
 const NAV_ITEMS: {

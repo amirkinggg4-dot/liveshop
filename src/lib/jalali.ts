@@ -9,7 +9,7 @@
    همهٔ نمایش‌ها با ارقام فارسی است.
    ───────────────────────────────────────────────────────────── */
 
-import jalaali from "jalaali-js";
+import { toJalaali, toGregorian, jalaaliMonthLength } from "jalaali-js";
 import { toFa } from "@/lib/format";
 
 export const JALALI_MONTHS = [
@@ -37,11 +37,11 @@ export interface JalaliDate {
 }
 
 export function toJalali(date: Date): JalaliDate {
-  return jalaali.toJalaali(date.getFullYear(), date.getMonth() + 1, date.getDate());
+  return toJalaali(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 export function jalaliToDate(j: JalaliDate): Date {
-  const g = jalaali.toGregorian(j.jy, j.jm, j.jd);
+  const g = toGregorian(j.jy, j.jm, j.jd);
   return new Date(g.gy, g.gm - 1, g.gd);
 }
 
@@ -75,14 +75,14 @@ export interface CalendarCell {
  * و روزهای گذشته غیرفعال).
  */
 export function buildMonthGrid(jy: number, jm: number, today: JalaliDate): CalendarCell[] {
-  const length = jalaali.jalaaliMonthLength(jy, jm);
+  const length = jalaaliMonthLength(jy, jm);
   const first = jalaliToDate({ jy, jm, jd: 1 });
   /* شنبه → ستون ۰ : (getDay ۶=شنبه) offset=(getDay+1)%7 */
   const offset = (first.getDay() + 1) % 7;
 
   const cells: CalendarCell[] = [];
   const prev = jm === 1 ? { jy: jy - 1, jm: 12 } : { jy, jm: jm - 1 };
-  const prevLen = jalaali.jalaaliMonthLength(prev.jy, prev.jm);
+  const prevLen = jalaaliMonthLength(prev.jy, prev.jm);
 
   for (let i = 0; i < offset; i++) {
     const jd = prevLen - offset + 1 + i;

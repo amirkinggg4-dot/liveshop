@@ -6,12 +6,15 @@ import {
   CalendarClock,
   ClipboardList,
   Package,
+  Store,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppStore } from "@/store/app-store";
+import { useSellerGate } from "@/store/seller-onboarding-store";
 import { faNum, toman } from "@/lib/format";
+import { formatFaThousands } from "@/lib/fa-number";
 import { getSeller, getShow } from "@/lib/data/shows";
 import {
   PageHeader,
@@ -119,6 +122,9 @@ export default function SellerDashboardView() {
   const setRoot = useAppStore((s) => s.setRoot);
   const openShow = useAppStore((s) => s.openShow);
 
+  /* v1.7.0 — گیت onboarding فروشنده: تا تأیید نشدن، شروع لایو/لیستینگ غیرفعال */
+  const gate = useSellerGate();
+
   const scheduledShows = useSellerStore((s) => s.scheduledShows);
   const sellerOrders = useSellerStore((s) => s.orders);
 
@@ -167,13 +173,17 @@ export default function SellerDashboardView() {
           </div>
         </section>
 
-        {/* آمار هفته */}
+        {/* آمار هفته — v1.7.0: «فروش هفته» عدد یک‌خط با فونت متناسب و «تومان» کوچک‌تر زیرش */}
         <section className="grid grid-cols-3 gap-3" aria-label="آمار این هفته">
           <div className="bg-ls-card border border-white/5 rounded-2xl p-3">
             <p className="text-[11px] text-white/45">فروش هفته</p>
-            <p className="text-sm font-extrabold mt-1 leading-5 tabular-nums">
-              {toman(4_280_000)}
+            <p
+              className="mt-1 whitespace-nowrap font-extrabold tabular-nums leading-none text-[13px] sm:text-sm lg:text-base"
+              aria-label="فروش هفته: ۴ میلیون و ۲۸۰ هزار تومان"
+            >
+              {formatFaThousands(4_280_000)}
             </p>
+            <p className="text-[10px] text-white/50 mt-1">تومان</p>
             <p className="text-[11px] font-bold text-ls-green mt-1">
               ▲ {faNum(18)}٪
             </p>
@@ -224,6 +234,45 @@ export default function SellerDashboardView() {
             مشاهدهٔ سفارش‌ها
           </button>
         </section>
+
+        {/* v1.7.0 — گیت onboarding فروشنده */}
+        {!gate.approved && (
+          <section
+            aria-label="گیت onboarding فروشنده"
+            className="rounded-2xl border border-amber-300/40 bg-amber-300/10 p-4"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-300/15">
+                <Store className="h-5 w-5 text-amber-300" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-extrabold text-sm text-amber-300">
+                  {gate.status === "none" ? "فروشندهٔ LiveShop شو" : "فروشگاهت فعال نیست"}
+                </p>
+                <p className="text-xs text-white/75 mt-1 leading-5">
+                  {gate.reason}
+                </p>
+              </div>
+            </div>
+            {gate.status === "none" ? (
+              <button
+                onClick={() => push("sellerOnboarding")}
+                aria-label="شروع فروش — ثبت درخواست فروشندگی"
+                className="mt-3 w-full bg-amber-300 text-[#3a2c00] rounded-xl py-2.5 text-sm font-extrabold hover:bg-amber-300/90 transition-colors active:scale-[.99]"
+              >
+                شروع فروش
+              </button>
+            ) : (
+              <button
+                onClick={() => push("sellerOnboarding")}
+                aria-label="مشاهدهٔ وضعیت درخواست فروشندگی"
+                className="mt-3 w-full border border-amber-300/50 text-amber-300 rounded-xl py-2.5 text-sm font-extrabold hover:bg-amber-300/10 transition-colors active:scale-[.99]"
+              >
+                مشاهدهٔ وضعیت درخواست
+              </button>
+            )}
+          </section>
+        )}
 
         {/* اکشن‌های سریع */}
         <section className="grid grid-cols-2 gap-3" aria-label="دسترسی‌های سریع">
@@ -304,13 +353,30 @@ export default function SellerDashboardView() {
                 </span>
               )}
             </div>
-            <button
-              onClick={() => push("sellerReadyRoom")}
-              aria-label="شروع لایو — اتاق آماده‌به‌پخش"
-              className="ms-auto shrink-0 bg-ls-purple text-white rounded-xl px-4 py-2.5 text-sm font-extrabold shadow-lg shadow-ls-purple/30 hover:bg-ls-purple-deep transition-colors active:scale-[.98]"
-            >
-              ● شروع لایو
-            </button>
+            {/* v1.7.0 — گیت: تا تأیید نشدن شروع لایو غیرفعال است و علتش نمایش داده می‌شود */}
+            {gate.approved ? (
+              <button
+                onClick={() => push("sellerReadyRoom")}
+                aria-label="شروع لایو — اتاق آماده‌به‌پخش"
+                className="ms-auto shrink-0 bg-ls-purple text-white rounded-xl px-4 py-2.5 text-sm font-extrabold shadow-lg shadow-ls-purple/30 hover:bg-ls-purple-deep transition-colors active:scale-[.98]"
+              >
+                ● شروع لایو
+              </button>
+            ) : (
+              <span className="ms-auto shrink-0 flex flex-col items-end gap-1">
+                <button
+                  disabled
+                  aria-disabled="true"
+                  aria-label="شروع لایو — غیرفعال تا تأیید فروشندگی"
+                  className="shrink-0 cursor-not-allowed rounded-xl bg-ls-card-2 px-4 py-2.5 text-sm font-extrabold text-white/35"
+                >
+                  🔒 شروع لایو
+                </button>
+                <span className="max-w-36 text-[9px] leading-3 text-amber-300 text-end">
+                  {gate.reason}
+                </span>
+              </span>
+            )}
           </div>
 
           {/* گرید هشت‌ماژوله */}

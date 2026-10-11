@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
+import { useSellerGate } from "@/store/seller-onboarding-store";
 import { faNum, toman } from "@/lib/format";
 import { LOW_STOCK_THRESHOLD } from "@/lib/config";
 import { getShow } from "@/lib/data/shows";
@@ -40,6 +41,9 @@ interface QueueRow {
 export default function SellerReadyRoomView() {
   const back = useAppStore((s) => s.back);
   const openShow = useAppStore((s) => s.openShow);
+
+  /* v1.7.0 — گیت onboarding: تا تأیید نشدن شروع پخش غیرفعال است */
+  const gate = useSellerGate();
 
   const show = getShow("sh1");
 
@@ -249,15 +253,34 @@ export default function SellerReadyRoomView() {
           </div>
         </section>
 
-        {/* شروع پخش زنده */}
+        {/* شروع پخش زنده — v1.7.0 گیت: فقط فروشندهٔ تأییدشده */}
         <div className="space-y-2">
-          <button
-            onClick={goLive}
-            aria-label="شروع پخش زنده"
-            className="w-full rounded-2xl bg-ls-pink text-white py-4 font-black text-base shadow-lg shadow-ls-pink/30 flex items-center justify-center gap-2 hover:bg-ls-pink/90 transition-colors active:scale-[.99]"
-          >
-            ● شروع پخش زنده
-          </button>
+          {gate.approved ? (
+            <button
+              onClick={goLive}
+              aria-label="شروع پخش زنده"
+              className="w-full rounded-2xl bg-ls-pink text-white py-4 font-black text-base shadow-lg shadow-ls-pink/30 flex items-center justify-center gap-2 hover:bg-ls-pink/90 transition-colors active:scale-[.99]"
+            >
+              ● شروع پخش زنده
+            </button>
+          ) : (
+            <>
+              <button
+                disabled
+                aria-disabled="true"
+                aria-label="شروع پخش زنده — غیرفعال تا تأیید فروشندگی"
+                className="w-full rounded-2xl bg-ls-card-2 py-4 font-black text-base text-white/35 cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                🔒 شروع پخش زنده
+              </button>
+              <p
+                className="text-center text-[11px] font-bold text-amber-300"
+                role="alert"
+              >
+                {gate.reason}
+              </p>
+            </>
+          )}
           <p className="text-center text-[10px] text-white/40 leading-4">
             با شروع پخش، قوانین فروشندهٔ LiveShop را می‌پذیرید — پخش منصفانه،
             ارسال به‌موقع

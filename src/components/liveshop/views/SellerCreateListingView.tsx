@@ -2,16 +2,19 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Info, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { Info, Lock, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toFa, faNum } from "@/lib/format";
 import type { Cover } from "@/lib/data/types";
 import { useAppStore } from "@/store/app-store";
 import { useSellerStore } from "@/store/seller-store";
+import { useSellerGate } from "@/store/seller-onboarding-store";
 import { GradientCover, PageHeader } from "@/components/liveshop/shared";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { FaNumberInput } from "@/components/liveshop/fa-number-input";
+import { formatFaThousands } from "@/lib/fa-number";
 import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ─────────────────────────────────────────────────────────────
@@ -50,6 +53,9 @@ export default function SellerCreateListingView() {
   const back = useAppStore((s) => s.back);
   const addDraft = useSellerStore((s) => s.addDraft);
 
+  /* v1.7.0 — گیت onboarding: انتشار لیستینگ تا تأیید فروشندگی غیرفعال است */
+  const gate = useSellerGate();
+
   /* کاور مشترک گرید عکس — جایگاه‌های خالی آن را جلو می‌برند */
   const [coverIdx, setCoverIdx] = useState(0);
   const [coverPicked, setCoverPicked] = useState(false);
@@ -60,14 +66,16 @@ export default function SellerCreateListingView() {
   const [size, setSize] = useState("");
   const [condition, setCondition] = useState<(typeof CONDITIONS)[number]>("نو با جعبه");
 
-  /* ── v1.4 — قیمت ثابت + موجودی + گزینه‌ها ── */
-  const [priceInput, setPriceInput] = useState("");
-  const [stockInput, setStockInput] = useState("۱");
+  /* ── v1.4 — قیمت ثابت + موجودی + گزینه‌ها ──
+     v1.7.0 — قیمت/موجودی/وزن با ورودی عددی فارسی (هزارگان + پسوند،
+     مقدار ذخیره‌شده صحیح) */
+  const [price, setPrice] = useState(0);
+  const [stock, setStock] = useState(1);
   const [variants, setVariants] = useState<VariantRow[]>([]);
   const [newVariantLabel, setNewVariantLabel] = useState("");
 
   /* وزن و ابعاد بسته */
-  const [weightInput, setWeightInput] = useState("۹۰۰");
+  const [weight, setWeight] = useState(900);
   const [dimsInput, setDimsInput] = useState("");
 
   /* ── فیلدهای حراج (پشت AUCTION_ENABLED — حفظ‌شده) ── */
@@ -75,8 +83,12 @@ export default function SellerCreateListingView() {
   const [binOn, setBinOn] = useState(true);
   const [binPriceInput, setBinPriceInput] = useState("");
 
-  const price = parseFaNum(priceInput);
-  const stock = Math.max(0, parseFaNum(stockInput));
+  const variantTotalStock = variants.reduce(
+    (s, v) => s + parseFaNum(v.stock),
+    0
+  );
+  /* موجودی مؤثر: با واریانت از جمع خودکار، بدون واریانت از فیلد مستقیم */
+  const effectiveStock = variants.length > 0 ? variantTotalStock : stock;
 
   const advanceCover = () => {
     setCoverIdx((i) => (i + 1) % PRESET_COVERS.length);
@@ -103,6 +115,10 @@ export default function SellerCreateListingView() {
 
   /* انتشار با اعتبارسنجی — در دمو به انبار «اضافه» می‌شود */
   const publish = () => {
+    if (!gate.approved) {
+      toast.error(gate.reason ?? "فروشگاهت فعال نیست");
+      return;
+    }
     if (!title.trim()) {
       toast.error("عنوان را وارد کن");
       return;
@@ -120,7 +136,7 @@ export default function SellerCreateListingView() {
         toast.error("قیمت ثابت را وارد کن");
         return;
       }
-      if (variants.length === 0 && stock <= 0) {
+      if (variants.length === 0 && effectiveStock <= 0) {
         toast.error("موجودی باید حداقل ۱ عدد باشد");
         return;
       }
@@ -131,6 +147,10 @@ export default function SellerCreateListingView() {
 
   /* ذخیرهٔ پیش‌نویس — فیلدهای ناقص در missing ثبت می‌شوند */
   const saveDraft = () => {
+    if (!gate.approved) {
+      toast.error(gate.reason ?? "فروشگاهت فعال نیست");
+      return;
+    }
     if (!title.trim()) {
       toast.error("عنوان را وارد کن");
       return;
@@ -151,22 +171,24 @@ export default function SellerCreateListingView() {
     back();
   };
 
-  const variantTotalStock = variants.reduce((s, v) => s + parseFaNum(v.stock), 0);
-
   return (
     <div className="flex-1 flex flex-col" aria-label="ساخت لیستینگ جدید">
       <PageHeader
         title="لیستینگ جدید"
         onBack={back}
         trailing={
-          <button
-            type="button"
-            onClick={saveDraft}
-            className="shrink-0 text-xs font-bold text-ls-purple-soft transition-colors hover:text-ls-purple"
-            aria-label="ذخیرهٔ پیش‌نویس لیستینگ"
-          >
-            ذخیرهٔ پیش‌نویس
-          </button>
+          gate.approved ? (
+            <button
+              type="button"
+              onClick={saveDraft}
+              className="shrink-0 text-xs font-bold text-ls-purple-soft transition-colors hover:text-ls-purple"
+              aria-label="ذخیرهٔ پیش‌نویس لیستینگ"
+            >
+              ذخیرهٔ پیش‌نویس
+            </button>
+          ) : (
+            <span className="shrink-0 text-xs font-bold text-white/35">قفل</span>
+          )
         }
       />
 
@@ -268,39 +290,46 @@ export default function SellerCreateListingView() {
           })}
         </div>
 
-        {/* ═══ v1.4 — قیمت ثابت + موجودی (حالت قیمت ثابت) ═══ */}
+        {/* ═══ v1.4 — قیمت ثابت + موجودی (حالت قیمت ثابت) — v1.7.0 ورودی عددی فارسی ═══ */}
         {!AUCTION_ENABLED && (
           <div className="space-y-4 rounded-2xl border border-white/5 bg-ls-card p-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="fixed-price" className="text-xs text-white/70">
-                  قیمت ثابت (تومان)
+                  قیمت ثابت
                 </Label>
-                <Input
+                <FaNumberInput
                   id="fixed-price"
-                  dir="ltr"
-                  inputMode="numeric"
-                  value={priceInput}
-                  onChange={(e) => setPriceInput(e.target.value)}
-                  placeholder="مثلاً ۶٬۵۰۰٬۰۰۰"
-                  className="h-10 rounded-xl border-white/10 bg-ls-card-2 text-left text-sm tabular-nums"
-                  aria-label="قیمت ثابت به تومان"
+                  value={price}
+                  onValueChange={setPrice}
+                  suffix="تومان"
+                  ariaLabel="قیمت ثابت به تومان"
+                  placeholder="۶٬۵۰۰٬۰۰۰"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="listing-stock" className="text-xs text-white/70">
-                  {variants.length > 0 ? "موجودی کل (خودکار)" : "موجودی (عدد)"}
+                  {variants.length > 0 ? "موجودی کل (خودکار)" : "موجودی"}
                 </Label>
-                <Input
-                  id="listing-stock"
-                  dir="ltr"
-                  inputMode="numeric"
-                  value={variants.length > 0 ? String(variantTotalStock) : stockInput}
-                  onChange={(e) => setStockInput(e.target.value)}
-                  disabled={variants.length > 0}
-                  className="h-10 rounded-xl border-white/10 bg-ls-card-2 text-left text-sm tabular-nums disabled:opacity-60"
-                  aria-label="موجودی کالا"
-                />
+                {variants.length > 0 ? (
+                  <div
+                    className="flex h-10 items-center justify-between rounded-xl border border-white/10 bg-ls-card-2 px-3 disabled:opacity-60"
+                    aria-label={`موجودی کل خودکار: ${faNum(variantTotalStock)} عدد`}
+                  >
+                    <span className="text-sm font-bold tabular-nums">
+                      {formatFaThousands(variantTotalStock)}
+                    </span>
+                    <span className="text-[10px] font-bold text-white/40">عدد</span>
+                  </div>
+                ) : (
+                  <FaNumberInput
+                    id="listing-stock"
+                    value={stock}
+                    onValueChange={(n) => setStock(Math.max(0, n))}
+                    suffix="عدد"
+                    ariaLabel="موجودی کالا به عدد"
+                  />
+                )}
               </div>
             </div>
             <p className="text-[10px] text-white/40">
@@ -449,21 +478,19 @@ export default function SellerCreateListingView() {
           </div>
         )}
 
-        {/* ── وزن و ابعاد بسته ── */}
+        {/* ── وزن و ابعاد بسته — v1.7.0 ورودی عددی فارسی ── */}
         <div className="space-y-1.5">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="pkg-weight" className="text-xs text-white/70">
-                وزن (گرم)
+                وزن
               </Label>
-              <Input
+              <FaNumberInput
                 id="pkg-weight"
-                dir="ltr"
-                inputMode="numeric"
-                value={weightInput}
-                onChange={(e) => setWeightInput(e.target.value)}
-                className="h-10 rounded-xl border-white/10 bg-ls-card-2 text-left text-sm tabular-nums"
-                aria-label="وزن بسته به گرم"
+                value={weight}
+                onValueChange={setWeight}
+                suffix="گرم"
+                ariaLabel="وزن بسته به گرم"
               />
             </div>
             <div className="space-y-1.5">
@@ -499,16 +526,39 @@ export default function SellerCreateListingView() {
         </div>
       </div>
 
-      {/* ── نوار انتشار چسبان ── */}
+      {/* ── نوار انتشار چسبان — v1.7.0 گیت لیستینگ ── */}
       <div className="sticky bottom-0 z-20 mt-auto bg-gradient-to-t from-ls-bg via-ls-bg/95 to-transparent px-4 pb-4 pt-3">
-        <button
-          type="button"
-          onClick={publish}
-          className="h-12 w-full rounded-xl bg-ls-purple text-sm font-black text-white shadow-[0_8px_24px_rgba(108,92,255,.35)] transition-transform active:scale-[.98]"
-          aria-label="انتشار لیستینگ"
-        >
-          انتشار لیستینگ
-        </button>
+        {gate.approved ? (
+          <button
+            type="button"
+            onClick={publish}
+            className="h-12 w-full rounded-xl bg-ls-purple text-sm font-black text-white shadow-[0_8px_24px_rgba(108,92,255,.35)] transition-transform active:scale-[.98]"
+            aria-label="انتشار لیستینگ"
+          >
+            انتشار لیستینگ
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              aria-label="انتشار لیستینگ — غیرفعال تا تأیید فروشندگی"
+              className="h-12 w-full cursor-not-allowed rounded-xl bg-ls-card-2 text-sm font-black text-white/35"
+            >
+              <span className="inline-flex items-center justify-center gap-2">
+                <Lock className="h-4 w-4" aria-hidden />
+                انتشار لیستینگ — قفل
+              </span>
+            </button>
+            <p
+              className="mt-1.5 text-center text-[11px] font-bold text-amber-300"
+              role="alert"
+            >
+              {gate.reason}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

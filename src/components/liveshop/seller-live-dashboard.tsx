@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { faNum, toman } from "@/lib/format";
 import { useLiveStore } from "@/store/live-store";
 import { useSellerStore } from "@/store/seller-store";
+import { useAppStore } from "@/store/app-store";
 import { WATCHING_VIEWERS, type WatchingViewer } from "@/lib/data/seller";
 import { stockLabelFa } from "@/lib/data/items";
 import { ITEM_PHOTO } from "@/lib/data/media";
@@ -74,6 +75,8 @@ export default function SellerLiveDashboard({
   const liveItems = useLiveStore((s) => s.items);
   const soldCount = useLiveStore((s) => s.soldCount);
   const chat = useLiveStore((s) => s.chat);
+  /* v1.7.0 — اوج بیننده برای تب «فروش» داشبورد */
+  const peakViewers = useLiveStore((s) => s.peakViewers);
   /* v1.4 — پین «کالای در حال نمایش» از همین داشبورد */
   const pinnedItemId = useLiveStore((s) => s.pinnedItemId);
   const pinItem = useLiveStore((s) => s.pinItem);
@@ -87,13 +90,39 @@ export default function SellerLiveDashboard({
     AUCTION_ENABLED ? "activity" : "sales"
   );
 
-  /* ابزارهای رشد پخش — فاز ۳ (Raid / کو-هاست) */
+  /* ابزارهای رشد پخش — (Raid / کو-هاست) */
   const [raidOpen, setRaidOpen] = useState(false);
   const [cohostOpen, setCohostOpen] = useState(false);
+
+  /* v1.7.0 — پایان پخش میزبان → گزارش پایان لایو */
+  const endShow = useLiveStore((s) => s.endShow);
+  const pushView = useAppStore((s) => s.push);
+  const onEndShow = () => {
+    const report = endShow();
+    onClose();
+    if (report) {
+      pushView("sellerLiveReport");
+      toast.success("پخش تمام شد — گزارش ساخته شد");
+    } else {
+      toast.error("پخش فعالی برای پایان‌دادن نیست");
+    }
+  };
 
   const sales = liveItems
     .filter((i) => i.status === "sold")
     .reduce((sum, i) => sum + (i.soldPrice ?? 0), 0);
+
+  /* v1.7.0 — فهرست فروش‌های واقعی این پخش (تب «فروش» حالت قیمت ثابت)
+     آمار تب از شمارنده‌های همین جلسهٔ پخش می‌آید (نه کالاهای فروخته‌شدهٔ
+     قبلی شو) — «فروش‌های همین پخش» واقعاً همین پخش است. */
+  const sessionOrders = useLiveStore((s) => s.sessionOrders);
+  const sessionSalesAmount = useLiveStore((s) => s.sessionSalesAmount);
+  const sessionSoldQty = useLiveStore((s) => s.sessionSoldQty);
+  const soldFeed = useMemo(
+    () =>
+      liveItems.filter((i) => (sessionSoldQty[i.id] ?? 0) > 0 || i.status === "sold"),
+    [liveItems, sessionSoldQty]
+  );
 
   /* شبیه‌سازی انعام زندهٔ بیننده‌ها */
   useEffect(() => {
@@ -358,18 +387,18 @@ export default function SellerLiveDashboard({
               </button>
             </div>
           ) : tab === "sales" ? (
-            /* ═══ v1.7.0 — تب فروش: آمار واقعی این پخش از موتور ═══ */
+            /* ═══ v1.7.0 — تب فروش: آمار واقعی همین پخش از موتور ═══ */
             <div className="mt-3 flex flex-col flex-1 min-h-0">
-              <div className="grid grid-cols-3 gap-2" aria-label="آمار فروش این پخش">
+              <div className="grid grid-cols-3 gap-2" aria-label="آمار فروش همین پخش">
                 <div className="rounded-xl bg-ls-card-2 p-2.5 text-center">
                   <p className="text-[10px] text-white/45">فروش</p>
                   <p className="text-sm font-black text-ls-green tabular-nums mt-0.5">
-                    {toman(sales, false)}
+                    {toman(sessionSalesAmount, false)}
                   </p>
                 </div>
                 <div className="rounded-xl bg-ls-card-2 p-2.5 text-center">
                   <p className="text-[10px] text-white/45">سفارش</p>
-                  <p className="text-sm font-black tabular-nums mt-0.5">{faNum(soldCount)}</p>
+                  <p className="text-sm font-black tabular-nums mt-0.5">{faNum(sessionOrders)}</p>
                 </div>
                 <div className="rounded-xl bg-ls-card-2 p-2.5 text-center">
                   <p className="text-[10px] text-white/45">اوج بیننده</p>
@@ -390,28 +419,40 @@ export default function SellerLiveDashboard({
                     هنوز فروشی ثبت نشده — اولین خرید لحظهٔ خودش را می‌گوید
                   </p>
                 ) : (
-                  soldFeed.map((it) => (
-                    <div
-                      key={it.id}
-                      className="bg-ls-card border border-ls-green/20 rounded-xl p-2.5 flex items-center gap-2.5"
-                    >
-                      <GradientCover
-                        cover={it.cover}
-                        className="h-9 w-9 shrink-0 rounded-lg"
-                        emojiClassName="text-base"
-                        photo={ITEM_PHOTO[it.id]}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-bold">{it.title}</p>
-                        <p className="text-[10px] text-white/45 mt-0.5">
-                          خریدار: {it.soldTo ?? "بیننده"}
-                        </p>
+                  soldFeed.map((it) => {
+                    const qty = sessionSoldQty[it.id] ?? 0;
+                    return (
+                      <div
+                        key={it.id}
+                        className="bg-ls-card border border-ls-green/20 rounded-xl p-2.5 flex items-center gap-2.5"
+                      >
+                        <GradientCover
+                          cover={it.cover}
+                          className="h-9 w-9 shrink-0 rounded-lg"
+                          emojiClassName="text-base"
+                          photo={ITEM_PHOTO[it.id]}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-bold">
+                            {it.title}
+                            {qty > 0 && (
+                              <span className="ms-1.5 text-[10px] font-black text-ls-green tabular-nums">
+                                ×{faNum(qty)}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-white/45 mt-0.5">
+                            {qty > 0
+                              ? `خریدار: ${it.soldTo ?? "بیننده"}`
+                              : "فروخته از قبل — خارج از این پخش"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs font-black text-ls-green tabular-nums">
+                          {toman(it.soldPrice ?? it.price, false)}
+                        </span>
                       </div>
-                      <span className="shrink-0 text-xs font-black text-ls-green tabular-nums">
-                        {toman(it.soldPrice ?? it.price, false)}
-                      </span>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -442,12 +483,12 @@ export default function SellerLiveDashboard({
                           : "border-white/5 bg-ls-card"
                       )}
                     >
-                      <span
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ls-card-2 text-base"
-                        aria-hidden
-                      >
-                        {item.emoji}
-                      </span>
+                      <GradientCover
+                        cover={item.cover}
+                        className="h-9 w-9 shrink-0 rounded-lg"
+                        emojiClassName="text-base"
+                        photo={ITEM_PHOTO[item.id]}
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-bold text-white/90">
                           {item.title}
@@ -542,7 +583,7 @@ export default function SellerLiveDashboard({
             </div>
           )}
 
-          {/* ── ابزارهای رشد پخش — فاز ۳: Raid و کو-هاست ── */}
+          {/* ── پایان پخش + ابزارهای رشد: Raid و کو-هاست ── */}
           <div className="mt-3 border-t border-white/5 pt-3">
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -560,9 +601,14 @@ export default function SellerLiveDashboard({
                 🤝 کو-هاست
               </button>
             </div>
-            <p className="mt-2 text-center text-[10px] text-white/40">
-              ابزارهای رشد پخش — فاز ۳
-            </p>
+            {/* v1.7.0 — پایان پخش توسط میزبان → گزارش پایان لایو */}
+            <button
+              onClick={onEndShow}
+              aria-label="پایان پخش و مشاهدهٔ گزارش"
+              className="mt-2 w-full rounded-xl border border-[#FF3B5C]/40 bg-[#FF3B5C]/10 px-3 py-2.5 text-xs font-black text-[#FF3B5C] hover:bg-[#FF3B5C]/20 active:scale-[.99] transition-all"
+            >
+              ● پایان پخش و مشاهدهٔ گزارش
+            </button>
           </div>
         </div>
 
