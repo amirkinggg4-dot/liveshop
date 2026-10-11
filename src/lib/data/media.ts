@@ -34,6 +34,11 @@ export const ITEM_PHOTO: Record<string, string> = {
   it4: "/liveshop/item-it4.jpg",
   it5: "/liveshop/item-it5.jpg",
   it6: "/liveshop/item-it6.jpg",
+  /* v1.7.0 — عکس اصلی برای همهٔ آیتم‌های انبار (تولیدشده برای دمو) */
+  it7: "/liveshop/item-it7.jpg",
+  it8: "/liveshop/item-it8.jpg",
+  it9: "/liveshop/item-it9.jpg",
+  it10: "/liveshop/item-it10.jpg",
 };
 
 export const SELLER_PHOTO: Record<string, string> = {

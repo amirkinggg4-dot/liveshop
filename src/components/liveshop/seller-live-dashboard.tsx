@@ -9,7 +9,8 @@ import { useLiveStore } from "@/store/live-store";
 import { useSellerStore } from "@/store/seller-store";
 import { WATCHING_VIEWERS, type WatchingViewer } from "@/lib/data/seller";
 import { stockLabelFa } from "@/lib/data/items";
-import { Avatar } from "@/components/liveshop/shared";
+import { ITEM_PHOTO } from "@/lib/data/media";
+import { Avatar, GradientCover } from "@/components/liveshop/shared";
 import {
   Drawer,
   DrawerContent,
@@ -81,9 +82,9 @@ export default function SellerLiveDashboard({
   const addTip = useSellerStore((s) => s.addTip);
 
   const [filter, setFilter] = useState<"all" | "auction" | "sale" | "giveaway" | "tip">("all");
-  /* v1.4 — در حالت قیمت ثابت، تب پیش‌فرض «کالاها»ست (پین کالای بعدی) */
-  const [tab, setTab] = useState<"activity" | "watching" | "items">(
-    AUCTION_ENABLED ? "activity" : "items"
+  /* v1.7.0 — تب پیش‌فرض حالت قیمت ثابت: «فروش» (فهرست فروش‌های واقعی این پخش) */
+  const [tab, setTab] = useState<"activity" | "watching" | "items" | "sales">(
+    AUCTION_ENABLED ? "activity" : "sales"
   );
 
   /* ابزارهای رشد پخش — فاز ۳ (Raid / کو-هاست) */
@@ -250,6 +251,19 @@ export default function SellerLiveDashboard({
             {!AUCTION_ENABLED && (
               <button
                 role="tab"
+                aria-selected={tab === "sales"}
+                onClick={() => setTab("sales")}
+                className={cn(
+                  "flex-1 rounded-xl py-2 text-xs font-bold transition-colors",
+                  tab === "sales" ? "bg-ls-card-2 text-white" : "text-white/45"
+                )}
+              >
+                فروش
+              </button>
+            )}
+            {!AUCTION_ENABLED && (
+              <button
+                role="tab"
                 aria-selected={tab === "items"}
                 onClick={() => setTab("items")}
                 className={cn(
@@ -342,6 +356,64 @@ export default function SellerLiveDashboard({
               >
                 ثبت انعام (دمو) 💚
               </button>
+            </div>
+          ) : tab === "sales" ? (
+            /* ═══ v1.7.0 — تب فروش: آمار واقعی این پخش از موتور ═══ */
+            <div className="mt-3 flex flex-col flex-1 min-h-0">
+              <div className="grid grid-cols-3 gap-2" aria-label="آمار فروش این پخش">
+                <div className="rounded-xl bg-ls-card-2 p-2.5 text-center">
+                  <p className="text-[10px] text-white/45">فروش</p>
+                  <p className="text-sm font-black text-ls-green tabular-nums mt-0.5">
+                    {toman(sales, false)}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-ls-card-2 p-2.5 text-center">
+                  <p className="text-[10px] text-white/45">سفارش</p>
+                  <p className="text-sm font-black tabular-nums mt-0.5">{faNum(soldCount)}</p>
+                </div>
+                <div className="rounded-xl bg-ls-card-2 p-2.5 text-center">
+                  <p className="text-[10px] text-white/45">اوج بیننده</p>
+                  <p className="text-sm font-black tabular-nums mt-0.5">
+                    {faNum(peakViewers)}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-2.5 text-[11px] text-white/50">
+                فروش‌های همین پخش — هر خرید همان لحظه اینجا می‌آید:
+              </p>
+              <div
+                className="mt-1.5 flex-1 min-h-0 space-y-2 max-h-60 overflow-y-auto scroll-thin"
+                aria-label="فهرست فروش‌های زنده"
+              >
+                {soldFeed.length === 0 ? (
+                  <p className="py-8 text-center text-xs text-white/40">
+                    هنوز فروشی ثبت نشده — اولین خرید لحظهٔ خودش را می‌گوید
+                  </p>
+                ) : (
+                  soldFeed.map((it) => (
+                    <div
+                      key={it.id}
+                      className="bg-ls-card border border-ls-green/20 rounded-xl p-2.5 flex items-center gap-2.5"
+                    >
+                      <GradientCover
+                        cover={it.cover}
+                        className="h-9 w-9 shrink-0 rounded-lg"
+                        emojiClassName="text-base"
+                        photo={ITEM_PHOTO[it.id]}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-bold">{it.title}</p>
+                        <p className="text-[10px] text-white/45 mt-0.5">
+                          خریدار: {it.soldTo ?? "بیننده"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-black text-ls-green tabular-nums">
+                        {toman(it.soldPrice ?? it.price, false)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           ) : tab === "items" ? (
             /* ═══ v1.4 — تب کالاها: پین‌کردن «کالای در حال نمایش» بعدی ═══ */

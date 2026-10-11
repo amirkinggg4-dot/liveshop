@@ -8,7 +8,12 @@ import type { Cover } from "./types";
    همهٔ مبالغ به «تومان» هستند و اعداد در UI فارسی نمایش داده می‌شوند.
    ───────────────────────────────────────────────────────────── */
 
-/* ── شوهای زمان‌بندی‌شدهٔ فروشنده ── */
+/* ── شوهای زمان‌بندی‌شدهٔ فروشنده ──
+   v1.7.0 — ساختار هم‌شکل بخش ۶ قرارداد API (CRUD /seller/shows):
+   scheduledAt واقعی (ISO) + itemIds با ترتیب + توضیح کوتاه + status.
+   whenLabel از scheduledAt مشتق می‌شود (برای نمایش). */
+export type ScheduledShowStatus = "scheduled" | "cancelled";
+
 export interface SellerScheduledShow {
   id: string;
   title: string;
@@ -26,6 +31,15 @@ export interface SellerScheduledShow {
   /** پین کامنت */
   pinComment: boolean;
   cover: Cover;
+  /* ── v1.7.0 ── */
+  /** شروع واقعی شو (ISO) — مبنای «در گذشته نیست» و تقویم */
+  scheduledAt?: string;
+  /** کالاهای شو به ترتیب نمایش (اولی پین می‌شود) */
+  itemIds?: string[];
+  /** توضیح کوتاه شو */
+  description?: string;
+  /** لغو‌شده‌ها برای تاریخچه — پیش‌فرض scheduled */
+  status?: ScheduledShowStatus;
 }
 
 export const SELLER_SCHEDULED_SHOWS: SellerScheduledShow[] = [
@@ -40,6 +54,9 @@ export const SELLER_SCHEDULED_SHOWS: SellerScheduledShow[] = [
     cohost: false,
     pinComment: false,
     cover: { from: "#FF3B8B", to: "#6C5CFF", emoji: "👟" },
+    itemIds: [],
+    description: "",
+    status: "scheduled",
   },
   {
     id: "sch2",
@@ -52,6 +69,9 @@ export const SELLER_SCHEDULED_SHOWS: SellerScheduledShow[] = [
     cohost: true,
     pinComment: false,
     cover: { from: "#6C5CFF", to: "#1b1729", emoji: "👟" },
+    itemIds: [],
+    description: "",
+    status: "scheduled",
   },
 ];
 
@@ -64,6 +84,8 @@ export interface SellerOrder {
   itemBrand?: string;
   emoji: string;
   cover: Cover;
+  /** v1.7.0 — id کالا در ITEMS_SH1 برای عکس اصلی (fallback = گرادیان/ایموجی) */
+  itemId?: string;
   buyerName: string;
   buyerEmoji: string;
   /** hex برند برای آواتار خریدار */
@@ -96,6 +118,7 @@ export const SELLER_ORDERS: SellerOrder[] = [
     itemBrand: "آسیکس",
     emoji: "👟",
     cover: { from: "#6C5CFF", to: "#0b5f4a", emoji: "🏃" },
+    itemId: "it6",
     buyerName: "reza_vault",
     buyerEmoji: "💎",
     buyerColor: "#00C896",
@@ -133,6 +156,7 @@ export const SELLER_ORDERS: SellerOrder[] = [
     itemBrand: "نایک",
     emoji: "👟",
     cover: { from: "#FF3B8B", to: "#6C5CFF", emoji: "👟" },
+    itemId: "it1",
     buyerName: "sole_hunter",
     buyerEmoji: "👟",
     buyerColor: "#FF3B8B",
@@ -152,6 +176,7 @@ export const SELLER_ORDERS: SellerOrder[] = [
     itemBrand: "لایف اسپرت",
     emoji: "🧦",
     cover: { from: "#FF3B8B", to: "#FFB454", emoji: "🧦" },
+    itemId: "it7",
     buyerName: "sara_snkrs",
     buyerEmoji: "🎀",
     buyerColor: "#6C5CFF",
@@ -170,6 +195,7 @@ export const SELLER_ORDERS: SellerOrder[] = [
     itemBrand: "جردن",
     emoji: "👟",
     cover: { from: "#FF3B8B", to: "#7a1030", emoji: "🧡" },
+    itemId: "it3",
     buyerName: "ali_rezaei",
     buyerEmoji: "🧢",
     buyerColor: "#6C5CFF",
@@ -189,6 +215,7 @@ export const SELLER_ORDERS: SellerOrder[] = [
     itemBrand: "ادون",
     emoji: "🎒",
     cover: { from: "#1b1729", to: "#6C5CFF", emoji: "🎒" },
+    itemId: "it8",
     buyerName: "kian_plant",
     buyerEmoji: "🌵",
     buyerColor: "#00C896",
@@ -208,6 +235,7 @@ export const SELLER_ORDERS: SellerOrder[] = [
     itemBrand: "نیوبالانس",
     emoji: "👟",
     cover: { from: "#00C896", to: "#155e75", emoji: "👟" },
+    itemId: "it4",
     buyerName: "sara_snkrs",
     buyerEmoji: "🎀",
     buyerColor: "#6C5CFF",
@@ -228,6 +256,7 @@ export const SELLER_ORDERS: SellerOrder[] = [
     itemBrand: "ادیداس",
     emoji: "👟",
     cover: { from: "#6C5CFF", to: "#1b1729", emoji: "👟" },
+    itemId: "it2",
     buyerName: "sole_hunter",
     buyerEmoji: "👟",
     buyerColor: "#FF3B8B",

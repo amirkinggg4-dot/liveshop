@@ -1,9 +1,15 @@
 "use client";
 
 import { create } from "zustand";
-import type { InventoryDraft, SellerOrder, SellerScheduledShow } from "@/lib/data/seller";
+import type {
+  InventoryDraft,
+  ScheduledShowStatus,
+  SellerOrder,
+  SellerScheduledShow,
+} from "@/lib/data/seller";
 import { INVENTORY_DRAFTS, SELLER_ORDERS, SELLER_SCHEDULED_SHOWS } from "@/lib/data/seller";
 import { useLiveStore } from "./live-store";
+import { useInboxStore } from "./inbox-store";
 import { toman } from "@/lib/format";
 
 /* ─────────────────────────────────────────────────────────────
@@ -43,6 +49,13 @@ export interface SellerState {
   publishedCount: number;
 
   addScheduledShow: (s: SellerScheduledShow) => void;
+  /** v1.7.0 — ویرایش شوی زمان‌بندی‌شده (زمان/کالاها/توضیح/عنوان) */
+  updateScheduledShow: (
+    id: string,
+    patch: Partial<SellerScheduledShow>
+  ) => void;
+  /** v1.7.0 — لغو شو با تأیید؛ بعد از لغو پیام به فالوورها می‌رود (mock) */
+  cancelScheduledShow: (id: string) => boolean;
   /** سفارش to_scan → shipped + کد رهگیری ۶رقمی؛ کد ساخته‌شده یا null برمی‌گرداند */
   printLabel: (orderId: string) => string | null;
   /** فقط ثبت/به‌روزرسانی کد رهگیری سفارش (وضعیت عوض نمی‌شود) */
@@ -126,6 +139,35 @@ export const useSellerStore = create<SellerState>((set, get) => ({
     set((s) => ({
       scheduledShows: [...s.scheduledShows, { ...show, cover: { ...show.cover } }],
     })),
+
+  updateScheduledShow: (id, patch) =>
+    set((s) => ({
+      scheduledShows: s.scheduledShows.map((sh) =>
+        sh.id === id
+          ? { ...sh, ...patch, cover: patch.cover ? { ...patch.cover } : sh.cover }
+          : sh
+      ),
+    })),
+
+  cancelScheduledShow: (id) => {
+    const show = get().scheduledShows.find((sh) => sh.id === id);
+    if (!show || show.status === "cancelled") return false;
+    set((s) => ({
+      scheduledShows: s.scheduledShows.map((sh) =>
+        sh.id === id ? { ...sh, status: "cancelled" as ScheduledShowStatus } : sh
+      ),
+    }));
+    /* پیام به فالوورها (mock) — اعلان صندوق ورودی */
+    useInboxStore.getState().pushNotification({
+      kind: "system",
+      title: `شو «${show.title}» لغو شد`,
+      body: `${show.whenLabel} برگزار نمی‌شود — به‌محض تعیین زمان جدید خبر می‌دهیم.`,
+      atLabel: "همین حالا",
+      emoji: "📅",
+      color: "#6C5CFF",
+    });
+    return true;
+  },
 
   printLabel: (orderId) => {
     const order = get().orders.find((o) => o.id === orderId);

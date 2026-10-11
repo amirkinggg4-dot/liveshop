@@ -14,6 +14,8 @@ interface InboxState {
   notifications: InboxNotification[];
   markRead: (id: string) => void;
   markAllRead: () => void;
+  /** v1.7.0 — افزودن اعلان (مثل پیام لغو شو به فالوورها) */
+  pushNotification: (n: Omit<InboxNotification, "id" | "unread">) => void;
 }
 
 /* ── seed (کپی مستقل از دیتای static) ── */
@@ -29,6 +31,8 @@ export function selectUnreadCount(state: InboxState): number {
   );
 }
 
+let inboxCounter = 100;
+
 export const useInboxStore = create<InboxState>((set) => ({
   notifications: SEED_NOTIFICATIONS,
 
@@ -42,5 +46,13 @@ export const useInboxStore = create<InboxState>((set) => ({
   markAllRead: () =>
     set((s) => ({
       notifications: s.notifications.map((n) => ({ ...n, unread: false })),
+    })),
+
+  pushNotification: (n) =>
+    set((s) => ({
+      notifications: [
+        { ...n, id: `nb-${++inboxCounter}`, unread: true },
+        ...s.notifications,
+      ],
     })),
 }));

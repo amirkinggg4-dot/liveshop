@@ -393,7 +393,8 @@ export default function ActivityView() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-bold">{b.itemTitle}</p>
                       <p className="mt-0.5 truncate text-[10px] text-white/40">
-                        مزایده · {b.sellerName} · {toman(b.myBid, false)}
+                        {/* v1.7.0 — در حالت غیر-حراج برچسب «خرید» به‌جای «مزایده» */}
+                        {AUCTION_ENABLED ? "مزایده" : "خرید"} · {b.sellerName} · {toman(b.myBid, false)}
                       </p>
                     </div>
                     <span

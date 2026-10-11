@@ -11,11 +11,14 @@ import {
   PlayCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 import { faNum, toman } from "@/lib/format";
+import { LOW_STOCK_THRESHOLD } from "@/lib/config";
 import { getShow } from "@/lib/data/shows";
 import { getShowItems } from "@/lib/data/items";
 import { READY_ROOM } from "@/lib/data/seller";
+import { ITEM_PHOTO } from "@/lib/data/media";
 import type { Cover } from "@/lib/data/types";
 import { PageHeader, GradientCover } from "@/components/liveshop/shared";
 
@@ -30,6 +33,7 @@ interface QueueRow {
   title: string;
   fmt: string;
   price: number;
+  stock: number;
   cover: Cover;
 }
 
@@ -46,8 +50,10 @@ export default function SellerReadyRoomView() {
       .map((it) => ({
         id: it.id,
         title: it.title,
-        fmt: `مزایده · شروع ${toman(it.startPrice, false)}`,
-        price: it.startPrice,
+        /* v1.7.0 — «قیمت ثابت · X تومان · N عدد» به‌جای «مزایده · شروع X» */
+        fmt: `قیمت ثابت · ${toman(it.price, false)} تومان · ${faNum(it.stock)} عدد`,
+        price: it.price,
+        stock: it.stock,
         cover: it.cover,
       }))
   );
@@ -134,7 +140,7 @@ export default function SellerReadyRoomView() {
                 موقعیت: خاموش
               </span>
               <button
-                onClick={() => toast("انتخاب اورلی — در فاز ۳ (دمو)")}
+                onClick={() => toast("انتخاب اورلی (دمو)")}
                 aria-label="انتخاب اورلی‌ها"
                 className="flex items-center gap-1 bg-black/50 backdrop-blur text-[11px] rounded-full px-2.5 py-1 border border-white/10 text-white/70 hover:text-white transition-colors active:scale-[.98]"
               >
@@ -176,6 +182,7 @@ export default function SellerReadyRoomView() {
                   cover={row.cover}
                   className="w-10 h-10 rounded-lg shrink-0"
                   emojiClassName="text-base"
+                  photo={ITEM_PHOTO[row.id]}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -188,7 +195,14 @@ export default function SellerReadyRoomView() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-white/45 truncate mt-0.5">
+                  <p
+                    className={cn(
+                      "text-[10px] truncate mt-0.5 tabular-nums",
+                      row.stock > 0 && row.stock < LOW_STOCK_THRESHOLD
+                        ? "text-amber-300 font-bold"
+                        : "text-white/45"
+                    )}
+                  >
                     {row.fmt}
                   </p>
                 </div>

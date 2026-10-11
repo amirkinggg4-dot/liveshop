@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import type { ChatMessage, ShopItem, ShippingMethodId } from "@/lib/data/types";
 import { getShowItems } from "@/lib/data/items";
-import { getSeller } from "@/lib/data/shows";
+import { getShow, getSeller } from "@/lib/data/shows";
 import { CHAT_BY_SHOW } from "@/lib/data/chat";
 import { DEFAULT_ADDRESS, SHIPPING_METHODS, escrowTimeline } from "@/lib/data/orders";
 import { useWalletStore } from "@/store/wallet-store";
@@ -39,6 +39,22 @@ export interface FinishedItem {
   winnerLabel: string;
   price: number;
   iWon: boolean;
+}
+
+/* ═════════ v1.7.0 — گزارش پایان لایو (بخش ۶: POST /seller/shows/:id/end) ═════════
+   مدت، اوج بیننده، تعداد و مبلغ فروش، پرفروش‌ترین کالا، تعداد سفارش جدید */
+export interface LiveReport {
+  showId: string;
+  showTitle: string;
+  endedAtLabel: string;
+  /** طول پخش به ثانیه */
+  durationSec: number;
+  peakViewers: number;
+  /** تعداد سفارش جدید */
+  salesCount: number;
+  /** مبلغ فروش (بدون ارسال) به تومان */
+  salesAmount: number;
+  topItem: { title: string; qty: number; amount: number } | null;
 }
 
 interface BotRival {
@@ -115,9 +131,23 @@ interface LiveState {
   finishedItem: FinishedItem | null;
   chat: ChatMessage[];
   giveaway: GiveawayState;
+  /* ── v1.7.0 — آمار جلسهٔ پخش برای گزارش پایان ── */
+  /** لحظهٔ شروع پخش (مبنای مدت) */
+  startedAtMs: number | null;
+  /** بینندهٔ زندهٔ شبیه‌سازی‌شده (drift روی show.viewers) */
+  viewers: number;
+  peakViewers: number;
+  /** شمارنده‌های جلسه — با startShow صفر و با هر خرید بالا می‌روند */
+  sessionOrders: number;
+  sessionSalesAmount: number;
+  sessionSoldQty: Record<string, number>;
+  /** آخرین گزارش پایان لایو — برای صفحهٔ گزارش */
+  lastReport: LiveReport | null;
 
   startShow: (showId: string) => void;
   stopShow: () => void;
+  /** v1.7.0 — پایان پخش توسط میزبان + ساخت گزارش */
+  endShow: () => LiveReport | null;
   tick: () => void;
   placeMyBid: (amount: number) => { ok: boolean; error?: string };
   setMyMaxBid: (enabled: boolean, amount?: number) => void;
@@ -281,6 +311,14 @@ export const useLiveStore = create<LiveState>((set, get) => {
     finishedItem: null,
     chat: [],
     giveaway: { phase: "idle", secondsLeft: 0, winnerLabel: "", winnerEmoji: "", winnerColor: "" },
+    /* v1.7.0 — آمار جلسه */
+    startedAtMs: null,
+    viewers: 0,
+    peakViewers: 0,
+    sessionOrders: 0,
+    sessionSalesAmount: 0,
+    sessionSoldQty: {},
+    lastReport: null,
 
     startShow: (showId) => {
       const items = getShowItems(showId).map((i) => ({ ...i, variants: i.variants?.map((v) => ({ ...v })) }));
@@ -288,6 +326,7 @@ export const useLiveStore = create<LiveState>((set, get) => {
       const pinned =
         items.find((i) => i.status !== "sold" && i.stock > 0) ?? items[0];
       const seedChat = (CHAT_BY_SHOW[showId] ?? []).map((m) => ({ ...m }));
+      const baseViewers = getShow(showId).viewers;
       set({
         showId,
         items,
@@ -306,13 +345,64 @@ export const useLiveStore = create<LiveState>((set, get) => {
         finishedItem: null,
         chat: seedChat,
         giveaway: { phase: "idle", secondsLeft: 0, winnerLabel: "", winnerEmoji: "", winnerColor: "" },
+        /* v1.7.0 — شروع جلسهٔ تازهٔ آمار */
+        startedAtMs: Date.now(),
+        viewers: baseViewers,
+        peakViewers: baseViewers,
+        sessionOrders: 0,
+        sessionSalesAmount: 0,
+        sessionSoldQty: {},
+        lastReport: null,
       });
     },
 
     stopShow: () => set({ phase: "idle" }),
 
+    /* ═══ v1.7.0 — پایان پخش میزبان + گزارش (POST /seller/shows/:id/end) ═══ */
+    endShow: () => {
+      const s = get();
+      if (!s.showId || s.phase === "idle") return null;
+      const show = (() => {
+        try {
+          return getShow(s.showId);
+        } catch {
+          return null;
+        }
+      })();
+      const durationSec = s.startedAtMs
+        ? Math.max(1, Math.round((Date.now() - s.startedAtMs) / 1000))
+        : 0;
+      let topItem: LiveReport["topItem"] = null;
+      for (const [id, qty] of Object.entries(s.sessionSoldQty)) {
+        const it = s.items.find((i) => i.id === id);
+        if (!it) continue;
+        if (!topItem || qty > topItem.qty) {
+          topItem = { title: it.title, qty, amount: it.price * qty };
+        }
+      }
+      const report: LiveReport = {
+        showId: s.showId,
+        showTitle: show?.title ?? "لایو",
+        endedAtLabel: nowLabel(),
+        durationSec,
+        peakViewers: s.peakViewers,
+        salesCount: s.sessionOrders,
+        salesAmount: s.sessionSalesAmount,
+        topItem,
+      };
+      set({ phase: "idle", lastReport: report });
+      return report;
+    },
+
     tick: () => {
       const s = get();
+
+      /* ── v1.7.0 — شبیه‌سازی ملایم بینندهٔ زنده + ثبت اوج (برای گزارش پایان) ── */
+      if (s.phase === "running" && s.viewers > 0) {
+        const drift = Math.floor(Math.random() * 13) - 6; /* ±۶ */
+        const viewers = Math.max(10, s.viewers + drift);
+        set({ viewers, peakViewers: Math.max(s.peakViewers, viewers) });
+      }
 
       /* گیواوی */
       if (s.giveaway.phase === "countdown") {
@@ -565,6 +655,13 @@ export const useLiveStore = create<LiveState>((set, get) => {
           };
         }),
         soldCount: newStock <= 0 && item.status !== "sold" ? st.soldCount + 1 : st.soldCount,
+        /* v1.7.0 — شمارنده‌های جلسه برای گزارش پایان لایو */
+        sessionOrders: st.sessionOrders + 1,
+        sessionSalesAmount: st.sessionSalesAmount + item.price * qty,
+        sessionSoldQty: {
+          ...st.sessionSoldQty,
+          [item.id]: (st.sessionSoldQty[item.id] ?? 0) + qty,
+        },
       }));
 
       /* ۷) پیام چت خرید */
