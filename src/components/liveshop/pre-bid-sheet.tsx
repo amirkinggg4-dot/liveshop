@@ -69,7 +69,7 @@ export default function PreBidSheet({
     }
     const res = placePrebid(itemId, amount);
     if (res.ok) {
-      toast.success("پیش‌بید ثبت شد ✅ — لحظهٔ شروع خودکار می‌رود");
+      toast.success("پیش‌بید ثبت شد — لحظهٔ شروع خودکار می‌رود");
       setDrafts((p) => {
         const n = { ...p };
         delete n[itemId];

@@ -6,6 +6,7 @@ import { Gauge, Loader2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { faNum, toFa, toman } from "@/lib/format";
 import { SHIPPING_METHODS } from "@/lib/data/orders";
+import { SCAN_DEADLINE } from "@/lib/config/fees";
 import type { SellerOrder } from "@/lib/data/seller";
 import { HUB_STATS } from "@/lib/data/seller";
 import { ITEM_PHOTO } from "@/lib/data/media";
@@ -412,7 +413,8 @@ export default function SellerOrdersView() {
               <strong className="font-black">
                 {faNum(HUB_STATS.onTimeScanPct)}٪
               </strong>{" "}
-              — بالای {faNum(80)}٪ بمانید تا محدودیت فروش نداشته باشید.
+              — بالای {faNum(80)}٪ بمانید تا محدودیت فروش نداشته باشید. مهلت
+              اسکن هر سفارش {faNum(SCAN_DEADLINE.deadlineHours)} ساعت.
             </p>
           </div>
         )}
@@ -530,7 +532,7 @@ export default function SellerOrdersView() {
                         type="button"
                         onClick={() => {
                           completeOrder(o.id);
-                          toast.success(`سفارش ${toFa(o.id)} تکمیل شد ✅`);
+                          toast.success(`سفارش ${toFa(o.id)} تکمیل شد`);
                         }}
                         className="ms-auto rounded-lg border border-ls-green/50 px-2.5 py-1.5 text-[11px] font-extrabold text-ls-green transition-colors hover:bg-ls-green/10"
                         aria-label={`تکمیل سفارش ${toFa(o.id)}`}

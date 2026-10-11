@@ -6,6 +6,7 @@ import { Check, Clock, Share2 } from "lucide-react";
 import { compactFa, faNum, toFa, toman } from "@/lib/format";
 import { STOREFRONT } from "@/lib/data/seller-marketing";
 import { SELLER_SCHEDULED_SHOWS } from "@/lib/data/seller";
+import { SHIPPING_PRICES } from "@/lib/config/fees";
 import { getSeller } from "@/lib/data/shows";
 import { useAppStore } from "@/store/app-store";
 import {
@@ -167,7 +168,7 @@ export default function SellerStorefrontView() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => toast("یادآوری فعال شد 🔔")}
+                  onClick={() => toast("یادآوری فعال شد")}
                   className="shrink-0 rounded-lg border border-ls-purple/40 bg-ls-purple/15 px-2.5 py-1.5 text-[11px] font-bold text-ls-purple-soft transition-transform active:scale-[.98]"
                   aria-label={`یادآوری شو ${s.title}`}
                 >
@@ -228,10 +229,10 @@ export default function SellerStorefrontView() {
           )}
         </button>
 
-        {/* نکتهٔ هزینهٔ ارسال برای شفافیت لندینگ */}
+        {/* نکتهٔ هزینهٔ ارسال برای شفافیت لندینگ — قیمت از fees.ts */}
         <p className="text-center text-[10px] text-white/35">
           هزینهٔ ارسال هر آیتم در شو جداگانه اعلام می‌شود — معمولاً{" "}
-          {toman(45_000)} با تیپاکس
+          {toman(SHIPPING_PRICES.tipax)} با تیپاکس
         </p>
       </div>
     </div>

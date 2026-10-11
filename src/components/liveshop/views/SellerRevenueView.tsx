@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { BarChart3, CheckCircle2, Loader2, Wallet } from "lucide-react";
 import { faNum, toFa, toman } from "@/lib/format";
 import { COMMISSION_NOTE, SELLER_REVENUE } from "@/lib/data/seller";
+import { WITHDRAWAL_DEPOSIT_HOURS } from "@/lib/config/fees";
 import { useAppStore } from "@/store/app-store";
 import { PageHeader, SectionTitle } from "@/components/liveshop/shared";
 import {
@@ -60,7 +61,9 @@ function WithdrawDialog({
       timerRef.current = null;
       setProcessing(false);
       onOpenChange(false);
-      toast.success("درخواست برداشت ثبت شد — تا ۲۴ ساعت به شبا واریز می‌شود");
+      toast.success(
+        `درخواست برداشت ثبت شد — تا ${faNum(WITHDRAWAL_DEPOSIT_HOURS)} ساعت به شبا واریز می‌شود`
+      );
     }, 1000);
   };
 
@@ -106,7 +109,7 @@ function WithdrawDialog({
               </p>
             </div>
             <p className="text-center text-[11px] text-white/45">
-              واریز تا حداکثر ۲۴ ساعت — بدون کارمزد برداشت
+              واریز تا حداکثر {faNum(WITHDRAWAL_DEPOSIT_HOURS)} ساعت — بدون کارمزد برداشت
             </p>
             <button
               type="button"

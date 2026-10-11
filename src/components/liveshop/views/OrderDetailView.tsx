@@ -240,7 +240,7 @@ export default function OrderDetailView() {
           <button
             onClick={() => {
               setRated(order.id);
-              toast.success("امتیاز ۵ ستاره ثبت شد ⭐");
+              toast.success("امتیاز ۵ ستاره ثبت شد");
             }}
             className="w-full h-12 rounded-xl bg-ls-green text-sm font-black text-[#04281e] shadow-[0_8px_24px_rgba(0,200,150,.3)] transition-transform active:scale-[.98]"
             aria-label="ثبت امتیاز به فروشنده"

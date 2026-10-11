@@ -241,7 +241,8 @@ const STATUS_MAP: Record<
   { label: string; className: string }
 > = {
   auction: {
-    label: "در مزایده",
+    /* وضعیت auction فقط در حالت حراج رخ می‌دهد (کد حفظ‌شده) */
+    label: AUCTION_ENABLED ? "در مزایده" : "در شو",
     className: "bg-ls-purple text-white shadow-[0_0_14px_rgba(108,92,255,.45)]",
   },
   up_next: {

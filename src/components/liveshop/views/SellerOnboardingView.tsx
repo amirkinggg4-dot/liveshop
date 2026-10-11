@@ -372,7 +372,7 @@ export default function SellerOnboardingView() {
               }}
               onApproveDemo={() => {
                 approve();
-                toast.success("درخواست تأیید شد — فروشگاهت فعال است ✅");
+                toast.success("درخواست تأیید شد — فروشگاهت فعال است");
               }}
             />
           </>

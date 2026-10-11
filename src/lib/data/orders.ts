@@ -1,10 +1,12 @@
 import type { Order, ShippingMethod, ShippingMethodId } from "./types";
+import { SHIPPING_PRICES } from "@/lib/config/fees";
 
-/* ── روش‌های ارسال ایران (بومی‌سازی: تیپاکس، پست، پیک شهری) ── */
+/* ── روش‌های ارسال ایران (بومی‌سازی: تیپاکس، پست، پیک شهری) ──
+   v1.7.1 — قیمت‌ها از lib/config/fees.ts (تک منبع عدد) */
 export const SHIPPING_METHODS: ShippingMethod[] = [
-  { id: "tipax", label: "تیپاکس", price: 45_000, eta: "۲ تا ۳ روز کاری" },
-  { id: "post", label: "پست پیشتاز", price: 30_000, eta: "۳ تا ۵ روز کاری" },
-  { id: "peyk", label: "پیک شهری (تهران)", price: 25_000, eta: "همان روز" },
+  { id: "tipax", label: "تیپاکس", price: SHIPPING_PRICES.tipax, eta: "۲ تا ۳ روز کاری" },
+  { id: "post", label: "پست پیشتاز", price: SHIPPING_PRICES.post, eta: "۳ تا ۵ روز کاری" },
+  { id: "peyk", label: "پیک شهری (تهران)", price: SHIPPING_PRICES.peyk, eta: "همان روز" },
 ];
 
 export function getShippingMethod(id: ShippingMethodId): ShippingMethod {

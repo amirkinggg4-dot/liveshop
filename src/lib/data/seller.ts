@@ -1,4 +1,6 @@
 import type { Cover } from "./types";
+import { calcNetIncome, commissionPctFor, COMMISSION_TIERS, SHIPPING_PRICES } from "@/lib/config/fees";
+import { MY_GMV_MONTH } from "./seller-marketing";
 
 /* ─────────────────────────────────────────────────────────────
    LiveShop — داده‌های سمت فروشنده (فاز ۲ — Whatnot-Atlas)
@@ -124,9 +126,9 @@ export const SELLER_ORDERS: SellerOrder[] = [
     buyerColor: "#00C896",
     buyerVip: true,
     itemPrice: 5_200_000,
-    shippingPrice: 45_000,
+    shippingPrice: SHIPPING_PRICES.tipax,
     shippingMethod: "tipax",
-    total: 5_245_000,
+    total: 5_200_000 + SHIPPING_PRICES.tipax,
     status: "to_scan",
     scanByLabel: "۳ ساعت — نزدیک مهلت!",
     urgency: "late",
@@ -142,9 +144,9 @@ export const SELLER_ORDERS: SellerOrder[] = [
     buyerEmoji: "🌸",
     buyerColor: "#B45CFF",
     itemPrice: 1_800_000,
-    shippingPrice: 30_000,
+    shippingPrice: SHIPPING_PRICES.post,
     shippingMethod: "post",
-    total: 1_830_000,
+    total: 1_800_000 + SHIPPING_PRICES.post,
     status: "to_scan",
     scanByLabel: "۶ ساعت",
     urgency: "warn",
@@ -162,9 +164,9 @@ export const SELLER_ORDERS: SellerOrder[] = [
     buyerColor: "#FF3B8B",
     buyerVip: true,
     itemPrice: 4_800_000,
-    shippingPrice: 45_000,
+    shippingPrice: SHIPPING_PRICES.tipax,
     shippingMethod: "tipax",
-    total: 4_845_000,
+    total: 4_800_000 + SHIPPING_PRICES.tipax,
     status: "to_scan",
     scanByLabel: "۱ روز و ۴ ساعت",
     urgency: "ok",
@@ -181,9 +183,9 @@ export const SELLER_ORDERS: SellerOrder[] = [
     buyerEmoji: "🎀",
     buyerColor: "#6C5CFF",
     itemPrice: 380_000,
-    shippingPrice: 25_000,
+    shippingPrice: SHIPPING_PRICES.peyk,
     shippingMethod: "peyk",
-    total: 405_000,
+    total: 380_000 + SHIPPING_PRICES.peyk,
     status: "to_scan",
     scanByLabel: "۲ روز",
     urgency: "ok",
@@ -200,9 +202,9 @@ export const SELLER_ORDERS: SellerOrder[] = [
     buyerEmoji: "🧢",
     buyerColor: "#6C5CFF",
     itemPrice: 4_200_000,
-    shippingPrice: 45_000,
+    shippingPrice: SHIPPING_PRICES.tipax,
     shippingMethod: "tipax",
-    total: 4_245_000,
+    total: 4_200_000 + SHIPPING_PRICES.tipax,
     status: "shipped",
     scanByLabel: "به‌موقع اسکن شد",
     urgency: "ok",
@@ -220,9 +222,9 @@ export const SELLER_ORDERS: SellerOrder[] = [
     buyerEmoji: "🌵",
     buyerColor: "#00C896",
     itemPrice: 1_450_000,
-    shippingPrice: 30_000,
+    shippingPrice: SHIPPING_PRICES.post,
     shippingMethod: "post",
-    total: 1_480_000,
+    total: 1_450_000 + SHIPPING_PRICES.post,
     status: "shipped",
     scanByLabel: "به‌موقع اسکن شد",
     urgency: "ok",
@@ -240,9 +242,9 @@ export const SELLER_ORDERS: SellerOrder[] = [
     buyerEmoji: "🎀",
     buyerColor: "#6C5CFF",
     itemPrice: 3_900_000,
-    shippingPrice: 25_000,
+    shippingPrice: SHIPPING_PRICES.peyk,
     shippingMethod: "peyk",
-    total: 3_925_000,
+    total: 3_900_000 + SHIPPING_PRICES.peyk,
     status: "completed",
     scanByLabel: "به‌موقع اسکن شد",
     urgency: "ok",
@@ -262,9 +264,9 @@ export const SELLER_ORDERS: SellerOrder[] = [
     buyerColor: "#FF3B8B",
     buyerVip: true,
     itemPrice: 3_600_000,
-    shippingPrice: 45_000,
+    shippingPrice: SHIPPING_PRICES.tipax,
     shippingMethod: "tipax",
-    total: 3_645_000,
+    total: 3_600_000 + SHIPPING_PRICES.tipax,
     status: "issue",
     scanByLabel: "۱ روز برای پاسخ",
     urgency: "warn",
@@ -307,34 +309,45 @@ export interface SellerRevenue {
   payouts: SellerPayout[];
 }
 
-export const SELLER_REVENUE: SellerRevenue = {
-  available: 12_405_000,
-  pendingClearing: 8_802_000,
-  lifetime: 482_130_000,
-  nextPayoutLabel: "پنج‌شنبه — تسویهٔ خودکار هفتگی",
-  shebaMasked: "IR۶۲۰۴ **** ۴۵۰۹ **** ۲۱",
-  lastShow: {
-    title: "شب کتونی‌های کمیاب",
-    gross: 21_500_000,
-    commissionPct: 8,
-    commission: 1_720_000,
-    processingPct: 2.9,
-    processingFlat: 30_000,
-    processing: 653_500,
-    net: 19_126_500,
-  },
-  tiers: [
-    { label: "تا ۱۰۰ میلیون تومان فروش", pct: 8 },
-    { label: "بعد از ۱۰۰ میلیون تومان", pct: 5 },
-    { label: "بعد از ۵۰۰ میلیون تومان", pct: 3 },
-  ],
-  payouts: [
-    { id: "po1", amount: 19_126_500, atLabel: "هفتهٔ قبل", method: "شبا", status: "واریز شد" },
-    { id: "po2", amount: 17_480_000, atLabel: "۲ هفتهٔ قبل", method: "شبا", status: "واریز شد" },
-    { id: "po3", amount: 15_930_000, atLabel: "۳ هفتهٔ قبل", method: "شبا", status: "واریز شد" },
-    { id: "po4", amount: 21_640_000, atLabel: "۴ هفتهٔ قبل", method: "شبا", status: "واریز شد" },
-  ],
-};
+export const SELLER_REVENUE: SellerRevenue = (() => {
+  /* v1.7.1 — همهٔ اعداد کارمزد از lib/config/fees.ts محاسبه می‌شوند:
+     کمیسیون پلکانی (بر اساس فروش ماهانه) + پردازش درگاه؛ خالص شو هم
+     همان فرمول ماشین‌حساب «نرخ‌های من» است. */
+  const lastShowCalc = calcNetIncome(21_500_000, MY_GMV_MONTH);
+  const tierLabel = (i: number) => {
+    const t = COMMISSION_TIERS[i];
+    if (t.upTo == null) return "بالای ۱۵۰ میلیون تومان فروش";
+    if (i === 0) return `تا ${t.upTo / 1_000_000} میلیون تومان فروش`;
+    return `${COMMISSION_TIERS[i - 1].upTo! / 1_000_000} تا ${t.upTo / 1_000_000} میلیون تومان فروش`;
+  };
+  return {
+    available: 12_405_000,
+    pendingClearing: 8_802_000,
+    lifetime: 482_130_000,
+    nextPayoutLabel: "پنج‌شنبه — تسویهٔ خودکار هفتگی",
+    shebaMasked: "IR۶۲۰۴ **** ۴۵۰۹ **** ۲۱",
+    lastShow: {
+      title: "شب کتونی‌های کمیاب",
+      gross: lastShowCalc.price,
+      commissionPct: lastShowCalc.commissionPct,
+      commission: lastShowCalc.commission,
+      processingPct: 2.9,
+      processingFlat: 30_000,
+      processing: lastShowCalc.processing,
+      net: lastShowCalc.net,
+    },
+    tiers: COMMISSION_TIERS.map((t, i) => ({
+      label: tierLabel(i),
+      pct: commissionPctFor(t.upTo == null ? Number.MAX_SAFE_INTEGER : t.upTo),
+    })),
+    payouts: [
+      { id: "po1", amount: lastShowCalc.net, atLabel: "هفتهٔ قبل", method: "شبا", status: "واریز شد" },
+      { id: "po2", amount: 17_480_000, atLabel: "۲ هفتهٔ قبل", method: "شبا", status: "واریز شد" },
+      { id: "po3", amount: 15_930_000, atLabel: "۳ هفتهٔ قبل", method: "شبا", status: "واریز شد" },
+      { id: "po4", amount: 21_640_000, atLabel: "۴ هفتهٔ قبل", method: "شبا", status: "واریز شد" },
+    ],
+  };
+})();
 
 /* ── اطلاعات تکمیلی انبار — keyed by SKU از ITEMS_SH1 ──
    SNK-A101 دَنک پاندا / A102 سامبا / A103 جردن ۱ / A104 نیوبالانس ۵۳۰
@@ -422,6 +435,5 @@ export const HUB_STATS = {
   defectFreePct: 97,
 } as const;
 
-/* ── توضیح پلکان کارمزد ── */
-export const COMMISSION_NOTE =
-  "پلکان کارمزد: با رشد فروش کل، کمیسیون از ۸٪ به ۵٪ و سپس ۳٪ می‌رسد — آستانه‌ها در همین صفحه شفاف است.";
+/* ── توضیح پلکان کارمزد — اعداد از fees.ts ── */
+export const COMMISSION_NOTE = `پلکان کارمزد: با رشد فروش کل، کمیسیون از ${COMMISSION_TIERS[0].pct}٪ به ${COMMISSION_TIERS[1].pct}٪ و سپس ${COMMISSION_TIERS[2].pct}٪ می‌رسد — آستانه‌ها در همین صفحه شفاف است.`;

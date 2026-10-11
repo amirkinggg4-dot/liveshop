@@ -251,7 +251,7 @@ export default function ProductView() {
 
         {item.status === "up_next" && (
           <button
-            onClick={() => toast("یادآوری فعال شد 🔔")}
+            onClick={() => toast("یادآوری فعال شد")}
             className="w-full h-12 rounded-xl border border-ls-pink/60 text-sm font-extrabold text-ls-pink hover:bg-ls-pink/10 transition-colors"
             aria-label="فعال‌سازی یادآوری برای آیتم بعدی"
           >
@@ -278,7 +278,7 @@ export default function ProductView() {
             <button
               onClick={() => {
                 setBidOpen(false);
-                toast.success("بید تو ثبت شد ✅");
+                toast.success("بید تو ثبت شد");
               }}
               className="flex-1 h-11 rounded-xl bg-ls-purple text-sm font-extrabold text-white transition-transform active:scale-[.98]"
             >

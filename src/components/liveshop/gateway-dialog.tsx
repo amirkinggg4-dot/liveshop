@@ -121,7 +121,7 @@ export default function GatewayDialog({
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       charge(parsedAmount, gateway);
-      toast.success("کیف پول شارژ شد ✅");
+      toast.success("کیف پول شارژ شد");
       setStep("success");
     }, 1200);
   };

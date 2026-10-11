@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Check, Lock, Trash2, Wallet } from "lucide-react";
 import { DANGER, NOTIF_PREFS, SHEBA_MASKED } from "@/lib/data/seller-marketing";
 import type { NotifPref } from "@/lib/data/seller-marketing";
+import { SHIPPING_DEADLINE_HOURS } from "@/lib/config/fees";
 import { useAppStore } from "@/store/app-store";
 import { PageHeader, SectionTitle } from "@/components/liveshop/shared";
 import { Switch } from "@/components/ui/switch";
@@ -28,7 +29,7 @@ import { cn } from "@/lib/utils";
    ───────────────────────────────────────────────────────────── */
 
 const SHIPPING_OPTIONS = [
-  { id: "tipax", label: "تیپاکس", emoji: "🚚", desc: "ارسال ۲۴ ساعته — پوشش سراسری" },
+  { id: "tipax", label: "تیپاکس", emoji: "🚚", desc: `ارسال ${SHIPPING_DEADLINE_HOURS} ساعته — پوشش سراسری` },
   { id: "post", label: "پست پیشتاز", emoji: "📮", desc: "اقتصادی برای شهرستان‌ها" },
   { id: "peyk", label: "پیک شهری", emoji: "🛵", desc: "سریع، داخل همان شهر" },
 ] as const;
@@ -214,7 +215,7 @@ export default function SellerSettingsView() {
                 <AlertDialogFooter className="flex-row-reverse gap-2 sm:flex-row-reverse">
                   <AlertDialogAction
                     className="flex-1 bg-[#FF3B5C] text-white hover:bg-[#FF3B5C]/90"
-                    onClick={() => toast("دمو — حسابی حذف نشد 😌")}
+                    onClick={() => toast("دمو — حسابی حذف نشد")}
                   >
                     {DANGER.confirmLabel}
                   </AlertDialogAction>

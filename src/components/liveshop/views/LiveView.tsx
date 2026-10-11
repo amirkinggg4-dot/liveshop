@@ -771,7 +771,7 @@ function ProductDock({ showId, show }: { showId: string; show: Show }) {
             <button
               onClick={(e) => {
                 stop(e);
-                toast("یادآوری فعال شد 🔔");
+                toast("یادآوری فعال شد");
               }}
               className="ms-auto rounded-xl border border-white/15 px-4 py-2 text-sm font-bold text-white/80 hover:bg-white/5 active:scale-[.98] transition-all"
               aria-label="یادآوری آیتم بعدی"

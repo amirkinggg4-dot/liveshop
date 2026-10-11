@@ -196,7 +196,7 @@ export default function ProfileView() {
         <MenuRow
           icon={Info}
           title="دربارهٔ LiveShop"
-          onClick={() => toast("نسخهٔ ۱٫۰ — دمو")}
+          onClick={() => toast("LiveShop — دمو")}
         />
       </nav>
     </div>

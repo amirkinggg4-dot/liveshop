@@ -1,9 +1,12 @@
 import type { Cover } from "./types";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ─────────────────────────────────────────────────────────────
    LiveShop — فاز ۳ (P1) — باشگاه ریواردز (تصاویر ۳۳+۲۱)،
    پیش‌بید شوهای آینده و ضمانت خریدار/اختلافات (تصویر ۰۵).
    همهٔ مبالغ به «تومان» و اعداد ساده (فارسی‌سازی در UI با toFa/faNum).
+   v1.7.1 — نشان‌ها/مأموریت‌ها/مزایا برای فروش قیمت ثابت بازنویسی
+   شده‌اند؛ نسخهٔ حراج با همان ساختار پشت AUCTION_ENABLED حفظ می‌شود.
    ───────────────────────────────────────────────────────────── */
 
 /* ── پروفایل ریواردز خریدار ── */
@@ -32,11 +35,17 @@ export const REWARD_TIERS: RewardTier[] = [
   {
     label: "برنزی",
     min: 0,
-    perks: [
-      "دسترسی به همهٔ شوهای عمومی",
-      "مزایده و خرید فوری استاندارد",
-      "نشان برنزی کنار اسم",
-    ],
+    perks: AUCTION_ENABLED
+      ? [
+          "دسترسی به همهٔ شوهای عمومی",
+          "مزایده و خرید فوری استاندارد",
+          "نشان برنزی کنار اسم",
+        ]
+      : [
+          "دسترسی به همهٔ شوهای عمومی",
+          "خرید با قیمت ثابت در همهٔ لایوها",
+          "نشان برنزی کنار اسم",
+        ],
   },
   {
     label: "نقره‌ای",
@@ -79,12 +88,27 @@ export interface RewardBadge {
   howToEarn?: string;
 }
 
-export const REWARD_BADGES: RewardBadge[] = [
+const AUCTION_BADGES: RewardBadge[] = [
   { id: "bg1", emoji: "🥇", label: "اولین مزایدهٔ برده", earned: true, earnedAtLabel: "۳ هفته پیش" },
-  { id: "bg2", emoji: "🛍", label: "اولین خرید لایو", earned: true, earnedAtLabel: "۲ هفته پیش" },
+  { id: "bg5", emoji: "💎", label: "کلکسیونر الماسی", earned: false, howToEarn: "۱۰ مزایده را ببر" },
+];
+
+const FIXED_BADGES: RewardBadge[] = [
+  { id: "bg1", emoji: "🥇", label: "اولین خرید لایو", earned: true, earnedAtLabel: "۳ هفته پیش" },
+  { id: "bg5", emoji: "💎", label: "کلکسیونر الماسی", earned: false, howToEarn: "۱۰ خرید لایو" },
+];
+
+export const REWARD_BADGES: RewardBadge[] = [
+  ...(AUCTION_ENABLED ? AUCTION_BADGES : FIXED_BADGES),
+  {
+    id: "bg2",
+    emoji: "🛍",
+    label: AUCTION_ENABLED ? "اولین خرید لایو" : "پنجمین خرید لایو",
+    earned: true,
+    earnedAtLabel: "۲ هفته پیش",
+  },
   { id: "bg3", emoji: "🔥", label: "استریک ۴ هفته‌ای", earned: true, earnedAtLabel: "هفتهٔ پیش" },
   { id: "bg4", emoji: "⭐", label: "حاضر در ۳۰ شو", earned: true, earnedAtLabel: "این هفته" },
-  { id: "bg5", emoji: "💎", label: "کلکسیونر الماسی", earned: false, howToEarn: "۱۰ مزایده را ببر" },
   { id: "bg6", emoji: "🎁", label: "مهمان‌نواز", earned: false, howToEarn: "۳ دوست را دعوت کن" },
   { id: "bg7", emoji: "🕵", label: "خریدار دقیق", earned: false, howToEarn: "۵ خرید بدون اختلاف ثبت کن" },
   { id: "bg8", emoji: "👑", label: "تاج طلایی", earned: false, howToEarn: "به سطح طلایی برس" },
@@ -101,6 +125,46 @@ export interface RewardTask {
   progressLabel?: string;
   ready?: boolean;
 }
+
+const AUCTION_TASKS: RewardTask[] = [
+  {
+    id: "rt3",
+    title: "شرکت در ۵ مزایده",
+    desc: "در ۵ مزایدهٔ زنده حداقل یک بید ثبت کن",
+    points: 40,
+    claimed: false,
+    progressLabel: "۵ از ۵ مزایده ✅",
+    ready: true,
+  },
+  {
+    id: "rt4",
+    title: "خرید با پیش‌بید",
+    desc: "روی یک شو آینده پیش‌بید ثبت کن و برنده شو",
+    points: 60,
+    claimed: false,
+    progressLabel: "۰ از ۱",
+  },
+];
+
+const FIXED_TASKS: RewardTask[] = [
+  {
+    id: "rt3",
+    title: "خرید در ۵ شو زنده",
+    desc: "در ۵ شو زنده حداقل یک خرید با قیمت ثابت انجام بده",
+    points: 40,
+    claimed: false,
+    progressLabel: "۵ از ۵ شو ✅",
+    ready: true,
+  },
+  {
+    id: "rt4",
+    title: "یادآور شو آینده",
+    desc: "برای یک شو آینده یادآور بگذار و در همان شو خرید کن",
+    points: 60,
+    claimed: false,
+    progressLabel: "۰ از ۱",
+  },
+];
 
 export const REWARD_TASKS: RewardTask[] = [
   {
@@ -120,23 +184,7 @@ export const REWARD_TASKS: RewardTask[] = [
     progressLabel: "۳ از ۳ شو ✅",
     ready: true,
   },
-  {
-    id: "rt3",
-    title: "شرکت در ۵ مزایده",
-    desc: "در ۵ مزایدهٔ زنده حداقل یک بید ثبت کن",
-    points: 40,
-    claimed: false,
-    progressLabel: "۵ از ۵ مزایده ✅",
-    ready: true,
-  },
-  {
-    id: "rt4",
-    title: "خرید با پیش‌بید",
-    desc: "روی یک شو آینده پیش‌بید ثبت کن و برنده شو",
-    points: 60,
-    claimed: false,
-    progressLabel: "۰ از ۱",
-  },
+  ...(AUCTION_ENABLED ? AUCTION_TASKS : FIXED_TASKS),
   {
     id: "rt5",
     title: "۵ هفته استریک پیوسته",

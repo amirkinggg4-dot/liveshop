@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   Copy,
+  Layers,
   Lock,
   Minus,
   Pencil,
@@ -33,7 +34,6 @@ import {
 import { INVENTORY_EXTRAS } from "@/lib/data/seller";
 import { cn } from "@/lib/utils";
 import { faNum, toFa } from "@/lib/format";
-import { formatFaThousands } from "@/lib/fa-number";
 import { getShow } from "@/lib/data/shows";
 import type { ShopItem } from "@/lib/data/types";
 import {
@@ -44,18 +44,19 @@ import {
   Chip,
   EmptyState,
 } from "@/components/liveshop/shared";
-import { FaNumberInput } from "@/components/liveshop/fa-number-input";
 import { AUCTION_ENABLED, LOW_STOCK_THRESHOLD } from "@/lib/config";
 import { ITEM_PHOTO } from "@/lib/data/media";
+import { ProductEditDialog } from "@/components/liveshop/product-edit-dialog";
 
 /* ─────────────────────────────────────────────────────────────
-   انبار کالا — v1.7.0 (بخش ۶ قرارداد API: CRUD /seller/products)
+   انبار کالا — v1.7.1 (بخش ۶ قرارداد API: CRUD /seller/products)
    ─ عکس اصلی کالا (fallback = گرادیان + ایموجی)
-   ─ ویرایش (عنوان/قیمت/موجودی)، کپی و حذف با دیالوگ تأیید
-   ─ موجودی سریع هر گزینهٔ سایز/رنگ جدا با +/−
+   ─ دیالوگ کامل ویرایش کالا: همهٔ فیلدهای لیستینگ
+     (product-edit-dialog.tsx) + کپی و حذف با دیالوگ تأیید
+   ─ موجودی سریع هر گزینهٔ سایز/رنگ جدا با +/− («ویرایش موجودی»)
    ─ هشدار و فیلتر «موجودی کم» (کمتر از ۳)
    ─ کالای در شو فعال قفل می‌ماند (همان رفتار قبلی)
-   ─ «قفل ویرایش» و وزن در دو خط جدا — روی هم نمی‌افتند
+   ─ عنوان کالا حداکثر ۲ خط، بدون «…»
    ───────────────────────────────────────────────────────────── */
 
 function priceOf(item: ShopItem): number {
@@ -75,141 +76,6 @@ function isInShow(item: ShopItem): boolean {
 }
 function isSoldOut(item: ShopItem): boolean {
   return item.status === "sold" || item.stock <= 0;
-}
-
-/* ═══ دیالوگ ویرایش کالا — عنوان + قیمت + موجودی با ورودی عددی فارسی ═══ */
-function EditItemDialog({
-  item,
-  onClose,
-}: {
-  item: ShopItem;
-  onClose: () => void;
-}) {
-  const updateItem = useSellerInventoryStore((s) => s.updateItem);
-  const [title, setTitle] = useState(item.title);
-  const [price, setPrice] = useState(item.price);
-  const [stock, setStock] = useState(item.stock);
-
-  const save = () => {
-    if (!title.trim()) {
-      toast.error("عنوان کالا را وارد کن");
-      return;
-    }
-    if (price <= 0) {
-      toast.error("قیمت باید بیشتر از صفر باشد");
-      return;
-    }
-    if (stock <= 0) {
-      toast.error("موجودی باید حداقل ۱ عدد باشد");
-      return;
-    }
-    /* موجودی بدون واریانت مستقیم؛ با واریانت‌ها از جمع خودکار می‌آید */
-    updateItem(item.id, {
-      title: title.trim(),
-      price,
-      ...(item.variants && item.variants.length > 0 ? {} : { stock }),
-    });
-    toast.success("تغییرات کالا ذخیره شد ✅");
-    onClose();
-  };
-
-  return (
-    <AlertDialog open onOpenChange={(v) => !v && onClose()}>
-      <AlertDialogContent
-        className="max-h-[85vh] overflow-y-auto scroll-thin rounded-2xl border-white/10 bg-ls-card sm:max-w-sm"
-        aria-label={`ویرایش کالا ${item.title}`}
-      >
-        <AlertDialogHeader className="text-right sm:text-right">
-          <AlertDialogTitle>ویرایش کالا</AlertDialogTitle>
-          <AlertDialogDescription className="text-xs leading-5">
-            {isItemLocked(item)
-              ? "این کالا در شو فعال است — ویرایش قفل است."
-              : "تغییرات بلافاصله در انبار اعمال می‌شود."}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {isItemLocked(item) ? (
-          <p
-            className="flex items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 text-xs font-bold text-amber-300"
-            role="alert"
-          >
-            <Lock className="h-4 w-4" aria-hidden />
-            کالای «در شو فعال» قفل است — بعد از پایان شو ویرایش آزاد می‌شود.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label htmlFor="edit-title" className="block text-xs font-bold text-white/70">
-                عنوان
-              </label>
-              <Input
-                id="edit-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                aria-label="عنوان کالا"
-                className="h-10 rounded-xl border-white/10 bg-ls-card-2 text-sm"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="edit-price" className="block text-xs font-bold text-white/70">
-                قیمت (تومان)
-              </label>
-              <FaNumberInput
-                id="edit-price"
-                value={price}
-                onValueChange={setPrice}
-                suffix="تومان"
-                ariaLabel="قیمت کالا به تومان"
-                className="w-full"
-              />
-              <p className="text-[10px] text-white/40 tabular-nums">
-                نمایش: {formatFaThousands(price)} تومان
-              </p>
-            </div>
-            {(!item.variants || item.variants.length === 0) && (
-              <div className="space-y-1.5">
-                <label htmlFor="edit-stock" className="block text-xs font-bold text-white/70">
-                  موجودی (عدد)
-                </label>
-                <FaNumberInput
-                  id="edit-stock"
-                  value={stock}
-                  onValueChange={setStock}
-                  suffix="عدد"
-                  ariaLabel="موجودی کالا به عدد"
-                  className="w-full"
-                />
-              </div>
-            )}
-            {item.variants && item.variants.length > 0 && (
-              <p className="rounded-xl bg-ls-card-2 p-2.5 text-[11px] leading-5 text-white/55">
-                این کالا گزینهٔ سایز/رنگ دارد — موجودی هر گزینه را از ردیف کالا
-                در انبار با «+/−» تغییر بده.
-              </p>
-            )}
-          </div>
-        )}
-
-        <AlertDialogFooter className="flex-row-reverse gap-2 sm:justify-start">
-          {!isItemLocked(item) && (
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                save();
-              }}
-              className="bg-ls-purple text-white hover:bg-ls-purple-deep"
-              aria-label="ذخیرهٔ تغییرات کالا"
-            >
-              ذخیره
-            </AlertDialogAction>
-          )}
-          <AlertDialogCancel className="border-white/15 bg-transparent text-white/70">
-            بستن
-          </AlertDialogCancel>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
 }
 
 /* ═══ ردیف موجودی گزینهٔ سایز با +/− سریع ═══ */
@@ -251,7 +117,7 @@ function VariantStockRow({
           type="button"
           onClick={() => {
             if (disabled) {
-              toast("آیتم در شو فعال است — ویرایش قفل است 🔒");
+              toast("آیتم در شو فعال است — ویرایش قفل است");
               return;
             }
             adjustVariantStock(itemId, label, -1);
@@ -266,7 +132,7 @@ function VariantStockRow({
           type="button"
           onClick={() => {
             if (disabled) {
-              toast("آیتم در شو فعال است — ویرایش قفل است 🔒");
+              toast("آیتم در شو فعال است — ویرایش قفل است");
               return;
             }
             adjustVariantStock(itemId, label, +1);
@@ -345,7 +211,7 @@ export default function SellerInventoryView() {
   const onDuplicate = (item: ShopItem) => {
     const copy = duplicateItem(item.id);
     if (copy) {
-      toast.success(`رونوشت «${item.title}» در انبار ساخته شد ✅`);
+      toast.success(`رونوشت «${item.title}» در انبار ساخته شد`);
     }
   };
 
@@ -525,8 +391,9 @@ export default function SellerInventoryView() {
                       photo={ITEM_PHOTO[item.id]}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="block font-bold text-sm truncate min-w-0">
+                      <div className="flex items-start gap-1.5">
+                        {/* v1.7.1 — عنوان حداکثر ۲ خط، بدون «…» */}
+                        <span className="block font-bold text-sm line-clamp-2 break-words min-w-0">
                           {item.title}
                         </span>
                         {low && (
@@ -611,12 +478,11 @@ export default function SellerInventoryView() {
                         type="button"
                         onClick={() => setExpandedId(expanded ? null : item.id)}
                         aria-expanded={expanded}
-                        aria-label={`${expanded ? "بستن" : "نمایش"} موجودی گزینه‌های ${item.title}`}
+                        aria-label={`${expanded ? "بستن" : "نمایش"} ویرایش موجودی گزینه‌های ${item.title}`}
                         className="flex items-center gap-1 rounded-lg border border-ls-green/40 bg-ls-green/10 px-2.5 py-1.5 text-[11px] font-bold text-ls-green hover:bg-ls-green/20 transition-colors active:scale-[.98]"
                       >
-                        <Plus className="h-3 w-3" aria-hidden />
-                        <Minus className="h-3 w-3 -ms-1.5" aria-hidden />
-                        موجودی هر سایز
+                        <Layers className="h-3 w-3" aria-hidden />
+                        ویرایش موجودی
                       </button>
                     )}
                     <button
@@ -632,7 +498,7 @@ export default function SellerInventoryView() {
                       type="button"
                       onClick={() => {
                         if (locked) {
-                          toast("آیتم در شو فعال است — حذف قفل است 🔒");
+                          toast("آیتم در شو فعال است — حذف قفل است");
                           return;
                         }
                         setDeleteFor(item.id);
@@ -690,7 +556,7 @@ export default function SellerInventoryView() {
       </div>
 
       {/* ═══ دیالوگ ویرایش کالا ═══ */}
-      {editItem && <EditItemDialog item={editItem} onClose={() => setEditFor(null)} />}
+      {editItem && <ProductEditDialog item={editItem} onClose={() => setEditFor(null)} />}
 
       {/* ═══ دیالوگ تأیید حذف کالا ═══ */}
       <AlertDialog

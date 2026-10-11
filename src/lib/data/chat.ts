@@ -36,7 +36,7 @@ export const CHAT_SH1: ChatMessage[] = [
     author: "reza_vault",
     emoji: "💎",
     color: "#00C896",
-    text: "دیشب آسیکس رو بردم، کیفیت بسته‌بندی عالی بود 🔥",
+    text: "دیشب آسیکس خریدم از لایو، کیفیت بسته‌بندی عالی بود 🔥",
     kind: "normal",
     time: "۲۱:۰۷",
   },

@@ -40,9 +40,12 @@ interface DashEvent {
   tipAmount?: number;
 }
 
-/** بج نوع رویداد */
+/** بج نوع رویداد — بج «مزایده» فقط در حالت حراج رخ می‌دهد (رویدادهای auction) */
 const KIND_BADGE: Record<Exclude<DashEventKind, "other">, { label: string; cls: string }> = {
-  auction: { label: "مزایده", cls: "bg-ls-purple/15 text-ls-purple-soft" },
+  auction: {
+    label: AUCTION_ENABLED ? "مزایده" : "فروش",
+    cls: "bg-ls-purple/15 text-ls-purple-soft",
+  },
   sale: { label: "فروش", cls: "bg-ls-green/15 text-ls-green" },
   giveaway: { label: "گیواوی", cls: "bg-ls-pink/15 text-ls-pink" },
   tip: { label: "انعام", cls: "bg-ls-green/15 text-ls-green" },
@@ -153,7 +156,8 @@ export default function SellerLiveDashboard({
           ? "sale"
           : m.kind === "giveaway"
             ? "giveaway"
-            : m.author === "Max Bid" || m.text.startsWith("بید ")
+            : (AUCTION_ENABLED &&
+                (m.author === "Max Bid" || m.text.startsWith("بید ")))
               ? "auction"
               : "other",
       author: m.author,
@@ -378,7 +382,7 @@ export default function SellerLiveDashboard({
               <button
                 onClick={() => {
                   addTip(500_000, "بینندهٔ مهمان");
-                  toast("انعام ثبت شد و در چت نمایش داده شد 💚");
+                  toast("انعام ثبت شد و در چت نمایش داده شد");
                 }}
                 className="mt-3 w-full py-2 rounded-xl border border-ls-green/40 text-ls-green text-xs font-bold hover:bg-ls-green/10 active:scale-[.99] transition-all"
                 aria-label="ثبت انعام نمایشی"

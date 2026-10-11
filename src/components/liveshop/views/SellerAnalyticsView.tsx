@@ -244,7 +244,7 @@ export default function SellerAnalyticsView() {
             })}
           </div>
           <p className="mt-3 text-[11px] text-white/50">
-            تبدیل کل: ٪{faDec(overallConv)} — از بازدید شو تا برنده
+            تبدیل کل: ٪{faDec(overallConv)} — از بازدید شو تا خریدار
           </p>
         </div>
 

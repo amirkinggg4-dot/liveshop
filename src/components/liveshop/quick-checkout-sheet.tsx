@@ -121,7 +121,7 @@ export default function QuickCheckoutSheet({
     }
     /* موفقیت — کانفتی کوتاه + پیام «خرید شما ثبت شد» */
     setCelebrate((k) => k + 1);
-    toast.success("خرید شما ثبت شد 🎉 — پول تا لحظهٔ تحویل امانت است");
+    toast.success("خرید شما ثبت شد — پول تا لحظهٔ تحویل امانت است");
     onOpenChange(false);
   };
 

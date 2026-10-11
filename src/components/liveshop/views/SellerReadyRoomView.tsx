@@ -9,6 +9,7 @@ import {
   Mic,
   MicOff,
   PlayCircle,
+  Radio,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -74,7 +75,10 @@ export default function SellerReadyRoomView() {
   };
 
   const goLive = () => {
-    toast.success("پخش زنده شروع شد 🔴");
+    /* v1.7.1 — بدون ایموجی؛ آیکون Radio جایگزین 🔴 شد */
+    toast.success("پخش زنده شروع شد", {
+      icon: <Radio className="h-4 w-4 text-ls-pink" aria-hidden />,
+    });
     openShow("sh1");
   };
 
@@ -195,7 +199,7 @@ export default function SellerReadyRoomView() {
                     </p>
                     {idx === 0 && (
                       <span className="shrink-0 text-[9px] font-black rounded px-1.5 py-0.5 bg-amber-300/15 text-amber-300 border border-amber-300/30">
-                        بعدی (UP NEXT)
+                        بعدی
                       </span>
                     )}
                   </div>

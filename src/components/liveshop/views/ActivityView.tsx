@@ -19,7 +19,9 @@ import { AUCTION_ENABLED } from "@/lib/config";
 
 type TabId = "bids" | "offers" | "history";
 
-/* چیپ وضعیت بید — پیشتاز سبز درخشان / باخت خاکستری */
+/* چیپ وضعیت بید — پیشتاز سبز درخشان / باخت خاکستری
+   v1.7.1 — برچسب برنده در حالت قیمت ثابت «خرید موفق» است
+   (تاریخچهٔ حالت ثابت = خریدهای mock) */
 const BID_CHIP: Record<BidStatus, { label: string; cls: string }> = {
   leading: {
     label: "پیشتاز",
@@ -30,7 +32,7 @@ const BID_CHIP: Record<BidStatus, { label: string; cls: string }> = {
     cls: "bg-ls-pink/15 text-ls-pink border border-ls-pink/40",
   },
   won: {
-    label: "برنده شدی",
+    label: AUCTION_ENABLED ? "برنده شدی" : "خرید موفق",
     cls: "bg-ls-purple text-white shadow-[0_0_12px_rgba(108,92,255,.4)]",
   },
   lost: {
@@ -72,7 +74,9 @@ const EMPTY_STATE: Record<TabId, { emoji: string; title: string; desc: string }>
   history: {
     emoji: "🗂️",
     title: "تاریخچه خالی است",
-    desc: "بردها، باخت‌ها و پیشنهادهای بسته‌شده اینجا آرشیو می‌شوند.",
+    desc: AUCTION_ENABLED
+      ? "بردها، باخت‌ها و پیشنهادهای بسته‌شده اینجا آرشیو می‌شوند."
+      : "خریدها و پیشنهادهای بسته‌شده اینجا آرشیو می‌شوند.",
   },
 };
 
@@ -85,7 +89,7 @@ function ActiveBidCard({ bid }: { bid: MyBidEntry }) {
   const onBump = () => {
     const res = bumpBid(bid.id);
     if (res.ok) {
-      toast.success("بید جدید ثبت شد ✅");
+      toast.success("بید جدید ثبت شد");
     } else {
       toast.error(res.error ?? "ثبت بید ممکن نشد");
     }
@@ -318,7 +322,7 @@ export default function ActivityView() {
             <TabsTrigger
               value="history"
               className="rounded-lg text-xs font-bold text-white/60 data-[state=active]:bg-ls-purple data-[state=active]:text-white"
-              aria-label="تاریخچهٔ بردها و باخت‌ها"
+              aria-label={AUCTION_ENABLED ? "تاریخچهٔ بردها و باخت‌ها" : "تاریخچهٔ خریدها"}
             >
               تاریخچه
             </TabsTrigger>
@@ -377,7 +381,7 @@ export default function ActivityView() {
             ) : (
               <ul
                 className="max-h-96 space-y-2 overflow-y-auto scroll-thin pl-1"
-                aria-label="تاریخچهٔ بردها، باخت‌ها و پیشنهادهای بسته‌شده"
+                aria-label={AUCTION_ENABLED ? "تاریخچهٔ بردها، باخت‌ها و پیشنهادهای بسته‌شده" : "تاریخچهٔ خریدها و پیشنهادهای بسته‌شده"}
               >
                 {historyBids.map((b) => (
                   <li

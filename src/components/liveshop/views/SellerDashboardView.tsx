@@ -302,7 +302,7 @@ export default function SellerDashboardView() {
             title="شو بعدی"
             desc="پنج‌شنبه ۲۱:۰۰ — شب کتونی ۲"
             onClick={() =>
-              toast("یادآوری فعال شد: پنج‌شنبه ۲۱:۰۰ — شب کتونی ۲ 🕒")
+              toast("یادآوری فعال شد: پنج‌شنبه ۲۱:۰۰ — شب کتونی ۲")
             }
             ariaLabel="شو بعدی، یادآوری"
           />

@@ -1,4 +1,5 @@
 import type { Cover } from "./types";
+import { AUCTION_ENABLED } from "@/lib/config";
 
 /* ─────────────────────────────────────────────────────────────
    LiveShop — داده‌های سمت خریدار (فاز ۳ — P1 · Whatnot-Atlas)
@@ -217,8 +218,10 @@ export const SAVED_SEARCHES: SavedSearch[] = [
   },
 ];
 
-/* ─────────────────────────── seed اعلان‌ها ─────────────────────────── */
-export const INBOX_NOTIFICATIONS: InboxNotification[] = [
+/* ─────────────────────────── seed اعلان‌ها ───────────────────────────
+   v1.7.1 — دو واریانت: اعلان‌های حالت حراج (پشت AUCTION_ENABLED) و
+   اعلان‌های حالت قیمت ثابت؛ شکل/تعداد/آیدی‌ها هم‌شکل تا UI بی‌تغییر بماند. */
+const AUCTION_NOTIFICATIONS: InboxNotification[] = [
   {
     id: "n1",
     kind: "bid",
@@ -299,17 +302,106 @@ export const INBOX_NOTIFICATIONS: InboxNotification[] = [
     emoji: "📣",
     color: "#6C5CFF",
   },
+];
+
+/* اعلان‌های حالت قیمت ثابت — بدون هیچ واژه‌ای از حراج */
+const FIXED_NOTIFICATIONS: InboxNotification[] = [
+  {
+    id: "n1",
+    kind: "system",
+    title: "کالای محبوب دارد تمام می‌شود 🔔",
+    body: "در «شب کتونی‌های کمیاب» روی نایک دَنک لو فقط ۲ عدد مانده — اگر می‌خواهی، همین حالا از لایو بخر!",
+    atLabel: "۲ دقیقه پیش",
+    unread: true,
+    emoji: "🔔",
+    color: "#FF3B8B",
+  },
+  {
+    id: "n2",
+    kind: "payment",
+    title: "خریدت ثبت شد 🏆",
+    body: "ساعت مچی کاسیو ادیس از «عطر و نگین» با ۲٬۴۰۰٬۰۰۰ تومان خریداری شد — پرداخت از صفحهٔ سفارش کامل است.",
+    atLabel: "۱ ساعت پیش",
+    unread: true,
+    emoji: "🏆",
+    color: "#6C5CFF",
+  },
+  {
+    id: "n3",
+    kind: "shipping",
+    title: "سفارش ارسال شد 🚚",
+    body: "نیوبالانس ۵۳۰ با کد رهگیری TPX-396359 از طریق تیپاکس در راه است — تحویل ۲ تا ۳ روز کاری.",
+    atLabel: "۳ ساعت پیش",
+    unread: true,
+    emoji: "🚚",
+    color: "#6C5CFF",
+  },
+  {
+    id: "n4",
+    kind: "payment",
+    title: "کیف پول شارژ شد 💳",
+    body: "مبلغ ۲٬۰۰۰٬۰۰۰ تومان از درگاه زرین‌پال به کیف پولت اضافه شد.",
+    atLabel: "امروز ۱۲:۳۰",
+    unread: false,
+    emoji: "💳",
+    color: "#00C896",
+  },
+  {
+    id: "n5",
+    kind: "system",
+    title: "خریدت در جریان است 🥇",
+    body: "نیک دَنک لو از «شب کتونی‌های کمیاب» به نامت رزرو شد — فروشنده بسته‌بندی را شروع کرده است.",
+    atLabel: "امروز ۲۱:۴۰",
+    unread: false,
+    emoji: "🥇",
+    color: "#00C896",
+  },
+  {
+    id: "n6",
+    kind: "tip",
+    title: "انعامت نمایش داده شد 💚",
+    body: "انعام ۲۰۰٬۰۰۰ تومانی‌ات در «شب کتونی‌های کمیاب» با نامت در چت عمومی دیده شد — ممنون از لطفت!",
+    atLabel: "دیروز ۲۲:۰۵",
+    unread: false,
+    emoji: "💚",
+    color: "#00C896",
+  },
+  {
+    id: "n7",
+    kind: "follow",
+    title: "فالوور جدید 👤",
+    body: "«گلخانهٔ مینا» حالا تو را دنبال می‌کند — پروفایل و لایوهای بعدی‌اش را از دست نده.",
+    atLabel: "دیروز ۱۹:۱۲",
+    unread: false,
+    emoji: "👤",
+    color: "#00C896",
+  },
+  {
+    id: "n8",
+    kind: "system",
+    title: "یادآور لایو 📣",
+    body: "«شبِ کتاب: نایاب‌ها و امضادار» امشب ساعت ۲۳:۰۰ شروع می‌شود — یادآورت روشن است.",
+    atLabel: "دیروز ۱۸:۰۰",
+    unread: false,
+    emoji: "📣",
+    color: "#6C5CFF",
+  },
   {
     id: "n9",
     kind: "system",
-    title: "به‌روزرسانی قوانین مزایده 📢",
-    body: "از این هفته پلهٔ مزایده‌های بالای ۵ میلیون تومان به ۲۵۰٬۰۰۰ تومان تغییر می‌کند — جزئیات در مرکز راهنما.",
+    title: "به‌روزرسانی قوانین خرید 📢",
+    body: "از این هفته مهلت ارسال سفارش‌های بالای ۵ میلیون تومان ۲۴ ساعت است — جزئیات در مرکز راهنما.",
     atLabel: "۲ روز پیش",
     unread: false,
     emoji: "📢",
     color: "#6C5CFF",
   },
 ];
+
+/** اعلان‌های فعال صندوق ورودی — بسته به حالت فروش */
+export const INBOX_NOTIFICATIONS: InboxNotification[] = AUCTION_ENABLED
+  ? AUCTION_NOTIFICATIONS
+  : FIXED_NOTIFICATIONS;
 
 /* ─────────────────────────── متادیتای دستهٔ اعلان ─────────────────────────── */
 export interface InboxKindMeta {

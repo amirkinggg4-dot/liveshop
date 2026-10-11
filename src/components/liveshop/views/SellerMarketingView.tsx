@@ -42,13 +42,13 @@ export default function SellerMarketingView() {
 
   const handleStartBoost = (pkgId: string) => {
     startBoost(pkgId, nextShowTitle ?? "شو بعدی");
-    toast.success("تقویت فعال شد 🚀 — شو بعدی بیشتر دیده می‌شود");
+    toast.success("تقویت فعال شد — شو بعدی بیشتر دیده می‌شود");
   };
 
   const handleCreateCode = () => {
     const created = addCode({ percent: selectedPercent });
     setNewOpen(false);
-    toast.success(`کد تخفیف ساخته شد 🎟️ — ${created.code}`);
+    toast.success(`کد تخفیف ساخته شد — ${created.code}`);
   };
 
   return (

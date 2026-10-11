@@ -331,7 +331,7 @@ export default function SellerScheduleView() {
       status: "scheduled",
     };
     addScheduledShow(show);
-    toast.success("شو زمان‌بندی شد — فالوورها خبر می‌شوند ✅");
+    toast.success("شو زمان‌بندی شد — فالوورها خبر می‌شوند");
     resetForm();
   };
 
@@ -353,7 +353,7 @@ export default function SellerScheduleView() {
       description: description.trim(),
       status: "scheduled",
     });
-    toast.success("تغییرات شو ذخیره شد ✅");
+    toast.success("تغییرات شو ذخیره شد");
     setSaveConfirmOpen(false);
     resetForm();
   };
@@ -363,7 +363,7 @@ export default function SellerScheduleView() {
     const ok = cancelScheduledShow(cancelConfirmFor);
     setCancelConfirmFor(null);
     if (ok) {
-      toast.success("شو لغو شد — پیام به فالوورها رفت 📨");
+      toast.success("شو لغو شد — پیام به فالوورها رفت");
     }
   };
 

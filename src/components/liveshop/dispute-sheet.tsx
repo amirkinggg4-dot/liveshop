@@ -73,7 +73,7 @@ export default function DisputeSheet({
       return;
     }
     openCase({ orderId, itemTitle, amount, reason, desc: desc.trim() });
-    toast.success("اختلاف ثبت شد — کارشناس تا ۲۴ ساعت بررسی می‌کند ✅");
+    toast.success("اختلاف ثبت شد — کارشناس تا ۲۴ ساعت بررسی می‌کند");
     handleOpenChange(false);
   };
 

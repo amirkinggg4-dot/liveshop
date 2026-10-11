@@ -215,7 +215,7 @@ export function CoHostSheet({
   const onAccept = () => {
     if (!incomingInvite) return;
     acceptIncoming();
-    toast.success(`🤝 کو-هاست با ${incomingInvite.sellerName} فعال شد`);
+    toast.success(`کو-هاست با ${incomingInvite.sellerName} فعال شد`);
   };
 
   const onDecline = () => {

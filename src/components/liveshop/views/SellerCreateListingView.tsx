@@ -141,7 +141,7 @@ export default function SellerCreateListingView() {
         return;
       }
     }
-    toast.success("لیستینگ منتشر شد ✅ — به انبار اضافه شد");
+    toast.success("لیستینگ منتشر شد — به انبار اضافه شد");
     back();
   };
 
@@ -333,7 +333,7 @@ export default function SellerCreateListingView() {
               </div>
             </div>
             <p className="text-[10px] text-white/40">
-              قیمت ثابت = همان مبلغی که خریدار در لایو می‌پردازد (بدون مزایده).
+              قیمت ثابت = همان مبلغی که خریدار در لایو می‌پردازد.
             </p>
 
             {/* ── سایزها/رنگ‌ها با موجودی جدا ── */}

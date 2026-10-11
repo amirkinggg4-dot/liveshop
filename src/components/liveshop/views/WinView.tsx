@@ -326,7 +326,7 @@ function WinContent({ pendingWin }: { pendingWin: PendingWin }) {
           <button
             onClick={() => {
               if (order) setRated(order.id);
-              toast.success("امتیاز تو ثبت شد ⭐");
+              toast.success("امتیاز تو ثبت شد");
               setRateOpen(false);
             }}
             className="h-11 w-full rounded-xl bg-ls-purple text-sm font-extrabold text-white transition-transform active:scale-[.98]"

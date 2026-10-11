@@ -55,7 +55,8 @@ export const RAID_TARGETS: RaidTarget[] = [
   },
   {
     showId: "sh3",
-    title: "مزایدهٔ کارت‌های کلکسیونی",
+    /* v1.7.1 — هماهنگ با عنوان واقعی sh3 در shows.ts (حالت قیمت ثابت) */
+    title: "شو کارت‌های کلکسیونی — قیمت ثابت",
     sellerName: "کلکسیون‌یار تهران",
     sellerEmoji: "🃏",
     sellerColor: "#6C5CFF",

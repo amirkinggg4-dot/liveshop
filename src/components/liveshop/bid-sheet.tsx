@@ -69,7 +69,7 @@ export default function BidSheet({
   const submit = () => {
     const res = placeMyBid(amount);
     if (res.ok) {
-      toast.success("بید تو ثبت شد ✅");
+      toast.success("بید تو ثبت شد");
       onOpenChange(false);
     } else {
       toast.error(res.error ?? "ثبت بید ممکن نشد");

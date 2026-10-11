@@ -3,13 +3,13 @@
 import { useMemo, useState } from "react";
 import { Calculator, CreditCard, ShieldCheck, TrendingUp } from "lucide-react";
 import { faNum, toFa, toman } from "@/lib/format";
+import { MY_GMV_MONTH, NOTE_BUYER_FEE } from "@/lib/data/seller-marketing";
 import {
+  calcNetIncome,
+  commissionPctFor,
   COMMISSION_TIERS,
-  MY_GMV_MONTH,
-  NOTE_BUYER_FEE,
-  PROCESSING,
-  TIER_CUTS,
-} from "@/lib/data/seller-marketing";
+  GATEWAY_FEE,
+} from "@/lib/config/fees";
 import { useAppStore } from "@/store/app-store";
 import { PageHeader } from "@/components/liveshop/shared";
 import { Input } from "@/components/ui/input";
@@ -19,14 +19,14 @@ import { Input } from "@/components/ui/input";
    شفافیت کامل هزینه‌ها: پلکان فعلی و فروش ماهانه، پلکان‌های
    کمیسیون، پردازش درگاه، صفر بودن کارمزد خریدار و
    ماشین‌حساب زندهٔ خالص درآمد.
+   v1.7.1 — همهٔ اعداد فقط از lib/config/fees.ts خوانده می‌شوند
+   (مقدار موقت — باید با درگاه و قوانین واقعی جایگزین شود).
    ───────────────────────────────────────────────────────────── */
 
-/* پلهٔ کمیسیون بر اساس مبلغ ورودی */
-function tierRateFor(amount: number): number {
-  if (amount < TIER_CUTS[0]) return COMMISSION_TIERS[0].rate;
-  if (amount < TIER_CUTS[1]) return COMMISSION_TIERS[1].rate;
-  return COMMISSION_TIERS[2].rate;
-}
+/* آستانه‌های عددی پلکان‌ها — از fees.ts */
+const TIER_CUTS = COMMISSION_TIERS.filter((t) => t.upTo != null).map(
+  (t) => t.upTo as number
+);
 
 /* ارقام فارسی/عربی → لاتین و حذف جداکننده‌ها */
 function parseFaNum(input: string): number {
@@ -49,28 +49,24 @@ export default function SellerRatesView() {
     if (MY_GMV_MONTH < TIER_CUTS[1]) return 1;
     return 2;
   }, []);
-  const currentTier = COMMISSION_TIERS[currentTierIndex];
-  const nextTier = COMMISSION_TIERS[currentTierIndex + 1];
+  const currentTierPct = COMMISSION_TIERS[currentTierIndex].pct;
+  const nextTierPct = COMMISSION_TIERS[currentTierIndex + 1]?.pct;
 
   /* ── پیشرفت تا آستانهٔ پلکان بعدی ── */
   const nextCut =
-    nextTier != null
+    nextTierPct != null
       ? TIER_CUTS[currentTierIndex]
       : TIER_CUTS[TIER_CUTS.length - 1];
-  const progressPct = nextTier
+  const progressPct = nextTierPct
     ? Math.min(100, Math.round((MY_GMV_MONTH / nextCut) * 100))
     : 100;
   const remaining = Math.max(0, nextCut - MY_GMV_MONTH);
 
-  /* ── ماشین‌حساب هزینه‌ها ── */
+  /* ── ماشین‌حساب هزینه‌ها — v1.7.1: منطق خالص در fees.ts ── */
   const price = useMemo(() => parseFaNum(priceInput), [priceInput]);
   const calc = useMemo(() => {
     if (price <= 0) return null;
-    const rate = tierRateFor(price);
-    const commission = Math.round((price * rate) / 100);
-    const processing = Math.round((price * PROCESSING.pct) / 100) + PROCESSING.flat;
-    const net = price - commission - processing;
-    return { rate, commission, processing, net };
+    return calcNetIncome(price, MY_GMV_MONTH);
   }, [price]);
 
   return (
@@ -89,7 +85,7 @@ export default function SellerRatesView() {
         >
           <p className="text-[11px] text-white/45">پلکان فعلی</p>
           <p className="mt-1 text-3xl font-black tabular-nums text-ls-purple-soft">
-            ٪{toFa(currentTier.rate)}
+            ٪{toFa(currentTierPct)}
           </p>
           <p className="mt-2 flex items-center gap-1.5 text-xs text-white/60">
             <TrendingUp className="h-3.5 w-3.5 text-ls-green" aria-hidden />
@@ -113,13 +109,13 @@ export default function SellerRatesView() {
             />
           </div>
           <p className="mt-2 text-[11px] leading-5 text-white/55">
-            {nextTier ? (
+            {nextTierPct ? (
               <>
                 ٪{toFa(progressPct)} راه — فقط{" "}
                 <span className="font-bold tabular-nums text-white/85">
                   {toman(remaining)}
                 </span>{" "}
-                فروش تا پلکان ٪{toFa(nextTier.rate)}
+                فروش تا پلکان ٪{toFa(nextTierPct)}
               </>
             ) : (
               <>بالاترین پلکان کمیسیون را باز کرده‌ای 🎉</>
@@ -136,13 +132,13 @@ export default function SellerRatesView() {
           <div className="space-y-2">
             {COMMISSION_TIERS.map((t, i) => (
               <div
-                key={t.rate}
+                key={t.upTo ?? "max"}
                 className={
                   i === currentTierIndex
                     ? "flex items-center gap-3 rounded-2xl border border-ls-purple bg-ls-purple/10 p-3.5"
                     : "flex items-center gap-3 rounded-2xl border border-white/5 bg-ls-card p-3.5"
                 }
-                aria-label={`پلکان کمیسیون ${t.rangeLabel}`}
+                aria-label={`پلکان کمیسیون ${t.upTo == null ? "بدون سقف" : `تا ${toFa(Math.round((t.upTo ?? 0) / 1_000_000))} میلیون تومان`}`}
               >
                 <span
                   className={
@@ -151,10 +147,14 @@ export default function SellerRatesView() {
                       : "w-14 shrink-0 text-center text-2xl font-black tabular-nums text-white/45"
                   }
                 >
-                  ٪{toFa(t.rate)}
+                  ٪{toFa(t.pct)}
                 </span>
                 <span className="min-w-0 flex-1 text-xs leading-5 text-white/75">
-                  {t.rangeLabel}
+                  {t.upTo == null
+                    ? "بالای ۱۵۰ میلیون تومان فروش ماهانه"
+                    : i === 0
+                      ? `تا ${toFa(Math.round((t.upTo ?? 0) / 1_000_000))} میلیون تومان فروش ماهانه`
+                      : `${toFa(Math.round((TIER_CUTS[i - 1] ?? 0) / 1_000_000))} تا ${toFa(Math.round((t.upTo ?? 0) / 1_000_000))} میلیون تومان فروش ماهانه`}
                 </span>
                 {i === currentTierIndex && (
                   <span className="shrink-0 rounded-full bg-ls-purple px-2.5 py-1 text-[10px] font-black text-white">
@@ -173,7 +173,7 @@ export default function SellerRatesView() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-extrabold tabular-nums">
-              پردازش درگاه: ٪{toFa(PROCESSING.pct)} + {faNum(PROCESSING.flat)} تومان
+              پردازش درگاه: ٪{toFa(GATEWAY_FEE.pct)} + {faNum(GATEWAY_FEE.flatToman)} تومان
             </p>
             <p className="mt-0.5 text-[11px] text-white/45">
               تسویهٔ هفتگی — هر پنج‌شنبه به شبای ثبت‌شده
@@ -193,9 +193,6 @@ export default function SellerRatesView() {
             </p>
           </div>
           <p className="mt-2 text-xs leading-6 text-white/75">{NOTE_BUYER_FEE}</p>
-          <p className="mt-1.5 text-[11px] text-white/50">
-            در بعضی پلتفرم‌ها تا ٪۱۰ از جیب خریدار برمی‌دارد — در LiveShop نه.
-          </p>
         </div>
 
         {/* ── ماشین‌حساب هزینه ── */}
@@ -229,7 +226,7 @@ export default function SellerRatesView() {
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-white/70">
-                کمیسیون {calc ? `(٪${toFa(calc.rate)})` : ""}
+                کمیسیون {calc ? `(٪${toFa(calc.commissionPct)})` : ""}
               </span>
               <span className="shrink-0 font-bold tabular-nums text-[#FF3B5C]">
                 {calc ? `−${toman(calc.commission)}` : "—"}
@@ -237,7 +234,7 @@ export default function SellerRatesView() {
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-white/70">
-                پردازش درگاه (٪{toFa(PROCESSING.pct)} + {faNum(PROCESSING.flat)})
+                پردازش درگاه (٪{toFa(GATEWAY_FEE.pct)} + {faNum(GATEWAY_FEE.flatToman)})
               </span>
               <span className="shrink-0 font-bold tabular-nums text-[#FF3B5C]">
                 {calc ? `−${toman(calc.processing)}` : "—"}

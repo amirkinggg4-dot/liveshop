@@ -8,6 +8,7 @@ import type { InboxKind, InboxNotification } from "@/lib/data/buyer-p1";
 import { getInboxKindMeta } from "@/lib/data/buyer-p1";
 import { useAppStore } from "@/store/app-store";
 import { useInboxStore, selectUnreadCount } from "@/store/inbox-store";
+import { AUCTION_ENABLED } from "@/lib/config";
 import { EmptyState, PageHeader } from "@/components/liveshop/shared";
 
 /* ─────────────────────────────────────────────────────────────
@@ -18,14 +19,17 @@ import { EmptyState, PageHeader } from "@/components/liveshop/shared";
 
 type FilterId = "all" | "auction" | "orders" | "follow" | "system";
 
-/* نگاشت دسته‌ها به kindهای اعلان برای فیلتر */
+/* نگاشت دسته‌ها به kindهای اعلان برای فیلتر
+   v1.7.1 — فیلتر «مزایده‌ها» فقط در حالت حراج نمایش داده می‌شود */
 const FILTERS: Array<{ id: FilterId; label: string; kinds: InboxKind[] }> = [
   {
     id: "all",
     label: "همه",
     kinds: ["bid", "win", "payment", "shipping", "follow", "tip", "system"],
   },
-  { id: "auction", label: "مزایده‌ها", kinds: ["bid", "win"] },
+  ...(AUCTION_ENABLED
+    ? [{ id: "auction" as const, label: "مزایده‌ها", kinds: ["bid", "win"] as InboxKind[] }]
+    : []),
   { id: "orders", label: "سفارش‌ها", kinds: ["payment", "shipping"] },
   { id: "follow", label: "فالو", kinds: ["follow", "tip"] },
   { id: "system", label: "سیستم", kinds: ["system"] },
@@ -55,7 +59,7 @@ export default function InboxView() {
       return;
     }
     markAllRead();
-    toast.success("همهٔ اعلان‌ها خوانده شد ✅");
+    toast.success("همهٔ اعلان‌ها خوانده شد");
   };
 
   return (
@@ -115,7 +119,7 @@ export default function InboxView() {
           <EmptyState
             emoji="📭"
             title="اعلانی اینجا نیست"
-            desc="اعلان‌های مزایده، سفارش و فروشنده‌ها اینجا جمع می‌شوند."
+            desc="اعلان‌های سفارش، فالو و فروشنده‌ها اینجا جمع می‌شوند."
           />
         ) : (
           <ul

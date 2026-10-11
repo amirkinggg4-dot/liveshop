@@ -4,6 +4,8 @@
    همهٔ اعداد به‌صورت JS number می‌مانند و در UI با faNum/toman فارسی می‌شوند.
    ───────────────────────────────────────────────────────────── */
 
+import { AUCTION_ENABLED } from "@/lib/config";
+
 /* ── دوره‌های آماری ── */
 export const ANALYTIC_PERIODS = ["۷ روز", "۳۰ روز", "فصل"] as const;
 export type AnalyticPeriod = (typeof ANALYTIC_PERIODS)[number];
@@ -66,7 +68,10 @@ export const REVENUE_SERIES: WeekPoint[] = [
   { label: "هفته ۸", value: 25_800_000 },
 ];
 
-/* ── قیف تبدیل شو ── */
+/* ── قیف تبدیل شو ──
+   v1.7.1 — برچسب‌ها برای فروش قیمت ثابت: «شروع خرید» و «خریدار»
+   (نسخهٔ حراج با برچسب‌های قبلی در همان ساختار پشت فلگ می‌ماند)؛
+   اعداد و رنگ‌ها هم‌شکل قبلی. */
 export interface FunnelStep {
   label: string;
   value: number;
@@ -76,8 +81,15 @@ export interface FunnelStep {
 export const FUNNEL: FunnelStep[] = [
   { label: "بازدید شو", value: 12_400, color: "#6C5CFF" },
   { label: "تماشای +۱ دقیقه", value: 7_200, color: "#8a7dff" },
-  { label: "بیدگذار", value: 1_860, color: "#FF3B8B" },
-  { label: "برنده", value: 312, color: "#00C896" },
+  ...(AUCTION_ENABLED
+    ? [
+        { label: "بیدگذار", value: 1_860, color: "#FF3B8B" },
+        { label: "برنده", value: 312, color: "#00C896" },
+      ]
+    : [
+        { label: "شروع خرید", value: 1_860, color: "#FF3B8B" },
+        { label: "خریدار", value: 312, color: "#00C896" },
+      ]),
 ];
 
 /* ── پرفروش‌ترین‌ها (تم کتونی، هماهنگ با انبار سینا) ── */

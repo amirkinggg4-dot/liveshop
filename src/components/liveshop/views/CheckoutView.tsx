@@ -76,7 +76,7 @@ export default function CheckoutView() {
       if (res.error?.includes("کیف پول")) push("wallet");
       return;
     }
-    toast.success("پرداخت امانی موفق! سفارش ثبت شد 🎉");
+    toast.success("پرداخت امانی موفق! سفارش ثبت شد");
     setRoot("orders");
   };
 
