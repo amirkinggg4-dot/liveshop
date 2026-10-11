@@ -796,3 +796,19 @@ Stage Summary:
 - v1.8.0 تأیید نهایی شد: همهٔ جریان‌های خریدار (لغو/تحویل/آزادسازی/امتیاز/اختلاف/رسید/گفتگو/شارژ/خرید سریع/تسویه) در مرورگر واقعی پاس می‌شوند؛ منطق مشترک calcOrderTotal در هر دو مسیر یکسان رفتار می‌کند
 - نکتهٔ ابزاری (نه باگ اپ): fill با رشتهٔ خالی در agent-browser رویداد input را به React نمی‌رساند — مسیر واقعی کاربر (Ctrl+A+Backspace و execCommand) هر دو درست کار می‌کنند
 - نکتهٔ محیطی: در sandbox تازه prisma generate لازم است وگرنه tsc خطای @prisma/client می‌دهد
+
+---
+Task ID: v1.8.0-push
+Agent: main (Z.ai Code)
+Task: push دو کامیت bb7137c (v1.8.0) و 23cbf31 (worklog) به origin/main طبق درخواست کاربر
+
+Work Log:
+- push اول بدون توکن: «could not read Username» (هیچ منبع اعتبارنامه‌ای نبود)
+- توکن ارسالی کاربر پیشوند دوگانه داشت (github_pat_github_pat_...) و 401 داد؛ با پیشوند تک‌صفری (github_pat_11CF77WSQ...) push موفق شد
+- push با URL صریح و -c credential.helper= انجام شد: c2aaf84..23cbf31 main -> main
+- توکن در هیچ فایل/کامیت ذخیره نشد (فقط inline در دستور، بعدش unset)
+- نکتهٔ فنی: چون push با URL صریح بود نه نام remote، ref محلی origin/main آپدیت نشد و اولین git log origin/main خروجی قدیمی (v1.6.2) داد؛ با git fetch origin همگام شد
+- تأیید: git ls-remote origin → HEAD و refs/heads/main هر دو 23cbf31ddb69ded08aa7dcd48e9d1292fa4c91ad
+
+Stage Summary:
+- origin/main = 23cbf31 (v1.8.0 + worklog) — مخزن گیت‌هاب همگام با محلی است؛ توکن نگهداری نشده و برای pushهای بعدی باید دوباره از کاربر گرفته شود
