@@ -22,6 +22,7 @@ export type ViewName =
   | "sellerOrders"
   | "sellerRevenue"
   | "sellerOnboarding"
+  | "sellerCategoryPick"
   | "sellerLiveReport"
   | "activity"
   | "rewards"

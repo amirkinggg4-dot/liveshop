@@ -8,6 +8,10 @@ import {
   validateSuspendReason,
   type SellerStatus,
 } from "@/lib/seller-status";
+import {
+  sanitizeCategoryDraft,
+} from "@/lib/seller-category-pick";
+import { CATEGORY_IDS } from "@/lib/data/categories";
 
 /* ─────────────────────────────────────────────────────────────
    درخواست فروشندگی (onboarding) — بخش ۶ قرارداد API
@@ -70,6 +74,13 @@ export const SAMPLE_SEED_APPLICATION: SellerApplication = {
 
 export type ActionGuardResult = { ok: true } | { ok: false; message: string };
 
+/* ── v2.0.2 — پیشرفت مرحلهٔ «انتخاب دسته» (صفحهٔ SellerCategoryPickView) ──
+   null = هنوز وارد جریان انتخاب نشده؛ آرایه = انتخاب‌های فعلی به ترتیب
+   لمس (عضو اول = دستهٔ اصلی). با هر toggle ذخیره می‌شود تا با بستن
+   و برگشتن از همین‌جا ادامه دهد؛ بعدی فرم «شروع فروش» دیگر دسته
+   نمی‌پرسد و عضو اول پیش‌فرض دستهٔ اصلی می‌شود. */
+export type CategoryDraft = string[] | null;
+
 /* ── v1.9.1 — پایداری نشست (sessionStorage) ──
    وضعیت فروشنده بین مسیر / و /admin مشترک است (mock مشترک ادمین/فروشنده).
    sessionStorage (نه localStorage): با بستن تب پاک می‌شود — هم‌فلسفهٔ
@@ -80,6 +91,8 @@ const SESSION_KEY = "ls-seller-onboarding-v1";
 type PersistedSeller = {
   status: SellerOnboardingStatus;
   application: SellerApplication | null;
+  /** v2.0.2 — اختیاری برای سازگاری با نشست‌های قبلی */
+  categoryDraft?: string[] | null;
 };
 
 function readSellerSession(): PersistedSeller | null {
@@ -92,7 +105,12 @@ function readSellerSession(): PersistedSeller | null {
       typeof p.status === "string" &&
       ["none", "pending", "approved", "rejected", "suspended"].includes(p.status)
     ) {
-      return { status: p.status, application: p.application ?? null };
+      return {
+        status: p.status,
+        application: p.application ?? null,
+        /* v2.0.2 — draft ذخیره‌شده پاک‌سازی می‌شود (id نامعتبر/تکراری/بیش از ۳) */
+        categoryDraft: sanitizeCategoryDraft(p.categoryDraft, CATEGORY_IDS),
+      };
     }
     return null;
   } catch {
@@ -119,6 +137,12 @@ function clearSellerSession(): void {
 interface OnboardingState {
   status: SellerOnboardingStatus;
   application: SellerApplication | null;
+  /** v2.0.2 — انتخاب‌های مرحلهٔ دسته (عضو اول = اصلی)؛ null = شروع نشده */
+  categoryDraft: CategoryDraft;
+  /** v2.0.2 — ثبت/به‌روزرسانی انتخاب دسته‌ها (با هر toggle صدا زده می‌شود) */
+  setCategoryDraft: (ids: string[]) => void;
+  /** v2.0.2 — پاک‌کردن انتخاب دسته‌ها (خروج از جریان بدون ذخیرهٔ عمدی — فعلاً مصرف نمی‌شود) */
+  clearCategoryDraft: () => void;
 
   /** ثبت/ارسال دوبارهٔ درخواست — فقط از none یا rejected */
   submit: (app: SellerApplication) => ActionGuardResult;
@@ -144,6 +168,22 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
      فقط با hydrateFromSession روی mount انجام می‌شود (نه در سازنده) */
   status: "none",
   application: null,
+  categoryDraft: null,
+
+  setCategoryDraft: (ids) => {
+    const next = {
+      ...get(),
+      categoryDraft: sanitizeCategoryDraft(ids, CATEGORY_IDS),
+    };
+    writeSellerSession(next);
+    set({ categoryDraft: next.categoryDraft });
+  },
+
+  clearCategoryDraft: () => {
+    const next = { ...get(), categoryDraft: null };
+    writeSellerSession(next);
+    set({ categoryDraft: null });
+  },
 
   submit: (app) => {
     const cur = get().status;
@@ -242,13 +282,18 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
 
   hardReset: () => {
     clearSellerSession();
-    set({ status: "none", application: null });
+    /* v2.0.2 — پیشرفت انتخاب دسته هم به کاربر گره خورده است */
+    set({ status: "none", application: null, categoryDraft: null });
   },
 
   hydrateFromSession: () => {
     const p = readSellerSession();
     if (!p) return false;
-    set({ status: p.status, application: p.application });
+    set({
+      status: p.status,
+      application: p.application,
+      categoryDraft: p.categoryDraft ?? null,
+    });
     return true;
   },
 

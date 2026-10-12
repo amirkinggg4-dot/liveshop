@@ -18,7 +18,8 @@ import {
   validateSheba,
   validateSlug,
 } from "@/lib/seller-validate";
-import { CATEGORIES } from "@/lib/data/categories";
+import { CATEGORIES, categoryById } from "@/lib/data/categories";
+import { primarySellerCategory } from "@/lib/seller-category-pick";
 import { PageHeader } from "@/components/liveshop/shared";
 import {
   SellerStatusCard,
@@ -53,6 +54,14 @@ export default function SellerOnboardingView() {
   const application = useSellerOnboardingStore((s) => s.application);
   const submit = useSellerOnboardingStore((s) => s.submit);
   const reopenForm = useSellerOnboardingStore((s) => s.reopenForm);
+  /* v2.0.2 — دسته‌های مرحلهٔ انتخاب (صفحهٔ انتخاب دسته)؛ عضو اول = اصلی */
+  const categoryDraft = useSellerOnboardingStore((s) => s.categoryDraft);
+  const draftPrimary =
+    categoryDraft && categoryDraft.length > 0
+      ? categoryById(primarySellerCategory(categoryDraft) ?? "")
+      : undefined;
+  /* وقتی دسته‌ها از مرحلهٔ انتخاب آمده‌اند، در فرم دوباره پرسیده نمی‌شوند */
+  const categoriesFromWizard = !!(categoryDraft && categoryDraft.length > 0);
 
   const forced = useForcedSellerStatus();
   /* کلید دمو اگر بود، وضعیت نمایشی را اجباری می‌کند */
@@ -66,7 +75,12 @@ export default function SellerOnboardingView() {
     touched: false,
   });
   const [category, setCategory] = useState(
-    application?.mainCategoryLabel ?? "کتونی و کفش"
+    /* v2.0.2 — پیش‌فرض: دستهٔ اصلی مرحلهٔ انتخاب؛ وگرنه آخرین درخواست؛
+       وگرنه دستهٔ پیش‌فرض قبلی */
+    application?.mainCategoryLabel ??
+      draftPrimary?.nameFa ??
+      draftPrimary?.label ??
+      "کتونی و کفش"
   );
   const [nid, setNid] = useState<NidState>({
     value: application?.nationalId ?? "",
@@ -267,7 +281,47 @@ export default function SellerOnboardingView() {
               )}
             </div>
 
-            {/* دستهٔ اصلی */}
+            {/* دستهٔ اصلی — v2.0.2: اگر دسته‌ها از مرحلهٔ انتخاب آمده‌اند،
+                اینجا دوباره پرسیده نمی‌شوند؛ فقط خلاصهٔ دسته‌ها با نشان
+                «اصلی» نمایش داده می‌شود (عضو اول = پیش‌فرض دستهٔ اصلی) */}
+            {categoriesFromWizard ? (
+              <div className="space-y-1.5">
+                <p className="text-xs font-bold text-white/70">دسته‌های فروش</p>
+                <div
+                  className="rounded-2xl border border-ls-purple/30 bg-ls-purple/10 p-3"
+                  aria-label="دسته‌های انتخاب‌شده در مرحلهٔ قبل"
+                >
+                  <div className="flex flex-wrap gap-1.5">
+                    {(categoryDraft ?? []).map((id, i) => {
+                      const c = categoryById(id);
+                      if (!c) return null;
+                      return (
+                        <span
+                          key={id}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold",
+                            i === 0
+                              ? "bg-ls-purple text-white"
+                              : "bg-ls-card-2 text-white/75"
+                          )}
+                        >
+                          {i === 0 && (
+                            <span className="rounded-full bg-white/20 px-1 text-[9px] font-black leading-3">
+                              اصلی
+                            </span>
+                          )}
+                          {c.nameFa ?? c.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[10px] leading-4 text-white/50">
+                    از مرحلهٔ انتخاب دسته — هر وقت خواستی دسته‌های بیشتری اضافه
+                    می‌کنی.
+                  </p>
+                </div>
+              </div>
+            ) : (
             <div className="space-y-1.5">
               <p className="text-xs font-bold text-white/70">دستهٔ اصلی فروش</p>
               <div
@@ -294,6 +348,7 @@ export default function SellerOnboardingView() {
                 ))}
               </div>
             </div>
+            )}
 
             {/* کد ملی */}
             <div className="space-y-1.5">

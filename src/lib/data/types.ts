@@ -241,4 +241,14 @@ export interface Category {
   label: string;
   emoji: string;
   liveCount: number;
+  /* v2.0.2 — فیلدهای منبع واحد دسته‌ها (فقط در CATEGORIES پر می‌شوند؛
+     خروجی API این فیلدها را نمی‌سازد — optional تا نقشهٔ API دست‌نخورده بماند) */
+  /** شناسهٔ لاتین پایدار برای آدرس‌دهی (در CATEGORIES = id) */
+  slug?: string;
+  /** نام فارسی رسمی دسته (در CATEGORIES = label) */
+  nameFa?: string;
+  /** عکس دسته از public خود پروژه (همان عکس‌های کاوش — CATEGORY_PHOTO) */
+  image?: string;
+  /** قوانین اختصاصی هر دسته — فعلاً خالی (برای لیستینگ در آینده) */
+  rules?: string;
 }

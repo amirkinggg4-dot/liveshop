@@ -93,13 +93,14 @@ export default function SellerIntroSheet() {
   const authUser = useAuthStore((s) => s.user);
   const openLoginSheet = useAuthStore((s) => s.openLoginSheet);
 
-  /* «شروع» — مهمان: اول ورود، بعد فرم شروع فروش؛ لاگین: مستقیم فرم
-     (پشته: پنل فروشنده ریشه می‌شود و فرم روی آن — بازگشت به بخش شروع) */
+  /* «شروع» — مهمان: اول ورود، بعد مرحلهٔ ۲ (انتخاب دسته)؛ لاگین: مستقیم
+     همان صفحه. بعد از انتخاب دسته، فرم «شروع فروش» می‌آید
+     (پشته: پنل فروشنده ریشه می‌شود و انتخاب دسته روی آن) */
   const onStart = () => {
     closeIntro();
     const go = () => {
       setRoot("sellerDashboard");
-      push("sellerOnboarding");
+      push("sellerCategoryPick");
     };
     if (!authUser) {
       openLoginSheet(go);
