@@ -36,6 +36,7 @@ export type ViewName =
   | "addresses"
   | "settings"
   | "faq"
+  | "sellerFaq"
   | "terms"
   | "privacy"
   | "support";

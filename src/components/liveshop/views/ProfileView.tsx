@@ -46,6 +46,7 @@ import { useActivityStore } from "@/store/activity-store";
 import { useInboxStore, selectUnreadCount } from "@/store/inbox-store";
 import { useRewardsStore } from "@/store/rewards-store";
 import { useAuth } from "@/store/auth-store";
+import { useSellerEntry } from "@/components/liveshop/seller-intro-sheet";
 import { faNum, toFa, toman } from "@/lib/format";
 import { Avatar } from "@/components/liveshop/shared";
 import { TrustBadgePlaceholder } from "@/components/liveshop/trust-badge";
@@ -100,7 +101,10 @@ export default function ProfileView() {
   const myBids = useActivityStore((s) => s.myBids);
   const unreadCount = useInboxStore(selectUnreadCount);
   const rewardPoints = useRewardsStore((s) => s.points);
-  const { user, logout, openLoginSheet, requireAuth } = useAuth();
+  const { user, logout, openLoginSheet } = useAuth();
+  /* v2.0.1 — «فروشندهٔ من»: مهمان/none ← شیت معرفی فروشندگی؛
+     بقیهٔ وضعیت‌ها ← مستقیم به پنل/کارت وضعیت (رفتار v1.9.1) */
+  const handleSellerEntry = useSellerEntry();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const activeBidsCount = myBids.filter(
     (b) => b.status === "leading" || b.status === "outbid"
@@ -207,8 +211,8 @@ export default function ProfileView() {
           icon={Store}
           title="فروشندهٔ من"
           onClick={() =>
-            /* v1.9.1 — مهمان ← شیت ورود؛ بعد از ورود به پنل فروشنده */
-            requireAuth(() => setRoot("sellerDashboard"))
+            /* v2.0.1 — گیت ورود با شیت معرفی: مهمان/none ← شیت؛ بقیه ← مستقیم */
+            handleSellerEntry()
           }
         />
         <MenuRow

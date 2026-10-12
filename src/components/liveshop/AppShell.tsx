@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { toFa, toman } from "@/lib/format";
 import { useAppStore, NAV_VIEWS, type ViewName } from "@/store/app-store";
 import { useWalletStore } from "@/store/wallet-store";
-import { useAuthStore } from "@/store/auth-store";
 import {
   Home,
   Compass,
@@ -50,10 +49,15 @@ import ProfileEditView from "./views/ProfileEditView";
 import AddressesView from "./views/AddressesView";
 import SettingsView from "./views/SettingsView";
 import FaqView from "./views/FaqView";
+import SellerFaqView from "./views/SellerFaqView";
 import TermsView from "./views/TermsView";
 import PrivacyView from "./views/PrivacyView";
 import SupportView from "./views/SupportView";
 import LoginSheet from "./login-sheet";
+// v2.0.1 — شیت معرفی فروشندگی (غیرفروشنده/مهمان)
+import SellerIntroSheet, {
+  useSellerEntry,
+} from "./seller-intro-sheet";
 import {
   useSellerOnboardingStore,
 } from "@/store/seller-onboarding-store";
@@ -96,6 +100,7 @@ const VIEW_COMPONENTS: Record<ViewName, () => ReactNode> = {
   addresses: AddressesView,
   settings: SettingsView,
   faq: FaqView,
+  sellerFaq: SellerFaqView,
   terms: TermsView,
   privacy: PrivacyView,
   support: SupportView,
@@ -125,10 +130,9 @@ export default function AppShell() {
   const setRoot = useAppStore((s) => s.setRoot);
   const push = useAppStore((s) => s.push);
   const balance = useWalletStore((s) => s.balance);
-  /* v1.9.1 — تب «فروش» برای مهمان: شیت ورود باز می‌شود و بعد از ورود
-     به پنل فروشنده می‌رود (pendingAction) */
-  const authUser = useAuthStore((s) => s.user);
-  const openLoginSheet = useAuthStore((s) => s.openLoginSheet);
+  /* v2.0.1 — تب «فروش»: مهمان/none ← شیت معرفی فروشندگی؛
+     pending/rejected/suspended/approved ← مستقیم (رفتار v1.9.1) */
+  const handleSellerEntry = useSellerEntry();
 
   /* v1.9.1 — بازیابی وضعیت فروشنده + اعلان‌های تصمیم ادمین از sessionStorage
      (mock مشترک / و /admin — فقط روی mount، بعد از هیدریشن) */
@@ -185,6 +189,9 @@ export default function AppShell() {
         {/* v1.9.0 — شیت ورود سراسری (خودش از استور auth باز/بسته می‌شود) */}
         <LoginSheet />
 
+        {/* v2.0.1 — شیت معرفی فروشندگی (سراسری؛ از useSellerEntry باز می‌شود) */}
+        <SellerIntroSheet />
+
         {showNav && (
           <nav
             className="sticky bottom-0 z-30 mt-auto bg-ls-card/95 backdrop-blur-md border-t border-white/5"
@@ -194,10 +201,10 @@ export default function AppShell() {
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const active = current.view === item.view;
-                /* v1.9.1 — تب فروش: مهمان ← شیت ورود (بعد از ورود ادامه) */
+                /* v2.0.1 — تب فروش: مهمان/none ← شیت معرفی؛ بقیهٔ وضعیت‌ها ← مستقیم */
                 const onNav =
-                  item.view === "sellerDashboard" && !authUser
-                    ? () => openLoginSheet(() => setRoot("sellerDashboard"))
+                  item.view === "sellerDashboard"
+                    ? handleSellerEntry
                     : () => setRoot(item.view);
                 return (
                   <li key={item.view}>
