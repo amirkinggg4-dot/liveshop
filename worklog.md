@@ -931,3 +931,27 @@ Work Log:
 Stage Summary:
 - main = origin/main = 96dc0fd؛ درخت کاری تمیز؛ v1.9.1 کامل روی GitHub.
 - نکته برای آینده: بعد از هر reset سندباکس، قبل از هر کاری git log و git status را با remote مقایسه کن — refs محلی می‌توانند عقب بمانند ولی فایل‌های دیسک جدیدتر باشند.
+
+---
+Task ID: v2.0.0
+Agent: main (Z.ai Code)
+Task: نسخهٔ v2.0.0 — فقط بک‌اند: §4 تسویه + §5 کیف پول قرارداد api-spec (دفتر دوطرفه، امانت، idempotency)؛ UI دست‌نخورده
+
+Work Log:
+- recon: api-spec §4/§5، schema.prisma (مدل‌های Account/LedgerEntry/Order از قبل آماده)، auth.ts (Bearer JWT)، http.ts (قالب خطا)، fees.ts (پلکان کمیسیون + جدول ارسال)، order-state.ts (ماشین وضعیت UI — سرور با آن یکی شد)، test-server.sh (Postgres واقعی اسکیمای liveshop_test).
+- ledger: postTransaction با چک مجموع صفر + ensureAccount lazy با مسیر سریع و قفل advisory فقط برای اولین ساختن (چون NULL در ایندکس unique متمایز است و P2002 داخل تراکنش تعاملی قابل retry نیست) + lockAccountForUpdate + getBalance.
+- تریگر فقط-INSERT: ledger-ddl.ts (تک منبع) → migration 20261013000000 + scripts/apply-db-extras.ts (db:extras) + اعمال خودکار در test-server.sh؛ TRUNCATE از تریگر معاف است (seed سالم).
+- checkout.ts: createOrder در یک تراکنش تعاملی — replay/conflict کلید idempotency (بازندهٔ P2002 دوباره می‌خواند)، LIVE بودن شو، تعلق واریانت به ShowItem، مالکیت آدرس، SELF_PURCHASE، پول فقط از سرور (قیمت/ارسال/کمیسیون پلکانی روی فروش RELEASED ماه جاری)، کسر موجودی شرطی با مرتب‌سازی id، قفل FOR UPDATE کیف پول، postTransaction (−total/+ESCROW)، سفارش PAID_HELD با shipDeadline+48h و snapshotها، soldCount++، hook خالی realtime.
+- orders.ts: cancel (فقط قبل از ارسال، بازگشت کامل + برگشت موجودی و soldCount با GREATEST(0,…)، flip تک‌برنده)، confirm-delivery (SHIPPED→RELEASED، ESCROW→SELLER_PAYABLE+PLATFORM_REVENUE، idempotent با بازگشت alreadyReleased)، ship (فروشندهٔ همان سفارش، PAID_HELD→READY_TO_SHIP→SHIPPED، ردیف Shipment)، list/get خریدار (404 برای دیگران).
+- wallet.ts: getWalletView (موجودی + تاریخچه cursor با take limit+1) + dev-topup با گیت سخت NODE_ENV!==production && DEV_TOPUP=true (production همیشه 404 قبل از بدنه/احراز).
+- ۷ route جدید در src/app/api/v1 (orders، [id]، cancel، confirm-delivery، wallet، dev-topup، seller ship) — همهٔ نازک با handle/zod/requireUser.
+- scripts/reconcile-ledger.ts (bun run reconcile): صفر بودن هر txnId + صفر بودن کل دفتر + برابری ESCROW با سفارش‌های در نگهداری؛ خروج non-zero برای cron.
+- تست: ordering-helpers.ts (fixture کامل + fundWallet + invariantها) و checkout.test.ts — ۲۹ تست: happy path با snapshotها، ۶ خطای اعتبارسنجی، ۵۰ خریدار/موجودی ۵، ۱۰ سفارش/کیف برای ۳، idempotency ترتیبی و ۱۰تایی هم‌زمان، rollback شبیه‌سازی‌شدهٔ f/g، invariantهای دفتر، تریگر UPDATE/DELETE، چرخهٔ ship/confirm دوباره‌پرداخت‌نکردن، مجوزها، قیمت جعلی، cursor کیف پول، گیت dev-topup.
+- باگ تست‌ها که گرفته شد: تست کیف پول اول روی یک واریانت مشترک بود و قفل ردیف واریانت تصادفی serialize می‌کرد — با واریانت‌های متمایز بازنویسی شد تا واقعاً مسابقهٔ کیف پول آزموده شود (موتاسیون M2 بدون این اصلاح fail نمی‌شد).
+- تست‌ها بدون اسکیمای تست skip می‌شوند (گارد schema=liveshop_test + بی‌اثر شدن beforeAll) تا `bun test src/lib` گمراه نشود — ۹ fail شناخته‌شدهٔ قبلی دست‌نخورده ماند.
+- موتاسیون (هر بار فقط تست هدف قرمز و بعد revert): M1 کسر بی‌شرط موجودی، M2 حذف FOR UPDATE، M3 حذف چک مالکیت کلید، M4 حذف چک تراز، M5 تریگر بی‌اثر (RETURN COALESCE)، M6 حذف گارد آزادسازی، M7 حذف فیلتر مالکیت، M8 پذیرش قیمت کلاینت.
+- verify: ۶۷ تست سرور سبز (۳۸ قبلی + ۲۹ جدید)، ۲۴۴+ تست lib/hooks بدون رگرسیون (مجموع skipهای دیتابیس‌دار جدید: ۲۹)، tsc صفر خطا در src، lint پاک؛ seed و migration chain (تست migration.test روی اسکیمای تازه با migration جدید) سبز؛ README (db:extras/reconcile/تعداد تست) + CHANGELOG بخش v2.0.0 + نسخهٔ 2.0.0.
+
+Stage Summary:
+- v2.0.0 کامل: دفتر دوطرفهٔ فقط-INSERT با تریگر، تسویهٔ یک‌تراکنشی با idempotency/قفل کیف پول/کسر شرطی موجودی، امانت با آزادسازی یک‌باره، dev-topup gated، reconcile script؛ UI یک خط هم تغییر نکرد.
+- صادقانه: تست‌ها ماژول‌سطح‌اند نه HTTP؛ پرگارهای PURCHASE_HOLD بدون orderId (ترتیب f قبل از g)؛ courier→peyk با fees.ts یکی شد؛ jobهای §8 و topup واقعی و dispute در فازهای بعد؛ UI هنوز به API وصل نیست.

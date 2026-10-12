@@ -5,6 +5,65 @@
 
 ---
 
+## [v2.0.0] — بک‌اند: تسویه (§4) و کیف پول (§5) — دفتر دوطرفه، امانت و کلید idempotency
+
+محدوده: **فقط بک‌اند** — `src/lib/server`، `src/app/api/v1`، `prisma`، `scripts`. **هیچ فایل UI دست نخورده است** (تنها ثابت نسخه در config تغییر کرد). بدون درگاه واقعی. احراز هویت همان JWT موجود (Bearer)؛ نقش‌ها فقط سمت سرور بررسی می‌شوند.
+
+### الف) دفتر حساب دوطرفه (double-entry ledger)
+1. `src/lib/server/ledger.ts` — `postTransaction(tx, txnId, entries)`: چند `LedgerEntry` با یک `txnId`، **مجموع amountها دقیقاً صفر** وگرنه `LEDGER_UNBALANCED` و هیچ ردیفی نوشته نمی‌شود؛ همیشه داخل تراکنش صدا زننده. `getBalance(accountId)` = SUM(amount).
+2. حساب‌ها lazy: `ensureAccount` با مسیر سریع (یک SELECT بدون قفل) و برای «اولین ساختن» **قفل advisory تراکنشی** — چون ایندکس unique در Postgres مقادیر NULL را متمایز می‌داند و retry با P2002 داخل تراکنش تعاملی ممکن نیست (خطا کل تراکنش را abort می‌کند). حساب کاربر: `USER_WALLET`/`SELLER_PAYABLE`؛ سیستمی: `ESCROW`، `PLATFORM_REVENUE`، `GATEWAY_CLEARING`.
+3. **تریگر فقط-INSERT در PostgreSQL**: UPDATE و DELETE روی `LedgerEntry` با خطا رد می‌شود (`ledger_entry_no_update`) — منبع DDL: `src/lib/server/ledger-ddl.ts`؛ مسیرها: migration `20261013000000_v2_0_0_ledger_immutability` (db:deploy) + `bun run db:extras` (db:push) + اعمال خودکار در `scripts/test-server.sh`. TRUNCATE قربانی تریگر نمی‌شود (seed سالم).
+4. `prisma/seed.ts` — حساب‌های سیستمی `ESCROW` و `PLATFORM_REVENUE` به seed اضافه شدند.
+
+### ب) POST /api/v1/orders — تسویه (§4، مسیر بحرانی)
+هدر `Idempotency-Key` الزامی؛ بدنه با zod (`showId، items[{variantId,qty}]، addressId، shippingMethod`)؛ **فیلدهای اضافهٔ کلاینت (مثل قیمت جعلی) حذف می‌شوند و هرگز خوانده نمی‌شوند**. همه‌چیز در **یک تراکنش تعاملی**:
+1. کلید تکراری + همان کاربر → همان سفارش (200، `replayed`)؛ کلید برای کاربر دیگر → **409 `IDEMPOTENCY_KEY_CONFLICT`**؛ مسابقهٔ هم‌زمانی روی کلید → بازندهٔ create با P2002 دوباره می‌خواند و همان سفارش را برمی‌گرداند (بدون خرید دوباره).
+2. شو باید `LIVE` باشد؛ هر واریانت باید به محصولِ همین شو (`ShowItem`) تعلق داشته باشد؛ آدرس باید مال خریدار باشد؛ خرید از فروشگاه خودِ خریدار → **403 `SELF_PURCHASE`**.
+3. پول فقط از سرور: قیمت از `Variant.priceOverride ?? Product.price`، ارسال از جدول ثابت `SHIPPING_PRICES` (tipax 45k / post 30k / peyk 25k در `fees.ts`)، کمیسیون از پلکان فروشنده (`commissionPctFor` روی فروش RELEASEDِ ماه جاری فروشنده) و در `Order.commission` ذخیره می‌شود.
+4. موجودی: واریانت‌ها **مرتب بر اساس id** (ترتیب قفل پایدار) و کسر با `UPDATE … WHERE id=$ AND stock>=$qty` — ردیفِ تغییرنکرده → **409 `OUT_OF_STOCK`** و rollback کامل.
+5. کیف پول: ردیف حساب `USER_WALLET` خریدار با **SELECT … FOR UPDATE** قفل می‌شود (دو سفارش هم‌زمان یک خریدار نمی‌تواند یک موجودی را دوبار خرج کند)؛ ناکافی → **409 `INSUFFICIENT_FUNDS`**.
+6. دفتر: کیف پول خریدار −total، `ESCROW` +total (kind `PURCHASE_HOLD`).
+7. سفارش `PAID_HELD` با `shipDeadline = حالا + ۴۸h` (اسکن ۲۴ + ارسال ۲۴ از fees)، snapshot آدرس، `OrderItem` با snapshot عنوان/قیمت، `ShowItem.soldCount++`.
+8. خطاها با قالب استاندارد `{error:{code,message فارسی}}`. WebSocket هنوز نیست — hook خالی `publishOrderCommitted` در `src/lib/server/realtime.ts` بعد از commit صدا زده می‌شود (جای اتصال v2.1).
+
+### پ) بقیهٔ endpoints
+- `GET /orders` و `GET /orders/:id` — فقط سفارش‌های خودِ خریدار (سفارش دیگران 404، بدون لو دادن وجود)؛ cursor pagination با الگوی take limit+1.
+- `POST /orders/:id/cancel` — فقط قبل از ارسال (ماشین `order-state.ts`: PAID_HELD/READY_TO_SHIP)؛ بازگشت کامل ESCROW → کیف پول (kind `REFUND`) + برگشت موجودی واریانت و soldCount؛ flip تک‌برندهٔ شرطی → لغو دوباره پول دوبار برنمی‌گرداند (دوم 409).
+- `POST /orders/:id/confirm-delivery` — فقط خریدار؛ SHIPPED → RELEASED در یک txn دفتری: `ESCROW` −total، `SELLER_PAYABLE` فروشنده +(total−commission)، `PLATFORM_REVENUE` +commission؛ **صدا زدن دوبار فقط یک بار پول جابه‌جا می‌کند** (دوم 200 `alreadyReleased` بدون پرگار تازه).
+- `GET /wallet` — موجودی + تاریخچه cursor-دار (مبلغ‌ها از BigInt به عدد).
+- `POST /wallet/dev-topup` — فقط با `NODE_ENV !== "production"` **و** `DEV_TOPUP=true`؛ **در production همیشه 404** (قبل از خواندن بدنه و احراز هویت). طرف مقابل پرگار: `GATEWAY_CLEARING`، kind `TOPUP` با gatewayRef یکتا.
+- `POST /seller/orders/:id/ship` — فقط فروشندهٔ همان سفارش (فروشندهٔ دیگر 404، غیرفروشنده 403 `NOT_SELLER`)؛ `{carrier, trackingCode}` → SHIPPED (PAID_HELD → READY_TO_SHIP → SHIPPED، هر دو گام مجاز ماشین) + ردیف `Shipment`.
+- وضعیت‌ها همان enum `OrderStatus` و همان ماشین `src/lib/order-state.ts` (لغو قبل از ارسال؛ تأیید تحویل فقط از SHIPPED).
+
+### ت) تست‌ها (Postgres واقعی، اسکیمای `liveshop_test`) — ۲۹ تست جدید، مجموع سرور ۶۷ سبز
+- ۵۰ خریدار هم‌زمان برای واریانت با موجودی ۵ → دقیقاً ۵ موفق، ۴۵ `OUT_OF_STOCK`، موجودی نهایی ۰.
+- یک خریدار ۱۰ سفارش هم‌زمان با موجودی فقط برای ۳ → دقیقاً ۳ موفق، ۷ `INSUFFICIENT_FUNDS`، موجودی هرگز منفی نشد. **نکتهٔ تست:** هر سفارش واریانت متمایز می‌خرد تا قفل ردیف واریانت تصادفی هم‌زمانی‌ها را serialize نکند و واقعاً مسابقهٔ کیف پول آزموده شود.
+- کلید idempotency تکراری: یک سفارش و یک کسر؛ ۱۰ درخواست هم‌زمان با یک کلید → یک سفارش/یک کسر/پاسخ یکسان.
+- شکست شبیه‌سازی‌شده در مرحلهٔ f (ledger) و g (order) → موجودی، کیف پول و دفتر کامل برمی‌گردد (هیچ ردیفی نمی‌ماند).
+- مجموع هر `txnId` صفر؛ جمع کل دفتر صفر؛ `postTransaction` نامتراز رد می‌شود و چیزی نمی‌نویسد.
+- UPDATE و DELETE روی `LedgerEntry` با تریگر رد می‌شود.
+- confirm-delivery دوبار → یک پرداخت؛ لغو دوبار → یک بازگشت.
+- کاربر B نمی‌تواند سفارش A را ببیند/لغو کند/تأیید کند (همه 404)؛ غیرفروشنده 403؛ فروشندهٔ دیگر 404.
+- قیمت جعلی بدنه نادیده گرفته می‌شود (جمع = محاسبهٔ سرور).
+- تست‌ها بدون اسکیمای تست skip می‌شوند (اجرای عادی `bun test src/lib` گمراه نمی‌شود).
+- **موتاسیون:** هر گارد با نسخهٔ عمداً خراب هم شکست خورده و نشان داده شده: M1 کسر بی‌شرط موجودی، M2 حذف FOR UPDATE، M3 حذف چک مالکیت کلید، M4 حذف چک تراز، M5 تریگر بی‌اثر، M6 حذف گارد آزادسازی، M7 حذف فیلتر مالکیت، M8 پذیرش قیمت کلاینت — هر بار فقط تست هدف قرمز شد و بعد revert.
+
+### ث) ابزار و مستندات
+- `scripts/reconcile-ledger.ts` (`bun run reconcile`): صفر بودن هر txnId، صفر بودن کل دفتر، برابری موجودی `ESCROW` با جمع سفارش‌های در نگهداری (PAID_HELD/READY_TO_SHIP/SHIPPED/DELIVERED) — خروج non-zero برای cron/هشدار.
+- `scripts/apply-db-extras.ts` + `db:extras` در package.json؛ نسخه → 2.0.0.
+
+### صادقانه — نکته‌ها و ناکامل‌ها
+1. **shippingMethod فقط tipax/post/peyk** (کلیدهای `SHIPPING_PRICES` در fees.ts — تک منبع اعداد). متن درخواست «courier» می‌گفت؛ schema comment هم courier دارد ولی fees.ts و UI از `peyk` استفاده می‌کنند — با fees.ts یکی شد و مسیر ship به‌عنوان carrier هر چهار مقدار (شامل courier) را می‌پذیرد.
+2. **پرگارهای PURCHASE_HOLD مقدار orderId ندارند** (سفارش بعد از دفتر ساخته می‌شود — ترتیب حرف‌به‌حرف مراحل e→f→g؛ append-only اجازهٔ پس‌زدن orderId را نمی‌دهد). REFUND/RELEASE orderId دارند؛ سازگاری ESCROW از جمع سفارش‌ها حساب می‌شود نه ستون orderId.
+3. **تست‌ها در سطح ماژول‌اند نه HTTP واقعی** — مسیرهای route نازک‌اند (احراز + zod + فراخوانی ماژول) و مثل قرارداد قبلی پروژه، صحت‌سنجی E2E روی HTTP به فاز اتصال فرانت‌اند موکول شد؛ zod بدنه فقط در route اعمال می‌شود (ماژول دفاع مستقل qty دارد).
+4. **کمیسیون لحظهٔ خرید قفل می‌شود** — فروش ماهانه = جمع itemsTotal سفارش‌های RELEASEDِ ماه جاری؛ تغییر وضعیت سفارش‌های قدیمی بعداً درصدِ سفارش‌های جدید را عوض می‌کند نه قدیمی‌ها.
+5. **jobهای §8 نیستند**: لغو خودکار ردِ مهلت‌گذشته، آزادسازی خودکار ۳ روزه، پاک‌سازی — shipDeadline فقط ذخیره می‌شود.
+6. **`/wallet/topup` و callback درگاه (§5) و اختلاف سفارش (§4 dispute) در این فاز نیستند** — فقط dev-topup.
+7. **رسیدگی به shipDeadline گذشته در مسیر ship انجام نمی‌شود** (چون job لغو خودکار نیست).
+8. حالت API واقعی فقط با `NEXT_PUBLIC_USE_API=true` مصرف می‌شود؛ UI هنوز به آن وصل نیست (طبق محدودهٔ فاز).
+
+---
+
 ## [v1.9.0] — «حساب» و ورود (OTP) — آدرس‌ها، تنظیمات، اعتماد و پشتیبانی
 
 محدوده: فقط بخش حساب و ورود. با `AUCTION_ENABLED=false` هیچ واژهٔ حراجی نمایش داده نمی‌شود (نگهبان `forbidden-words.test.ts` سبز).

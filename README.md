@@ -13,8 +13,10 @@
 
 ```bash
 bun run postgres        # Postgres 17 محلی (بدون نصب سیستم‌عاملی) — یا DATABASE_URL خودتان را بدهید
-bun run db:deploy       # اعمال migrationها (شامل قیود stock>=0 و یک‌پین-در-هر-شو)
-bun run db:seed         # دادهٔ دموی فارسی (فروشندگان/کالاها/شوها + کیف پول دمو)
+bun run db:deploy       # اعمال migrationها (شامل قیود stock>=0، یک‌پین-در-هر-شو و تریگر append-only دفتر)
+bun run db:extras       # DDL خام خارج از پرisma (تریگر فقط-INSERT روی LedgerEntry) — بعد از هر db:push
+bun run db:seed         # دادهٔ دموی فارسی (فروشندگان/کالاها/شوها + کیف پول دمو + حساب‌های سیستمی)
+bun run reconcile       # سازگاری دفتر: صفر بودن هر txnId و برابری ESCROW با سفارش‌های در نگهداری
 ```
 
 راهنمای کامل راه‌اندازی، جریان OTP و نمونه‌ها: [`docs/BACKEND.md`](./docs/BACKEND.md)
@@ -23,7 +25,7 @@ UI همچنان روی دیتای mock خودش کار می‌کند؛ اتصا�
 ### تست‌های امنیتی سرور
 
 ```bash
-bun run test:server     # ۱۷ تست امنیتی روی یک Postgres واقعی (اسکیمای جداگانهٔ liveshop_test — دیتای dev دست‌نخورده)
+bun run test:server     # ۶۷ تست سرور روی یک Postgres واقعی (اسکیمای جداگانهٔ liveshop_test — دیتای dev دست‌نخورده)؛ شامل ۲۹ تست v2.0.0: هم‌زمانی موجودی/کیف پول/کلید idempotency، rollback، invariantهای دفتر، تریگر فقط-INSERT، مجوزها و قیمت جعلی
 ```
 
 هر تست طوری نوشته شده که قبل از اصلاح شکست می‌خورد و بعد از آن پاس می‌شود (۲۰۰ درخواست/مسابقهٔ هم‌زمان، پنجرهٔ نرخ با زمان شبیه‌سازی‌شده، reuse توکن و …).

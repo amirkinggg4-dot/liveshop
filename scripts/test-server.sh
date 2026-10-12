@@ -37,6 +37,9 @@ p.$executeRawUnsafe("CREATE SCHEMA IF NOT EXISTS liveshop_test")
 # Sync the test schema with prisma/schema.prisma (idempotent).
 DATABASE_URL="$TEST_URL" bunx prisma db push --skip-generate --accept-data-loss >/dev/null
 
+# v2.0.0 — apply raw DDL prisma cannot express (append-only LedgerEntry trigger).
+DATABASE_URL="$TEST_URL" bun scripts/apply-db-extras.ts >/dev/null
+
 # Run the suite with a stable test secret (≥32 chars, like production would have).
 export DATABASE_URL="$TEST_URL"
 export AUTH_SECRET="${AUTH_SECRET:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}"

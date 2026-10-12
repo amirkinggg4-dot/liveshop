@@ -406,10 +406,14 @@ async function main() {
   const buyer = await db.user.create({
     data: { phone: "09121234567", name: "علی" },
   });
-  const [wallet, clearing] = await Promise.all([
+  // v2.0.0 — حساب‌های سیستمی امانت و درآمد پلتفرم در seed (لازی هم در ensureAccount ساخته می‌شوند)
+  const [wallet, clearing, escrow, platformRevenue] = await Promise.all([
     db.account.create({ data: { type: "USER_WALLET", userId: buyer.id } }),
     db.account.create({ data: { type: "GATEWAY_CLEARING", userId: null } }),
+    db.account.create({ data: { type: "ESCROW", userId: null } }),
+    db.account.create({ data: { type: "PLATFORM_REVENUE", userId: null } }),
   ]);
+  console.log(`  system accounts: escrow=${escrow.id} platformRevenue=${platformRevenue.id}`);
   await db.ledgerEntry.createMany({
     data: [
       {
