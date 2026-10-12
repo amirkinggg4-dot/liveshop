@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { toFa, toman } from "@/lib/format";
 import { useAppStore, NAV_VIEWS, type ViewName } from "@/store/app-store";
 import { useWalletStore } from "@/store/wallet-store";
+import { useAuthStore } from "@/store/auth-store";
 import {
   Home,
   Compass,
@@ -52,6 +54,10 @@ import TermsView from "./views/TermsView";
 import PrivacyView from "./views/PrivacyView";
 import SupportView from "./views/SupportView";
 import LoginSheet from "./login-sheet";
+import {
+  useSellerOnboardingStore,
+} from "@/store/seller-onboarding-store";
+import { useInboxStore } from "@/store/inbox-store";
 
 const VIEW_COMPONENTS: Record<ViewName, () => ReactNode> = {
   home: HomeView,
@@ -119,6 +125,17 @@ export default function AppShell() {
   const setRoot = useAppStore((s) => s.setRoot);
   const push = useAppStore((s) => s.push);
   const balance = useWalletStore((s) => s.balance);
+  /* v1.9.1 — تب «فروش» برای مهمان: شیت ورود باز می‌شود و بعد از ورود
+     به پنل فروشنده می‌رود (pendingAction) */
+  const authUser = useAuthStore((s) => s.user);
+  const openLoginSheet = useAuthStore((s) => s.openLoginSheet);
+
+  /* v1.9.1 — بازیابی وضعیت فروشنده + اعلان‌های تصمیم ادمین از sessionStorage
+     (mock مشترک / و /admin — فقط روی mount، بعد از هیدریشن) */
+  useEffect(() => {
+    useSellerOnboardingStore.getState().hydrateFromSession();
+    useInboxStore.getState().hydrateAdminNotifications();
+  }, []);
 
   const current = stack[stack.length - 1];
   const View = VIEW_COMPONENTS[current.view];
@@ -177,10 +194,15 @@ export default function AppShell() {
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const active = current.view === item.view;
+                /* v1.9.1 — تب فروش: مهمان ← شیت ورود (بعد از ورود ادامه) */
+                const onNav =
+                  item.view === "sellerDashboard" && !authUser
+                    ? () => openLoginSheet(() => setRoot("sellerDashboard"))
+                    : () => setRoot(item.view);
                 return (
                   <li key={item.view}>
                     <button
-                      onClick={() => setRoot(item.view)}
+                      onClick={onNav}
                       aria-current={active ? "page" : undefined}
                       className={cn(
                         "w-full flex flex-col items-center gap-0.5 py-1.5 rounded-xl transition-colors",

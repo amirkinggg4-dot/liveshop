@@ -96,10 +96,12 @@ function unwrapRequired(v: RequiredValidation): string {
    validateAddress — اعتبارسنجی خالص فرم آدرس با پیام‌های فارسی
    ─ اجباری‌ها: گیرنده، استان، شهر، نشانی (validateRequiredFa)
    ─ موبایل: validatePhoneFa → نرمال 09xxxxxxxxx (لاتین)
-   ─ کدپستی: اجباری نیست؛ فقط اگر چیزی وارد شده باشد
-     validatePostalCodeFa اجرا می‌شود → لاتین ۱۰ رقمی
+   ─ کدپستی: v1.9.1 اجباری شد — خالی ← خطا؛ پرشده با قاعدهٔ ثابت
+     validatePostalCodeFa (۱۰ رقم، شروع ۱-۹، ارقام تکراری رد)
    ─ شهر باید از فهرست شهرهای همان استان (citiesOf) باشد
    ───────────────────────────────────────────────────────────── */
+export const POSTAL_REQUIRED_MESSAGE = "کدپستی را وارد کن";
+
 export function validateAddress(input: AddressInput): AddressValidation {
   const errors: AddressErrors = {};
 
@@ -126,9 +128,12 @@ export function validateAddress(input: AddressInput): AddressValidation {
   const phone = validatePhoneFa(input.phone);
   if (!phone.ok) errors.phone = phone.message;
 
-  /* کدپستی اختیاری است — فقط اگر پر شده باشد قواعدش بررسی می‌شود */
-  const postal = validatePostalCodeFa(input.postalCode);
-  if (!postal.ok && input.postalCode.trim()) {
+  /* کدپستی — v1.9.1 اجباری: خالی ← خطا؛ پرشده با قاعدهٔ همان فرمول قبلی */
+  const postalTrimmed = input.postalCode.trim();
+  const postal = postalTrimmed ? validatePostalCodeFa(input.postalCode) : null;
+  if (!postalTrimmed) {
+    errors.postalCode = POSTAL_REQUIRED_MESSAGE;
+  } else if (postal && !postal.ok) {
     errors.postalCode = postal.message;
   }
 
@@ -145,7 +150,9 @@ export function validateAddress(input: AddressInput): AddressValidation {
       province: unwrapRequired(province),
       city: unwrapRequired(city),
       line: unwrapRequired(line),
-      postalCode: postal.ok ? postal.postalCode : input.postalCode.trim(),
+      /* در مسیر موفق، کدپستی حتماً معتبر بوده → نرمال لاتین ۱۰ رقمی */
+      postalCode:
+        postal && postal.ok ? postal.postalCode : input.postalCode.trim(),
     },
   };
 }

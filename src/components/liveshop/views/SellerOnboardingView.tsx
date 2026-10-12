@@ -1,26 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  BadgeCheck,
-  Camera,
-  CheckCircle2,
-  Clock3,
-  FileWarning,
-  Info,
-  Send,
-  ShieldAlert,
-  Store,
-} from "lucide-react";
+import { Camera, CheckCircle2, Send, Store } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { useAppStore } from "@/store/app-store";
 import {
-  SELLER_STATUS_LABEL,
   useForcedSellerStatus,
   useSellerOnboardingStore,
-  type SellerOnboardingStatus,
+  type SellerApplication,
 } from "@/store/seller-onboarding-store";
 import {
   maskNationalId,
@@ -31,6 +20,10 @@ import {
 } from "@/lib/seller-validate";
 import { CATEGORIES } from "@/lib/data/categories";
 import { PageHeader } from "@/components/liveshop/shared";
+import {
+  SellerStatusCard,
+  SellerStatusChip,
+} from "@/components/liveshop/seller-status-cards";
 
 /* ─────────────────────────────────────────────────────────────
    v1.7.0 — «شروع فروش» (onboarding فروشنده — بخش ۶ قرارداد API:
@@ -40,192 +33,17 @@ import { PageHeader } from "@/components/liveshop/shared";
      اعتبارسنجی زنده؛ در UI فقط ماسک نمایش داده می‌شود.
    ─ تا تأیید نشدن، «شروع لایو» و «لیستینگ» در پنل فروشنده قفل است
      و علتش نمایش داده می‌شود (useSellerGate در SellerDashboardView).
-   ─ کلید دموی ?seller=none|pending|rejected|suspended کارت همان
-     وضعیت را اجباری می‌کند (الگوی ?state= نماهای دیگر).
+   ─ کلید دموی ?seller=none|pending|approved|rejected|suspended کارت
+     همان وضعیت را اجباری می‌کند (الگوی ?state= نماهای دیگر).
+   ─ v1.9.1 — کارت‌های وضعیت به seller-status-cards منتقل شدند
+     (مشترک با گیت تب «فروش»)؛ دکمهٔ دموی «شبیه‌سازی تأیید ادمین» حذف
+     شد — تأیید/رد/تعلیق از پنل ادمین (/admin) انجام می‌شود و وضعیت
+     همان لحظه در نمای فروشنده تغییر می‌کند (mock مشترک).
    ───────────────────────────────────────────────────────────── */
 
 type NidState = { value: string; valid: boolean; touched: boolean };
 type ShebaState = { value: string; valid: boolean; touched: boolean };
 type SlugState = { value: string; valid: boolean; touched: boolean };
-
-/* ── چیپ وضعیت ── */
-const STATUS_CHIP: Record<SellerOnboardingStatus, { cls: string; icon: typeof Clock3 }> = {
-  none: { cls: "bg-white/10 text-white/60 border border-white/15", icon: Info },
-  pending: {
-    cls: "bg-amber-300/15 text-amber-300 border border-amber-300/40",
-    icon: Clock3,
-  },
-  approved: {
-    cls: "bg-ls-green/15 text-ls-green border border-ls-green/40",
-    icon: BadgeCheck,
-  },
-  rejected: {
-    cls: "bg-ls-pink/15 text-ls-pink border border-ls-pink/40",
-    icon: FileWarning,
-  },
-  suspended: {
-    cls: "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/40",
-    icon: ShieldAlert,
-  },
-};
-
-function StatusChip({ status }: { status: SellerOnboardingStatus }) {
-  const chip = STATUS_CHIP[status];
-  const Icon = chip.icon;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-black",
-        chip.cls
-      )}
-      role="status"
-    >
-      <Icon className="h-3.5 w-3.5" aria-hidden />
-      {SELLER_STATUS_LABEL[status]}
-    </span>
-  );
-}
-
-/* ── کارت وضعیت (در انتظار / رد / تعلیق / تأیید) ── */
-function StatusCard({
-  status,
-  reason,
-  onEdit,
-  onApproveDemo,
-}: {
-  status: SellerOnboardingStatus;
-  reason?: string | null;
-  onEdit: () => void;
-  onApproveDemo: () => void;
-}) {
-  const goDash = useAppStore((s) => s.setRoot);
-
-  if (status === "pending") {
-    return (
-      <section
-        aria-label="وضعیت درخواست فروشندگی — در انتظار تأیید"
-        className="space-y-3 rounded-2xl border border-amber-300/40 bg-amber-300/10 p-4"
-      >
-        <div className="flex items-center gap-2">
-          <Clock3 className="h-5 w-5 shrink-0 text-amber-300" aria-hidden />
-          <p className="text-sm font-black text-amber-300">
-            درخواستت در صف بررسی است
-          </p>
-        </div>
-        <p className="text-xs leading-5 text-white/75">
-          تیم LiveShop حداکثر تا {`۴۸`} ساعت کاری درخواستت را بررسی می‌کند.
-          نتیجه از صندوق ورودی و همین صفحه اعلام می‌شود.
-        </p>
-        <div className="rounded-xl border border-white/10 bg-ls-card-2 p-3">
-          <p className="text-[11px] font-bold text-white/70">
-            تا تأیید شدن این‌ها غیرفعال است:
-          </p>
-          <ul className="mt-1.5 space-y-1 text-[11px] text-white/55">
-            <li>• شروع پخش زنده</li>
-            <li>• ساخت لیستینگ جدید</li>
-          </ul>
-        </div>
-        {/* دموی دستی — تأیید ادمین */}
-        <button
-          type="button"
-          onClick={onApproveDemo}
-          aria-label="شبیه‌سازی تأیید ادمین (دمو)"
-          className="w-full rounded-xl border border-ls-green/40 bg-ls-green/10 py-2.5 text-xs font-bold text-ls-green hover:bg-ls-green/20 transition-colors active:scale-[.99]"
-        >
-          (دمو) شبیه‌سازی تأیید ادمین
-        </button>
-      </section>
-    );
-  }
-
-  if (status === "rejected") {
-    return (
-      <section
-        aria-label="وضعیت درخواست فروشندگی — رد شده"
-        className="space-y-3 rounded-2xl border border-ls-pink/40 bg-ls-pink/10 p-4"
-      >
-        <div className="flex items-center gap-2">
-          <FileWarning className="h-5 w-5 shrink-0 text-ls-pink" aria-hidden />
-          <p className="text-sm font-black text-ls-pink">
-            درخواست فروشندگی رد شد
-          </p>
-        </div>
-        <div className="rounded-xl border border-ls-pink/25 bg-ls-card-2 p-3">
-          <p className="text-[11px] font-bold text-white/70">دلیل رد:</p>
-          <p className="mt-1 text-xs leading-5 text-white/80">
-            {reason || "مدارک ارسالی قابل راستی‌آزمایی نبود."}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label="اصلاح اطلاعات و ارسال مجدد درخواست"
-          className="w-full rounded-xl bg-ls-pink py-2.5 text-xs font-black text-white hover:bg-ls-pink/90 transition-colors active:scale-[.99]"
-        >
-          اصلاح اطلاعات و ارسال مجدد
-        </button>
-      </section>
-    );
-  }
-
-  if (status === "suspended") {
-    return (
-      <section
-        aria-label="وضعیت درخواست فروشندگی — تعلیق"
-        className="space-y-3 rounded-2xl border border-[#FF3B5C]/40 bg-[#FF3B5C]/10 p-4"
-      >
-        <div className="flex items-center gap-2">
-          <ShieldAlert
-            className="h-5 w-5 shrink-0 text-[#FF3B5C]"
-            aria-hidden
-          />
-          <p className="text-sm font-black text-[#FF3B5C]">
-            اکانت فروشندگی موقتاً تعلیق شده
-          </p>
-        </div>
-        <div className="rounded-xl border border-[#FF3B5C]/25 bg-ls-card-2 p-3">
-          <p className="text-[11px] font-bold text-white/70">علت تعلیق:</p>
-          <p className="mt-1 text-xs leading-5 text-white/80">
-            {reason || "فعالیت فروشگاه با قوانین LiveShop همخوان نبود."}
-          </p>
-        </div>
-        <p className="text-[11px] leading-5 text-white/60">
-          برای پیگیری با پشتیبانی در تماس باش — پاسخ‌گویی {`۲۴`} ساعته در
-          روزهای کاری.
-        </p>
-      </section>
-    );
-  }
-
-  if (status === "approved") {
-    return (
-      <section
-        aria-label="وضعیت درخواست فروشندگی — تأیید شده"
-        className="space-y-3 rounded-2xl border border-ls-green/40 bg-ls-green/10 p-4"
-      >
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-ls-green" aria-hidden />
-          <p className="text-sm font-black text-ls-green">
-            فروشندهٔ تأییدشده‌ای! 🎉
-          </p>
-        </div>
-        <p className="text-xs leading-5 text-white/75">
-          فروشگاهت فعال است — می‌توانی شو زمان‌بندی کنی و لیستینگ بسازی.
-        </p>
-        <button
-          type="button"
-          onClick={() => goDash("sellerDashboard")}
-          aria-label="رفتن به پنل فروشنده"
-          className="w-full rounded-xl bg-ls-purple py-2.5 text-xs font-black text-white hover:bg-ls-purple-deep transition-colors active:scale-[.99]"
-        >
-          رفتن به پنل فروشنده
-        </button>
-      </section>
-    );
-  }
-
-  return null;
-}
 
 /* ═══════════════ صفحهٔ اصلی ═══════════════ */
 export default function SellerOnboardingView() {
@@ -234,12 +52,11 @@ export default function SellerOnboardingView() {
   const storeStatus = useSellerOnboardingStore((s) => s.status);
   const application = useSellerOnboardingStore((s) => s.application);
   const submit = useSellerOnboardingStore((s) => s.submit);
-  const approve = useSellerOnboardingStore((s) => s.approve);
   const reopenForm = useSellerOnboardingStore((s) => s.reopenForm);
 
   const forced = useForcedSellerStatus();
   /* کلید دمو اگر بود، وضعیت نمایشی را اجباری می‌کند */
-  const status: SellerOnboardingStatus = forced ?? storeStatus;
+  const status = forced ?? storeStatus;
 
   /* ── فیلدهای فرم (پیش‌فرض: آخرین درخواست اگر باشد) ── */
   const [storeName, setStoreName] = useState(application?.storeName ?? "");
@@ -305,7 +122,7 @@ export default function SellerOnboardingView() {
       touched: true,
     });
 
-  const onSubmit = () => {
+  const onSubmit = (): void => {
     if (!storeName.trim() || storeName.trim().length < 3) {
       toast.error("نام فروشگاه را وارد کن (حداقل ۳ حرف)");
       return;
@@ -331,7 +148,7 @@ export default function SellerOnboardingView() {
       return;
     }
     /* ماسک — مقدار کامل کد ملی/شبا در toast نمی‌رود */
-    submit({
+    const app: SellerApplication = {
       storeName: storeName.trim(),
       slug: slugCheck.normalized,
       mainCategoryLabel: category,
@@ -340,13 +157,18 @@ export default function SellerOnboardingView() {
       idPhotoAccepted: true,
       termsAccepted: true,
       submittedAtLabel: "همین حالا",
-    });
+    };
+    const r = submit(app);
+    if (!r.ok) {
+      toast.error(r.message);
+      return;
+    }
     toast.success(
       `درخواست فروشندگی «${storeName.trim()}» ثبت شد — ${maskNationalId(nidCheck.ok ? nidCheck.normalized : "")}`
     );
   };
 
-  const showForm = status === "none" || forced === "none";
+  const showForm = status === "none";
 
   return (
     <div className="flex-1 flex flex-col" aria-label="شروع فروش">
@@ -361,18 +183,14 @@ export default function SellerOnboardingView() {
           <>
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-extrabold">وضعیت درخواست</h2>
-              <StatusChip status={status} />
+              <SellerStatusChip status={status} />
             </div>
-            <StatusCard
+            <SellerStatusCard
               status={status}
               reason={application?.rejectionReason ?? application?.suspendedReason}
               onEdit={() => {
-                reopenForm();
-                toast("فرم با اطلاعات قبلی برای اصلاح باز شد");
-              }}
-              onApproveDemo={() => {
-                approve();
-                toast.success("درخواست تأیید شد — فروشگاهت فعال است");
+                const r = reopenForm();
+                if (r.ok) toast("فرم با اطلاعات قبلی برای اصلاح باز شد");
               }}
             />
           </>

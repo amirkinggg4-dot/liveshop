@@ -892,3 +892,26 @@ Stage Summary:
 - v1.9.0 کامل: ورود OTP با همان قواعد سرور (نرخ/انقضا/قفل)، مهمان با ادامهٔ اقدام، آدرس‌ها واقعی مشترک بین تسویه/خرید سریع، تنظیمات با ماندگاری، اعتماد/پشتیبانی پیش‌نویس‌دار، حذف اعلان
 - نکته برای ایجنت‌های بعدی: auth-store با کاربر seed شروع می‌شود تا صفحات قبلی بدون رگرسیون کار کنند — «خروج» مهمان واقعی می‌سازد؛ requireAuth تنها راه گیت است (pendingAction بعد از verify اجرا می‌شود)
 - صادقانه: حالت API ورود E2E واقعی با SMS نشده (فقط مسیر/نقشه)؛ refreshToken با رفرش می‌پرد (README راهکار httpOnly)؛ عکس پروفایل آپلود واقعی نیست؛ حذف حساب mock است؛ متن‌های حقوقی پیش‌نویس‌اند؛ فیلتر «مزایده‌ها» صندوق پشت فلگ ماند
+
+---
+Task ID: v1.9.1
+Agent: main (Z.ai Code)
+Task: نسخهٔ v1.9.1 — الف) قفل‌کردن پنل فروشنده بر اساس ورود و وضعیت، ب) پنل ادمین (/admin، UI با دادهٔ mock مطابق api-spec §7)، ج) تست واحد گذار وضعیت + اسکرین‌شات + مستندات + push
+
+Work Log:
+- الف) ماژول خالص src/lib/seller-status.ts: جدول گذار (none→pending ثبت؛ pending→approved/rejected تصمیم ادمین؛ approved→suspended تعلیق؛ rejected→pending ارسال دوباره؛ rejected→none باز شدن فرم؛ suspended→approved رفع تعلیق — سه مورد اول/آخر علاوه بر موارد صریح درخواست، چون بدون آن‌ها ثبت اولیه/ارسال دوباره/رفع تعلیق غیرممکن بود؛ در گزارش صادقانه ثبت شد) + validateRejectReason/validateSuspendReason (خالی/کوتاه‌تر از ۳ حرف رد) + resolveSellerAccess (مهمان/شروع/در انتظار/رد/تعلیق/پنل).
+- الف) بازنویسی seller-onboarding-store: پیش‌فرض status=none و application=null (قبلاً approved با seed کفش‌خانهٔ سینا)؛ کلید دموی ?seller=approved اضافه شد (فروشندهٔ نمونه فقط با آن)؛ همهٔ اکشن‌ها با گارد canTransition و خروجی ActionGuardResult؛ hardReset + hydrateFromSession (sessionStorage با try/catch برای mock مشترک / و /admin — فقط روی mount تا hydration سالم بماند).
+- الف) اتصال به useAuth: logout/deleteAccount/ورود موفق در auth-store وضعیت فروشنده را پاک می‌کنند.
+- الف) UI گیت: کارت‌های وضعیت به کامپوننت مشترک seller-status-cards.tsx منتقل شد (SellerStatusChip/SellerStatusCard/SellerGuestGate)؛ SellerDashboardView با resolveSellerAccess گیت تمام‌صفحه شد (مهمان←کارت ورود + شیت؛ none←شروع فروش؛ pending/rejected/suspended←کارت وضعیت؛ approved←پنل — گیت کهربایی قدیمی داخل پنل حذف چون غیرقابل‌دسترس شده بود)؛ SellerOnboardingView دکمهٔ دموی «شبیه‌سازی تأیید ادمین» حذف و جایش لینک «(دمو) باز کردن پنل ادمین» نشست؛ BottomNav تب «فروش» و ProfileView «فروشندهٔ من» برای مهمان requireAuth → شیت ورود با ادامهٔ اقدام.
+- الف) کدپستی فرم آدرس اجباری شد (فرمول قبلی validatePostalCodeFa دست‌نخورده): validateAddress خالی را با POSTAL_REQUIRED_MESSAGE رد می‌کند؛ برچسب فرم «کد پستی (۱۰ رقم — اجباری)».
+- ب) admin-store.ts: ۷ فروشندهٔ mock غیردمو (ترکیب همهٔ وضعیت‌ها) + گزارش فعالیت seed + buildDemoRequest (درخواست کاربر دمو از استور onboarding مشتق می‌شود) + decide با گارد گذار و ثبت لاگ + enqueue/drain صف اعلان ادمین (sessionStorage یک‌بارمصرف — bug اعلان تکراری در نشست نرم پیدا و با حذف push مستقیم رفع شد) + useAdminRole (?role=admin با الگوی useSyncExternalStore).
+- ب) /admin (src/app/admin/page.tsx + components/admin/AdminApp.tsx): ۴۰۳ برای بدون‌نقش؛ هدر + دکمهٔ فروشگاه (Link نرم)؛ داشبورد ۳ کارتی (در انتظار/فعال/LIVE_SHOWS.length)؛ ۴ تب با «به‌زودی» ×۳؛ جدول (فیلتر وضعیت/جستجو/دسته/مرتب‌سازی تاریخ) + پنل جزئیات sticky (کد ملی/شبا فقط ماسک + SecretField «نمایش» با ثبت لاگ و توست + عکس مدرک placeholder)؛ دیالوگ تأیید/رد/تعلیق/رفع تعلیق (AlertDialogAction با preventDefault تا خطای اعتبارسنجی دیالوگ را باز نگه دارد)؛ گزارش فعالیت «چه کسی، چه چیزی، کی».
+- ج) تست: seller-status.test.ts (۲۶: پیمایش کامل ۵×۵، دلیل خالی، ۵ وضعیت + مهمان، گاردهای استور، پاک شدن با خروج) + address-form.test.ts (۶) — مجموع ۲۵۳ lib/hook سبز، ۹ fail همان baseline بدون Postgres، ۳۸ سرور سبز؛ tsc + lint صفر.
+- ج) E2E مرورگر: ثبت درخواست → pending (بدون دکمهٔ دمو) → رد ادمین با دلیل → نمایش دلیل واقعی به فروشنده → «اصلاح و ارسال مجدد» (فرم پیش‌پر) → تأیید ادمین → پنل فعال + اعلان یک‌باره در صندوق ورودی؛ خطای دلیل خالی؛ تعلیق/رفع تعلیق عطر و نگین؛ ۴۰۳؛ کدپستی اجباری؛ خروج ← شیت ورود روی تب فروش؛ ?seller=approved ← پنل نمونه.
+- ج) اسکرین‌شات: ۱۴ عکس جدید (۸ موبایل ۳۹۰@2x + ۶ دسکتاپ ادمین) + حذف ۴ عکس قدیمی (pending-mobile/desktop با دکمهٔ دمو، form-mobile پیش‌پر، hub-gated با گیت قدیمی) — INDEX.md بخش v1.9.1 + نکته‌های صادقانه.
+- مستندات: CHANGELOG بخش v1.9.1، APP_VERSION و package.json → 1.9.1.
+
+Stage Summary:
+- v1.9.1 کامل: گیت فروشنده ۵ وضعیت + مهمان با ماشین وضعیت تست‌شده، پنل ادمین دسکتاپی با mock مشترک و اعلان یک‌باره، کدپستی اجباری.
+- نکتهٔ فنی مهم برای ایجنت‌های بعدی: مسیر /admin صفحهٔ جدا است — zustand با soft-nav (next/link) بین دو مسیر مشترک می‌ماند و برای hard-nav وضعیت فروشنده/اعلان در sessionStorage نشست است؛ report فعالیت ادمین فقط حافظهٔ ماژول است.
+- نکتهٔ ابزار: agent-browser fill روی ورودی‌های کد OTP واکنش React نمی‌دهد (type با keyboard درست است)؛ click فیزیکی روی لینک زیر toast گیر می‌کند (eval .click() جایگزین).

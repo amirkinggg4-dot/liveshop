@@ -100,7 +100,7 @@ export default function ProfileView() {
   const myBids = useActivityStore((s) => s.myBids);
   const unreadCount = useInboxStore(selectUnreadCount);
   const rewardPoints = useRewardsStore((s) => s.points);
-  const { user, logout, openLoginSheet } = useAuth();
+  const { user, logout, openLoginSheet, requireAuth } = useAuth();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const activeBidsCount = myBids.filter(
     (b) => b.status === "leading" || b.status === "outbid"
@@ -206,7 +206,10 @@ export default function ProfileView() {
         <MenuRow
           icon={Store}
           title="فروشندهٔ من"
-          onClick={() => setRoot("sellerDashboard")}
+          onClick={() =>
+            /* v1.9.1 — مهمان ← شیت ورود؛ بعد از ورود به پنل فروشنده */
+            requireAuth(() => setRoot("sellerDashboard"))
+          }
         />
         <MenuRow
           icon={MapPin}

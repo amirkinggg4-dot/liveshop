@@ -24,6 +24,7 @@ import {
   type OtpState,
 } from "@/lib/otp-state";
 import { validatePhoneFa } from "@/lib/account-validate";
+import { useSellerOnboardingStore } from "@/store/seller-onboarding-store";
 
 /** flag — پیش‌فرض خاموش؛ فقط با NEXT_PUBLIC_USE_API="true" روشن می‌شود */
 export const USE_AUTH_API = process.env.NEXT_PUBLIC_USE_API === "true";
@@ -216,6 +217,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             memberSince: "عضو جدید",
           };
     set({ user, otp: r.state, demoCode: null, sheetOpen: false });
+    /* v1.9.1 — ورود موفق = نشست کاربر تازه؛ وضعیت فروشنده از صفر شروع می‌شود */
+    useSellerOnboardingStore.getState().hardReset();
     /* ادامهٔ اقدام معلق بعد از ورود */
     const act = get().pendingAction;
     if (act) {
@@ -245,18 +248,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       demoCode: s.otp.phase === "authenticated" ? s.demoCode : null,
     })),
 
-  logout: () =>
+  logout: () => {
+    /* v1.9.1 — وضعیت فروشنده به کاربر متصل است؛ با خروج پاک می‌شود */
+    useSellerOnboardingStore.getState().hardReset();
     set({
       user: null,
       otp: initialOtpState(Date.now()),
       demoCode: null,
       sheetOpen: false,
       pendingAction: null,
-    }),
+    });
+  },
 
   deleteAccount: () => {
     memAccessToken = null;
     memRefreshToken = null;
+    /* v1.9.1 — حذف حساب وضعیت فروشنده را هم پاک می‌کند */
+    useSellerOnboardingStore.getState().hardReset();
     set({
       user: null,
       otp: initialOtpState(Date.now()),

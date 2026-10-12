@@ -12,7 +12,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppStore } from "@/store/app-store";
-import { useSellerGate } from "@/store/seller-onboarding-store";
+import {
+  useSellerGate,
+  useSellerOnboardingStore,
+} from "@/store/seller-onboarding-store";
+import { useAuth } from "@/store/auth-store";
+import { resolveSellerAccess } from "@/lib/seller-status";
 import { faNum, toman } from "@/lib/format";
 import { formatFaThousands } from "@/lib/fa-number";
 import { getSeller, getShow } from "@/lib/data/shows";
@@ -23,6 +28,11 @@ import {
   Chip,
   LiveBadge,
 } from "@/components/liveshop/shared";
+import {
+  SellerGuestGate,
+  SellerStatusCard,
+  SellerStatusChip,
+} from "@/components/liveshop/seller-status-cards";
 
 /* فاز ۲ — هاب فروشنده (اطلس تصویر ۲۳) */
 import {
@@ -122,11 +132,105 @@ export default function SellerDashboardView() {
   const setRoot = useAppStore((s) => s.setRoot);
   const openShow = useAppStore((s) => s.openShow);
 
-  /* v1.7.0 — گیت onboarding فروشنده: تا تأیید نشدن، شروع لایو/لیستینگ غیرفعال */
+  /* v1.9.1 — گیت دسترسی پنل فروشنده بر اساس ورود + وضعیت:
+     مهمان ← شیت ورود؛ none ← شروع فروش؛ pending/rejected/suspended ←
+     کارت وضعیت؛ approved ← پنل. دادهٔ فروشندهٔ نمونه فقط با وضعیت
+     approved (یا کلید دموی ‎?seller=approved‎) دیده می‌شود. */
+  const { isAuthenticated, openLoginSheet } = useAuth();
   const gate = useSellerGate();
-
+  const application = useSellerOnboardingStore((s) => s.application);
+  const reopenForm = useSellerOnboardingStore((s) => s.reopenForm);
+  /* هوک‌های پنل — قبل از early-return صدا زده می‌شوند (قواعد هوک‌ها) */
   const scheduledShows = useSellerStore((s) => s.scheduledShows);
   const sellerOrders = useSellerStore((s) => s.orders);
+
+  const access = resolveSellerAccess(isAuthenticated, gate.status);
+
+  /* ══ گیت‌های غیر-پنل: هیچ دادهٔ فروشندهٔ نمونه‌ای رندر نمی‌شود ══ */
+  if (access !== "panel") {
+    const statusReason =
+      application?.rejectionReason ?? application?.suspendedReason ?? null;
+    return (
+      <div className="flex-1 flex flex-col">
+        <PageHeader title="فروشندهٔ من" onBack={back} />
+        <div className="px-4 pt-4 pb-8 space-y-4">
+          {access === "guest" && (
+            <SellerGuestGate
+              onLogin={() =>
+                openLoginSheet(() => setRoot("sellerDashboard"))
+              }
+            />
+          )}
+
+          {access === "start" && (
+            <section
+              aria-label="شروع فروش — بدون درخواست"
+              className="space-y-4"
+            >
+              <div className="rounded-2xl border border-ls-purple/30 bg-gradient-to-l from-ls-purple/15 to-ls-pink/10 p-5">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ls-purple/20 text-ls-purple-soft">
+                  <Store className="h-6 w-6" aria-hidden />
+                </span>
+                <p className="mt-3 text-base font-black">
+                  فروشندهٔ LiveShop شو
+                </p>
+                <p className="mt-1 text-xs leading-6 text-white/70">
+                  کالاهایت را در پخش زنده با قیمت ثابت بفروش — تسویهٔ امن،
+                  ارسال با تیپاکس و پشتیبانی اختصاصی.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-ls-card p-4">
+                <p className="text-xs font-bold text-white/70">
+                  برای شروع چه چیزی لازم است؟
+                </p>
+                <ul className="mt-2 space-y-1.5 text-[11px] leading-5 text-white/55">
+                  <li>• نام فروشگاه و شناسهٔ عمومی</li>
+                  <li>• کد ملی و شماره شبا برای تسویه</li>
+                  <li>• عکس مدرک هویتی</li>
+                </ul>
+              </div>
+              <button
+                type="button"
+                onClick={() => push("sellerOnboarding")}
+                aria-label="شروع فروش — ثبت درخواست فروشندگی"
+                className="w-full rounded-2xl bg-ls-pink py-4 text-sm font-black text-white shadow-lg shadow-ls-pink/30 hover:bg-ls-pink/90 transition-colors active:scale-[.99]"
+              >
+                شروع فروش
+              </button>
+              <p className="text-center text-[10px] leading-4 text-white/40">
+                بررسی درخواست حداکثر ۴۸ ساعت کاری طول می‌کشد
+              </p>
+            </section>
+          )}
+
+          {(access === "pending" ||
+            access === "rejected" ||
+            access === "suspended") && (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-extrabold">وضعیت فروشندگی</h2>
+                <SellerStatusChip status={gate.status} />
+              </div>
+              <SellerStatusCard
+                status={gate.status}
+                reason={statusReason}
+                onEdit={() => {
+                  const r = reopenForm();
+                  if (r.ok) {
+                    push("sellerOnboarding");
+                  } else {
+                    toast.error(r.message);
+                  }
+                }}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ══ پنل فروشنده (approved) — رفتار قبلی بدون تغییر ══ */
 
   const seller = getSeller("s1");
   const liveShow = getShow("sh1");
@@ -234,45 +338,6 @@ export default function SellerDashboardView() {
             مشاهدهٔ سفارش‌ها
           </button>
         </section>
-
-        {/* v1.7.0 — گیت onboarding فروشنده */}
-        {!gate.approved && (
-          <section
-            aria-label="گیت onboarding فروشنده"
-            className="rounded-2xl border border-amber-300/40 bg-amber-300/10 p-4"
-          >
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-300/15">
-                <Store className="h-5 w-5 text-amber-300" aria-hidden />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="font-extrabold text-sm text-amber-300">
-                  {gate.status === "none" ? "فروشندهٔ LiveShop شو" : "فروشگاهت فعال نیست"}
-                </p>
-                <p className="text-xs text-white/75 mt-1 leading-5">
-                  {gate.reason}
-                </p>
-              </div>
-            </div>
-            {gate.status === "none" ? (
-              <button
-                onClick={() => push("sellerOnboarding")}
-                aria-label="شروع فروش — ثبت درخواست فروشندگی"
-                className="mt-3 w-full bg-amber-300 text-[#3a2c00] rounded-xl py-2.5 text-sm font-extrabold hover:bg-amber-300/90 transition-colors active:scale-[.99]"
-              >
-                شروع فروش
-              </button>
-            ) : (
-              <button
-                onClick={() => push("sellerOnboarding")}
-                aria-label="مشاهدهٔ وضعیت درخواست فروشندگی"
-                className="mt-3 w-full border border-amber-300/50 text-amber-300 rounded-xl py-2.5 text-sm font-extrabold hover:bg-amber-300/10 transition-colors active:scale-[.99]"
-              >
-                مشاهدهٔ وضعیت درخواست
-              </button>
-            )}
-          </section>
-        )}
 
         {/* اکشن‌های سریع */}
         <section className="grid grid-cols-2 gap-3" aria-label="دسترسی‌های سریع">

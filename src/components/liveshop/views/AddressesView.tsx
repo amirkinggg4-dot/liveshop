@@ -434,9 +434,9 @@ export default function AddressesView() {
               />
             </Field>
 
-            {/* کدپستی */}
+            {/* کدپستی — v1.9.1 اجباری */}
             <Field
-              label="کد پستی (اختیاری)"
+              label="کد پستی (۱۰ رقم — اجباری)"
               htmlFor="addr-postal"
               error={errors.postalCode}
             >
