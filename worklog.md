@@ -915,3 +915,19 @@ Stage Summary:
 - v1.9.1 کامل: گیت فروشنده ۵ وضعیت + مهمان با ماشین وضعیت تست‌شده، پنل ادمین دسکتاپی با mock مشترک و اعلان یک‌باره، کدپستی اجباری.
 - نکتهٔ فنی مهم برای ایجنت‌های بعدی: مسیر /admin صفحهٔ جدا است — zustand با soft-nav (next/link) بین دو مسیر مشترک می‌ماند و برای hard-nav وضعیت فروشنده/اعلان در sessionStorage نشست است؛ report فعالیت ادمین فقط حافظهٔ ماژول است.
 - نکتهٔ ابزار: agent-browser fill روی ورودی‌های کد OTP واکنش React نمی‌دهد (type با keyboard درست است)؛ click فیزیکی روی لینک زیر toast گیر می‌کند (eval .click() جایگزین).
+
+---
+Task ID: v1.9.1-push
+Agent: main (Z.ai Code)
+Task: push کامیت v1.9.1 روی main با توکن جدید (کاربر فراهم کرد)
+
+Work Log:
+- وضعیت ناسازگار کشف شد: commit قبلی b9966b3 (کامییت v1.9.1 جلسهٔ قبل) هیچ‌جا وجود نداشت — بعد از reset سندباکس، HEAD محلی به c2aaf84 (v1.7.1) برگشته بود ولی فایل‌های working tree (کار کامل v1.9.1) سالم مانده بودند؛ remote اصلی main = edb8989 (v1.9.0) بود.
+- اصلاح: git reset --mixed روی origin/main (edb8989) + add -A؛ ۱۵۸ عکس resurrectedشده (حذف‌شده‌های قدیمی که restore سندباکس به دیسک برگردانده بود) + ۴ عکس حذف‌شدهٔ v1.9.1 (seller-onboarding-pending-mobile/desktop، seller-onboarding-form-mobile، seller-hub-gated-mobile) از دیسک پاک شدند — مجموعهٔ نهایی ۲۷۸ عکس دقیقاً مطابق ادعای INDEX.md (۲۶۸ remote − ۴ + ۱۴ v191).
+- صحت‌سنجی قبل از کامیت: ۳۲ تست جدید v1.9.1 سبز؛ tsc صفر خطا در src (فقط ۴ خطای قدیمی examples/skills سندباکس)؛ دلتای stage شده فایل‌به‌فایل مرور شد: ۳۹ فایل = ۲۰ کد/داک + ۱۴ عکس v191 + ۴ حذف.
+- کامیت 96dc0fd (hash جدید — بازتولید دقیق hash قبلی b9966b3 ناممکن است چون timestamp آن با reset سندباکس از بین رفته) و push موفق main: edb8989..96dc0fd (fast-forward).
+- توکن فقط inline در URL push استفاده شد؛ در هیچ فایل/کامیت/config ذخیره نشد. پیشوند تکراری github_pat_github_pat_ دوباره رخ داد — با حذف تکرار (github_pat_…) کار کرد.
+
+Stage Summary:
+- main = origin/main = 96dc0fd؛ درخت کاری تمیز؛ v1.9.1 کامل روی GitHub.
+- نکته برای آینده: بعد از هر reset سندباکس، قبل از هر کاری git log و git status را با remote مقایسه کن — refs محلی می‌توانند عقب بمانند ولی فایل‌های دیسک جدیدتر باشند.
