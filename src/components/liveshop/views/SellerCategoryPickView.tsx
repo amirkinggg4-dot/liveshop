@@ -27,28 +27,30 @@ import {
 } from "@/store/seller-onboarding-store";
 import { useSellerIntroStore } from "@/store/seller-intro-store";
 import { SmartImg } from "@/components/liveshop/shared";
+import { SELLER_ONBOARDING_TOTAL_STEPS } from "@/lib/seller-onboarding-steps";
 
 /* ─────────────────────────────────────────────────────────────
-   v2.0.2 — مرحلهٔ ۲ ثبت‌نام فروشنده: انتخاب دسته (صفحهٔ تمام‌صفحه)
+   v2.0.2 — مرحلهٔ ۱ ثبت‌نام فروشنده: انتخاب دسته (صفحهٔ تمام‌صفحه)
    پس از «شروع» در شیت معرفی (و ورود در صورت مهمان) به اینجا می‌آید و
-   با «بعدی» به فرم «شروع فروش» می‌رود — دسته‌ها دیگر در فرم پرسیده
-   نمی‌شوند و دستهٔ اصلی همان نخستین انتخاب است.
+   با «بعدی» به مرحلهٔ ۲ (انتخاب زیرمجموعه) می‌رود — v2.0.3.
    ─ شبکهٔ ۳ ستونه از کاشی‌های مربع با عکس دسته‌های کاوش (منبع واحد:
      CATEGORIES در lib/data/categories — عکس فقط از public خود پروژه).
    ─ انتخاب چندتایی تا ۳: حاشیهٔ رنگی + تیک؛ اولین انتخاب نشان
      «اصلی» می‌گیرد؛ انتخاب چهارم → toast «حداکثر ۳ دسته»؛ لمس دوباره
      = حذف (حذف اصلی، اصلی را به بعدی جابه‌جا می‌کند).
-   ─ پایین ثابت: نوار پیشرفت (مرحله ۱ از ۴) + «بعدی» تا حداقل ۱
-     انتخاب غیرفعال است.
+   ─ پایین ثابت: نوار پیشرفت (مرحله ۱ از ۵ — v2.0.3: کل مراحل ۵ است)
+     + «بعدی» تا حداقل ۱ انتخاب غیرفعال است.
    ─ پیشرفت در استور seller-onboarding (categoryDraft) ذخیره می‌شود تا
-     با بستن و برگشتن از همین‌جا ادامه دهد.
+     با بستن و برگشتن از همین‌جا ادامه دهد؛ با حذف دسته، زیرمجموعه‌هایش
+     هم از draft مرحلهٔ بعد پاک می‌شود.
    ─ بالا: فلش برگشت (به شیت معرفی) و ✕ (خروج با تأیید «پیشرفتت
      ذخیره می‌شود؟»).
    متن و ارقام فارسی، RTL، بدون ایموجی؛ هدف لمسی ≥۴۴px؛ ARIA گروه
    چک‌باکس‌ها.
    ───────────────────────────────────────────────────────────── */
 
-const WIZARD_TOTAL_STEPS = 4;
+/* v2.0.3 — کل مراحل wizard از تک‌منبع مشترک (مرحلهٔ این صفحه = ۱ دسته) */
+const WIZARD_TOTAL_STEPS = SELLER_ONBOARDING_TOTAL_STEPS;
 const WIZARD_STEP = 1;
 
 export default function SellerCategoryPickView() {
@@ -80,9 +82,9 @@ export default function SellerCategoryPickView() {
     if (!r.ok) toast.error(r.message);
   };
 
-  /* «بعدی» — دسته‌ها از همین لحظه در فرم «شروع فروش» هستند (استور) */
+  /* «بعدی» — مرحلهٔ ۲: انتخاب زیرمجموعه (دسته‌ها همین لحظه در استورند) */
   const onNext = () => {
-    push("sellerOnboarding");
+    push("sellerSubcategoryPick");
   };
 
   /* خروج با تأیید — پیشرفت در استور مانده است */
@@ -225,7 +227,7 @@ export default function SellerCategoryPickView() {
           aria-label={
             selected.length < 1
               ? "بعدی — برای فعال شدن حداقل یک دسته انتخاب کن"
-              : "بعدی — رفتن به فرم شروع فروش"
+              : "بعدی — رفتن به انتخاب زیرمجموعه‌ها"
           }
           className={cn(
             "flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-black transition-all active:scale-[.99]",

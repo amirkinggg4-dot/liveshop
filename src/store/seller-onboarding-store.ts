@@ -11,7 +11,15 @@ import {
 import {
   sanitizeCategoryDraft,
 } from "@/lib/seller-category-pick";
-import { CATEGORY_IDS } from "@/lib/data/categories";
+import {
+  sanitizeSubcategoryDraft,
+  syncSubcategoryDraft,
+  type SubcategoryDraft,
+} from "@/lib/seller-subcategory-pick";
+import {
+  CATEGORY_IDS,
+  SUBCATEGORY_IDS_BY_CATEGORY,
+} from "@/lib/data/categories";
 
 /* ─────────────────────────────────────────────────────────────
    درخواست فروشندگی (onboarding) — بخش ۶ قرارداد API
@@ -81,6 +89,13 @@ export type ActionGuardResult = { ok: true } | { ok: false; message: string };
    نمی‌پرسد و عضو اول پیش‌فرض دستهٔ اصلی می‌شود. */
 export type CategoryDraft = string[] | null;
 
+/* ── v2.0.3 — پیشرفت مرحلهٔ «انتخاب زیرمجموعه» (SellerSubcategoryPickView) ──
+   {categoryId: string[]} — کلیدها دقیقاً دسته‌های انتخابی مرحلهٔ ۱ هستند
+   (با حذف دسته، زیرمجموعه‌هایش از draft پاک می‌شود؛ با افزودن، بخش خالی
+   می‌آید) و عضوهای هر کلید زیرمجموعه‌های انتخابی همان دسته‌اند (بدون سقف).
+   null = هنوز وارد جریان زیرمجموعه نشده. */
+export type SellerSubcategoryDraftState = SubcategoryDraft | null;
+
 /* ── v1.9.1 — پایداری نشست (sessionStorage) ──
    وضعیت فروشنده بین مسیر / و /admin مشترک است (mock مشترک ادمین/فروشنده).
    sessionStorage (نه localStorage): با بستن تب پاک می‌شود — هم‌فلسفهٔ
@@ -93,6 +108,8 @@ type PersistedSeller = {
   application: SellerApplication | null;
   /** v2.0.2 — اختیاری برای سازگاری با نشست‌های قبلی */
   categoryDraft?: string[] | null;
+  /** v2.0.3 — اختیاری برای سازگاری با نشست‌های قبلی */
+  subcategoryDraft?: Record<string, string[]> | null;
 };
 
 function readSellerSession(): PersistedSeller | null {
@@ -105,11 +122,23 @@ function readSellerSession(): PersistedSeller | null {
       typeof p.status === "string" &&
       ["none", "pending", "approved", "rejected", "suspended"].includes(p.status)
     ) {
+      const categoryDraft = sanitizeCategoryDraft(p.categoryDraft, CATEGORY_IDS);
+      /* v2.0.3 — draft زیرمجموعه هم پاک‌سازی و همگام با دسته‌های موجود می‌شود:
+         کلیدهای دستهٔ حذف‌شده دور ریخته و کلیدهای تازه با [] برمی‌گردند. */
+      const subcategoryDraft = categoryDraft
+        ? syncSubcategoryDraft(
+            sanitizeSubcategoryDraft(
+              p.subcategoryDraft,
+              SUBCATEGORY_IDS_BY_CATEGORY
+            ) ?? {},
+            categoryDraft
+          )
+        : null;
       return {
         status: p.status,
         application: p.application ?? null,
-        /* v2.0.2 — draft ذخیره‌شده پاک‌سازی می‌شود (id نامعتبر/تکراری/بیش از ۳) */
-        categoryDraft: sanitizeCategoryDraft(p.categoryDraft, CATEGORY_IDS),
+        categoryDraft,
+        subcategoryDraft,
       };
     }
     return null;
@@ -144,6 +173,13 @@ interface OnboardingState {
   /** v2.0.2 — پاک‌کردن انتخاب دسته‌ها (خروج از جریان بدون ذخیرهٔ عمدی — فعلاً مصرف نمی‌شود) */
   clearCategoryDraft: () => void;
 
+  /** v2.0.3 — انتخاب‌های مرحلهٔ زیرمجموعه ({categoryId: string[]})؛ null = شروع نشده */
+  subcategoryDraft: SellerSubcategoryDraftState;
+  /** v2.0.3 — ثبت/به‌روزرسانی انتخاب زیرمجموعه‌ها (با هر toggle صدا زده می‌شود) */
+  setSubcategoryDraft: (draft: SubcategoryDraft) => void;
+  /** v2.0.3 — پاک‌کردن انتخاب زیرمجموعه‌ها (هم‌قرارداد clearCategoryDraft) */
+  clearSubcategoryDraft: () => void;
+
   /** ثبت/ارسال دوبارهٔ درخواست — فقط از none یا rejected */
   submit: (app: SellerApplication) => ActionGuardResult;
   /** تأیید ادمین — فقط از pending (و رفع تعلیق از suspended با unsuspend) */
@@ -169,20 +205,43 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
   status: "none",
   application: null,
   categoryDraft: null,
+  subcategoryDraft: null,
 
   setCategoryDraft: (ids) => {
-    const next = {
-      ...get(),
-      categoryDraft: sanitizeCategoryDraft(ids, CATEGORY_IDS),
-    };
+    const categoryDraft = sanitizeCategoryDraft(ids, CATEGORY_IDS);
+    /* v2.0.3 — همگام‌سازی draft زیرمجموعه با انتخاب دسته‌ها:
+       حذف دسته ← زیرمجموعه‌هایش پاک؛ افزودن ← کلید خالی؛
+       بدون دسته (null) ← draft زیرمجموعه هم null. */
+    const subcategoryDraft = categoryDraft
+      ? syncSubcategoryDraft(get().subcategoryDraft ?? {}, categoryDraft)
+      : null;
+    const next = { ...get(), categoryDraft, subcategoryDraft };
     writeSellerSession(next);
-    set({ categoryDraft: next.categoryDraft });
+    set({ categoryDraft: next.categoryDraft, subcategoryDraft: next.subcategoryDraft });
   },
 
   clearCategoryDraft: () => {
-    const next = { ...get(), categoryDraft: null };
+    const next = { ...get(), categoryDraft: null, subcategoryDraft: null };
     writeSellerSession(next);
-    set({ categoryDraft: null });
+    set({ categoryDraft: null, subcategoryDraft: null });
+  },
+
+  setSubcategoryDraft: (draft) => {
+    const { categoryDraft } = get();
+    const sanitized = sanitizeSubcategoryDraft(draft, SUBCATEGORY_IDS_BY_CATEGORY);
+    /* همیشه همگام با دسته‌های انتخابی — کلیدهای بیگانه دور ریخته می‌شوند */
+    const subcategoryDraft = categoryDraft
+      ? syncSubcategoryDraft(sanitized ?? {}, categoryDraft)
+      : null;
+    const next = { ...get(), subcategoryDraft };
+    writeSellerSession(next);
+    set({ subcategoryDraft: next.subcategoryDraft });
+  },
+
+  clearSubcategoryDraft: () => {
+    const next = { ...get(), subcategoryDraft: null };
+    writeSellerSession(next);
+    set({ subcategoryDraft: null });
   },
 
   submit: (app) => {
@@ -282,8 +341,13 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
 
   hardReset: () => {
     clearSellerSession();
-    /* v2.0.2 — پیشرفت انتخاب دسته هم به کاربر گره خورده است */
-    set({ status: "none", application: null, categoryDraft: null });
+    /* v2.0.2/v2.0.3 — پیشرفت انتخاب دسته و زیرمجموعه هم به کاربر گره خورده است */
+    set({
+      status: "none",
+      application: null,
+      categoryDraft: null,
+      subcategoryDraft: null,
+    });
   },
 
   hydrateFromSession: () => {
@@ -293,6 +357,7 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
       status: p.status,
       application: p.application,
       categoryDraft: p.categoryDraft ?? null,
+      subcategoryDraft: p.subcategoryDraft ?? null,
     });
     return true;
   },

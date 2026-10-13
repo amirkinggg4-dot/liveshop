@@ -23,6 +23,7 @@ export type ViewName =
   | "sellerRevenue"
   | "sellerOnboarding"
   | "sellerCategoryPick"
+  | "sellerSubcategoryPick"
   | "sellerLiveReport"
   | "activity"
   | "rewards"

@@ -13,6 +13,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { PrismaClient } from "@prisma/client";
+import { CATEGORIES } from "@/lib/data/categories";
 
 const MIGRATION_SCHEMA = "liveshop_migration_test";
 const DEV_URL = "postgresql://liveshop:liveshop@localhost:5432/liveshop?schema=public";
@@ -91,6 +92,33 @@ describe("v1.6.3 migration chain on a seeded database", () => {
          AND indexname LIKE '%_trgm_idx'`,
       )) as { indexname: string }[];
       expect(idx.length).toBe(3);
+
+      // v2.0.3 — the seeded category tree matches the single source
+      // (src/lib/data/categories.ts): 10 top-level rows, each with its
+      // subcategory rows (same slugs/names), no subcategory at top level.
+      const tops = await db.category.findMany({
+        where: { parentId: null },
+        orderBy: { slug: "asc" },
+      });
+      expect(tops.length).toBe(CATEGORIES.length);
+      const expectedTotal =
+        CATEGORIES.length +
+        CATEGORIES.reduce((n, c) => n + (c.subcategories?.length ?? 0), 0);
+      expect(await db.category.count()).toBe(expectedTotal);
+      for (const c of CATEGORIES) {
+        const row = tops.find((t) => t.slug === c.slug);
+        expect(row).toBeDefined();
+        expect(row!.nameFa).toBe(c.nameFa ?? c.label);
+        const children = await db.category.findMany({
+          where: { parentId: row!.id },
+        });
+        expect(children.map((ch) => ch.slug).sort()).toEqual(
+          (c.subcategories ?? []).map((s) => s.slug).sort(),
+        );
+        expect(children.map((ch) => ch.nameFa).sort()).toEqual(
+          (c.subcategories ?? []).map((s) => s.nameFa).sort(),
+        );
+      }
     } finally {
       await db.$disconnect();
     }

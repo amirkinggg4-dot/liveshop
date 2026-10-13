@@ -14,6 +14,12 @@ import type { Category } from "@/lib/data/types";
 
 /* ── شکل پاسخ API (route ‏/api/v1/categories) ── */
 
+/** v2.0.3 — زیرمجموعهٔ دسته از API (فقط نام و slug) */
+export interface ApiCategoryChild {
+  slug: string;
+  nameFa: string;
+}
+
 export interface ApiCategory {
   id: string;
   slug: string;
@@ -21,6 +27,10 @@ export interface ApiCategory {
   liveShowCount: number;
   showCount: number;
   productCount: number;
+  /** v2.0.3 — زیرمجموعه‌های دسته؛ اختیاری تا مصرف‌کننده‌های فعلی (کاوش و
+     تست تساوی دقیق mapper) بدون تغییر رفتار باقی بمانند — کاوش/لیستینگ/
+     زمان‌بندی شو هر وقت لازم شد از همین فیلد می‌خوانند. */
+  children?: ApiCategoryChild[];
 }
 
 export interface ApiCategoriesResponse {

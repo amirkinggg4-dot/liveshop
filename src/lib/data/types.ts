@@ -236,6 +236,14 @@ export interface WalletTx {
   orderId?: string;
 }
 
+/** v2.0.3 — زیرمجموعهٔ دسته (منبع واحد: CATEGORIES در lib/data/categories) */
+export interface Subcategory {
+  id: string;
+  /** شناسهٔ لاتین پایدار — در CATEGORIES برابر id است (هم‌قرارداد دستهٔ پدر) */
+  slug: string;
+  nameFa: string;
+}
+
 export interface Category {
   id: string;
   label: string;
@@ -251,4 +259,8 @@ export interface Category {
   image?: string;
   /** قوانین اختصاصی هر دسته — فعلاً خالی (برای لیستینگ در آینده) */
   rules?: string;
+  /* v2.0.3 — زیرمجموعه‌های دسته (۴ تا ۷ مورد + «سایر»)؛ در خروجی API
+     به‌صورت فیلد children (فقط slug/nameFa) برمی‌گردد — optional تا
+     نقشهٔ API در useCategories و تست تساوی دقیقش دست‌نخورده بماند. */
+  subcategories?: Subcategory[];
 }

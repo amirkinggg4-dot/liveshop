@@ -125,8 +125,14 @@ model Category {
   id       String    @id @default(cuid())
   slug     String    @unique
   nameFa   String
+  // v2.0.3 — self-relation for subcategories (parentId = null → top-level)
+  parentId String?
+  parent   Category? @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Category[] @relation("CategoryTree")
   products Product[]
   shows    Show[]
+
+  @@index([parentId])
 }
 
 model Product {

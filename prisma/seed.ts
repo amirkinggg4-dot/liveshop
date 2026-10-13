@@ -2,14 +2,17 @@
  * LiveShop — seed for the real PostgreSQL backend (phase 1).
  *
  * Mirrors the mock data (src/lib/data) so the API returns familiar Persian
- * demo content: 10 categories, 5 approved sellers, products with size
- * variants, live/scheduled/ended shows with pinned items, and a demo buyer
- * with a topped-up wallet (double-entry ledger).
+ * demo content: 10 top-level categories WITH their subcategory tree (v2.0.3,
+ * read from the same single source src/lib/data/categories.ts), 5 approved
+ * sellers, products with size variants, live/scheduled/ended shows with
+ * pinned items, and a demo buyer with a topped-up wallet (double-entry
+ * ledger).
  *
  * Run:  bun run db:seed   (requires a reachable DATABASE_URL)
  */
 import { PrismaClient } from "@prisma/client";
 import { buildSearchText } from "../src/lib/normalize";
+import { CATEGORIES } from "../src/lib/data/categories";
 
 const db = new PrismaClient();
 
@@ -48,6 +51,22 @@ async function main() {
   );
   const cat = Object.fromEntries(categories.map((c) => [c.slug, c.id]));
   const catName = Object.fromEntries(categories.map((c) => [c.slug, c.nameFa]));
+
+  // ── v2.0.3 — Subcategories (from the SAME single source categories.ts) ──
+  // Each CATEGORIES row carries subcategories: {id, slug, nameFa} where
+  // slug is globally unique (<cat>-<suffix>, "سایر" = <cat>-other).
+  console.log("→ subcategories …");
+  let subCount = 0;
+  for (const c of CATEGORIES) {
+    const parentId = cat[c.id];
+    for (const s of c.subcategories ?? []) {
+      await db.category.create({
+        data: { slug: s.slug, nameFa: s.nameFa, parentId },
+      });
+      subCount++;
+    }
+  }
+  console.log(`  ${subCount} subcategory rows created`);
 
   // ───────── Sellers (mirrors src/lib/data/shows.ts) ─────────
   console.log("→ sellers & users …");

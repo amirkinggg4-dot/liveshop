@@ -43,8 +43,10 @@ import SellerRatesView from "./views/SellerRatesView";
 import SellerStorefrontView from "./views/SellerStorefrontView";
 import SellerSettingsView from "./views/SellerSettingsView";
 import SellerOnboardingView from "./views/SellerOnboardingView";
-// v2.0.2 — مرحلهٔ ۲ ثبت‌نام فروشنده: انتخاب دسته
+// v2.0.2 — مرحلهٔ ۱ ثبت‌نام فروشنده: انتخاب دسته
 import SellerCategoryPickView from "./views/SellerCategoryPickView";
+// v2.0.3 — مرحلهٔ ۲ ثبت‌نام فروشنده: انتخاب زیرمجموعه
+import SellerSubcategoryPickView from "./views/SellerSubcategoryPickView";
 import SellerLiveReportView from "./views/SellerLiveReportView";
 // v1.9.0 — حساب و ورود
 import ProfileEditView from "./views/ProfileEditView";
@@ -96,8 +98,10 @@ const VIEW_COMPONENTS: Record<ViewName, () => ReactNode> = {
   sellerSettings: SellerSettingsView,
   // v1.7.0 — فروش: onboarding + گزارش پایان لایو
   sellerOnboarding: SellerOnboardingView,
-  // v2.0.2 — مرحلهٔ ۲ ثبت‌نام: انتخاب دسته (بین شیت معرفی و فرم شروع فروش)
+  // v2.0.2 — مرحلهٔ ۱ ثبت‌نام: انتخاب دسته (بین شیت معرفی و مرحلهٔ زیرمجموعه)
   sellerCategoryPick: SellerCategoryPickView,
+  // v2.0.3 — مرحلهٔ ۲ ثبت‌نام: انتخاب زیرمجموعه (بین دسته و فرم شروع فروش)
+  sellerSubcategoryPick: SellerSubcategoryPickView,
   sellerLiveReport: SellerLiveReportView,
   // v1.9.0 — حساب و ورود
   profileEdit: ProfileEditView,

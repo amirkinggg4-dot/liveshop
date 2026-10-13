@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Camera, CheckCircle2, Send, Store } from "lucide-react";
+import { Camera, CheckCircle2, Pencil, Send, Store } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import {
   validateSheba,
   validateSlug,
 } from "@/lib/seller-validate";
-import { CATEGORIES, categoryById } from "@/lib/data/categories";
+import { CATEGORIES, categoryById, subcategoryById } from "@/lib/data/categories";
 import { primarySellerCategory } from "@/lib/seller-category-pick";
 import { PageHeader } from "@/components/liveshop/shared";
 import {
@@ -56,6 +56,9 @@ export default function SellerOnboardingView() {
   const reopenForm = useSellerOnboardingStore((s) => s.reopenForm);
   /* v2.0.2 — دسته‌های مرحلهٔ انتخاب (صفحهٔ انتخاب دسته)؛ عضو اول = اصلی */
   const categoryDraft = useSellerOnboardingStore((s) => s.categoryDraft);
+  /* v2.0.3 — زیرمجموعه‌های انتخابی هر دسته ({categoryId: string[]}) */
+  const subcategoryDraft = useSellerOnboardingStore((s) => s.subcategoryDraft);
+  const push = useAppStore((s) => s.push);
   const draftPrimary =
     categoryDraft && categoryDraft.length > 0
       ? categoryById(primarySellerCategory(categoryDraft) ?? "")
@@ -281,45 +284,60 @@ export default function SellerOnboardingView() {
               )}
             </div>
 
-            {/* دستهٔ اصلی — v2.0.2: اگر دسته‌ها از مرحلهٔ انتخاب آمده‌اند،
-                اینجا دوباره پرسیده نمی‌شوند؛ فقط خلاصهٔ دسته‌ها با نشان
-                «اصلی» نمایش داده می‌شود (عضو اول = پیش‌فرض دستهٔ اصلی) */}
+            {/* دسته‌ها و زیرمجموعه‌ها — v2.0.3: اگر دسته‌ها از مرحلهٔ انتخاب آمده‌اند،
+                اینجا دوباره پرسیده نمی‌شوند؛ کارت خلاصهٔ دسته‌ها + زیرمجموعه‌هایشان
+                نمایش داده می‌شود و با لمس، به مرحلهٔ زیرمجموعه برای ویرایش می‌رود */}
             {categoriesFromWizard ? (
               <div className="space-y-1.5">
-                <p className="text-xs font-bold text-white/70">دسته‌های فروش</p>
-                <div
-                  className="rounded-2xl border border-ls-purple/30 bg-ls-purple/10 p-3"
-                  aria-label="دسته‌های انتخاب‌شده در مرحلهٔ قبل"
+                <p className="text-xs font-bold text-white/70">دسته‌ها و زیرمجموعه‌های فروش</p>
+                <button
+                  type="button"
+                  onClick={() => push("sellerSubcategoryPick")}
+                  aria-label="ویرایش دسته‌ها و زیرمجموعه‌ها"
+                  className="w-full rounded-2xl border border-ls-purple/30 bg-ls-purple/10 p-3 text-right transition-colors hover:border-ls-purple/60 active:scale-[.99]"
                 >
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="space-y-2.5">
                     {(categoryDraft ?? []).map((id, i) => {
                       const c = categoryById(id);
                       if (!c) return null;
+                      const subs = subcategoryDraft?.[id] ?? [];
                       return (
-                        <span
-                          key={id}
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold",
-                            i === 0
-                              ? "bg-ls-purple text-white"
-                              : "bg-ls-card-2 text-white/75"
-                          )}
-                        >
-                          {i === 0 && (
-                            <span className="rounded-full bg-white/20 px-1 text-[9px] font-black leading-3">
-                              اصلی
+                        <div key={id}>
+                          <div className="flex items-center gap-1.5">
+                            {i === 0 && (
+                              <span className="rounded-full bg-ls-purple px-1.5 py-0.5 text-[9px] font-black leading-3 text-white">
+                                اصلی
+                              </span>
+                            )}
+                            <span className="text-xs font-black text-white/90">
+                              {c.nameFa ?? c.label}
                             </span>
+                          </div>
+                          {subs.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {subs.map((sid) => {
+                                const s = subcategoryById(id, sid);
+                                if (!s) return null;
+                                return (
+                                  <span
+                                    key={sid}
+                                    className="rounded-full bg-ls-card-2 px-2 py-0.5 text-[10px] font-bold text-white/70"
+                                  >
+                                    {s.nameFa}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           )}
-                          {c.nameFa ?? c.label}
-                        </span>
+                        </div>
                       );
                     })}
                   </div>
-                  <p className="mt-2 text-[10px] leading-4 text-white/50">
-                    از مرحلهٔ انتخاب دسته — هر وقت خواستی دسته‌های بیشتری اضافه
-                    می‌کنی.
+                  <p className="mt-2.5 flex items-center gap-1 text-[10px] font-bold text-ls-purple-soft">
+                    <Pencil className="h-3 w-3" aria-hidden />
+                    ویرایش دسته‌ها و زیرمجموعه‌ها
                   </p>
-                </div>
+                </button>
               </div>
             ) : (
             <div className="space-y-1.5">
