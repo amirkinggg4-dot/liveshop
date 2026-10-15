@@ -10,7 +10,7 @@
  *
  * Run:  bun run db:seed   (requires a reachable DATABASE_URL)
  */
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type BusinessKind } from "@prisma/client";
 import { buildSearchText } from "../src/lib/normalize";
 import { CATEGORIES } from "../src/lib/data/categories";
 
@@ -84,6 +84,10 @@ async function main() {
     companyNationalId?: string;
     economicCode?: string;
     registrationNumber?: string;
+    // v2.0.5 — اختیاری: ویژگی‌های فروش (مرحلهٔ ۴ ثبت‌نام) — کانال‌های
+    // فروش برای حقیقی و نوع کسب‌وکار برای حقوقی
+    sellChannels?: string[];
+    businessKind?: string;
   }[] = [
     {
       phone: "09120000001",
@@ -93,6 +97,8 @@ async function main() {
       bio: "کتونی‌های کمیاب، اورجینال و گارانتی اصالت. لایو خرید هر شب ساعت ۲۱ — همه‌چیز با قیمت ثابت.",
       ratingAvg: 4.9,
       ratingCount: 2341,
+      // v2.0.5 — کانال‌های فروش فعلی (مرحلهٔ ۴)
+      sellChannels: ["social", "physical_store"],
     },
     {
       phone: "09120000002",
@@ -102,6 +108,7 @@ async function main() {
       bio: "تک‌گیاه‌های نادر، ساکولنت و تجهیزات گلخانه. ارسال با بسته‌بندی ویژهٔ گیاه.",
       ratingAvg: 4.8,
       ratingCount: 1840,
+      sellChannels: ["social", "other_platforms"],
     },
     {
       phone: "09120000003",
@@ -111,6 +118,7 @@ async function main() {
       bio: "کارت‌های کلکسیونی، فیگور و یادگاری‌های نایاب. بسته‌بندی ضدضربه.",
       ratingAvg: 5.0,
       ratingCount: 968,
+      sellChannels: ["other_platforms", "social"],
     },
     {
       phone: "09120000004",
@@ -126,6 +134,9 @@ async function main() {
       companyNationalId: "10101234567",
       economicCode: "411123456789",
       registrationNumber: "486215",
+      // v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۴): نسخهٔ حقوقی → نوع کسب‌وکار
+      sellChannels: ["social", "other_platforms"],
+      businessKind: "RESELLER",
     },
     {
       phone: "09120000005",
@@ -135,6 +146,7 @@ async function main() {
       bio: "عطرهای اورجینال و زیورآلات دست‌ساز؛ لایو جمع‌بندی هر هفته.",
       ratingAvg: 4.6,
       ratingCount: 764,
+      sellChannels: ["website", "social"],
     },
   ];
 
@@ -164,6 +176,10 @@ async function main() {
         companyNationalId: s.companyNationalId ?? null,
         economicCode: s.economicCode ?? null,
         registrationNumber: s.registrationNumber ?? null,
+        // v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۴ ثبت‌نام): کانال‌های فروش
+        // (حقیقی — پیش‌فرض آرایهٔ خالی) و نوع کسب‌وکار (حقوقی — nullable)
+        sellChannels: s.sellChannels ?? [],
+        businessKind: (s.businessKind ?? null) as BusinessKind | null,
       },
     });
     sellers.push({ sellerId: profile.id, slug: profile.slug });

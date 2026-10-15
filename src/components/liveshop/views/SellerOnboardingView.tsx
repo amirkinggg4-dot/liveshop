@@ -13,6 +13,10 @@ import {
 } from "@/store/seller-onboarding-store";
 import { SELLER_TYPE_LABEL } from "@/lib/seller-identity";
 import {
+  BUSINESS_KIND_LABEL,
+  SELL_CHANNEL_LABEL,
+} from "@/lib/seller-profile-pick";
+import {
   maskNationalId,
   maskSheba,
   validateNationalId,
@@ -61,6 +65,9 @@ export default function SellerOnboardingView() {
   const subcategoryDraft = useSellerOnboardingStore((s) => s.subcategoryDraft);
   /* v2.0.4 — نوع فروشندهٔ مرحلهٔ ۳ ("individual" | "business" | null) */
   const sellerTypeDraft = useSellerOnboardingStore((s) => s.sellerTypeDraft);
+  /* v2.0.5 — ویژگی‌های فروش مرحلهٔ ۴ (دو نسخه بر اساس نوع) */
+  const sellChannelsDraft = useSellerOnboardingStore((s) => s.sellChannelsDraft);
+  const businessKindDraft = useSellerOnboardingStore((s) => s.businessKindDraft);
   const push = useAppStore((s) => s.push);
   const draftPrimary =
     categoryDraft && categoryDraft.length > 0
@@ -388,6 +395,45 @@ export default function SellerOnboardingView() {
                   <span className="mt-2.5 flex items-center gap-1 text-[10px] font-bold text-ls-purple-soft">
                     <Pencil className="h-3 w-3" aria-hidden />
                     ویرایش نوع فروشنده
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* ویژگی‌های فروش — v2.0.5: خلاصهٔ انتخاب مرحلهٔ ۴ (بسته به نوع
+                فروشنده: کانال‌های فروش حقیقی یا نوع کسب‌وکار حقوقی)؛
+                فقط وقتی انتخابی وجود دارد؛ قابل ویرایش با لمس */}
+            {sellerTypeDraft &&
+              (sellerTypeDraft === "individual"
+                ? sellChannelsDraft.length > 0
+                : businessKindDraft !== null) && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-bold text-white/70">ویژگی‌های فروش</p>
+                <button
+                  type="button"
+                  onClick={() => push("sellerProfilePick")}
+                  aria-label="ویرایش ویژگی‌های فروش"
+                  className="w-full rounded-2xl border border-ls-purple/30 bg-ls-purple/10 p-3 text-right transition-colors hover:border-ls-purple/60 active:scale-[.99]"
+                >
+                  {sellerTypeDraft === "individual" ? (
+                    <span className="flex flex-wrap gap-1">
+                      {sellChannelsDraft.map((c) => (
+                        <span
+                          key={c}
+                          className="rounded-full bg-ls-card-2 px-2 py-0.5 text-[10px] font-bold text-white/70"
+                        >
+                          {SELL_CHANNEL_LABEL[c]}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="block text-xs font-black text-white/90">
+                      {businessKindDraft ? BUSINESS_KIND_LABEL[businessKindDraft] : ""}
+                    </span>
+                  )}
+                  <span className="mt-2.5 flex items-center gap-1 text-[10px] font-bold text-ls-purple-soft">
+                    <Pencil className="h-3 w-3" aria-hidden />
+                    ویرایش ویژگی‌های فروش
                   </span>
                 </button>
               </div>

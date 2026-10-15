@@ -25,6 +25,7 @@ export type ViewName =
   | "sellerCategoryPick"
   | "sellerSubcategoryPick"
   | "sellerTypePick"
+  | "sellerProfilePick"
   | "sellerLiveReport"
   | "activity"
   | "rewards"

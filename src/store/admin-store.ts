@@ -88,6 +88,12 @@ export interface AdminSellerRequest {
   suspendedReason?: string;
   /** درخواست کاربر دموی لاگین‌شده — به نمای فروشنده متصل است */
   isDemoUser: boolean;
+  /** v2.0.5 — نوع فروشنده (مرحلهٔ ۳) — اختیاری برای سازگاری با mockهای قدیمی */
+  sellerType?: "INDIVIDUAL" | "BUSINESS";
+  /** v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۴): کانال‌های فروش (حقیقی) */
+  sellChannels?: string[];
+  /** v2.0.5 — نوع کسب‌وکار (مرحلهٔ ۴، حقوقی) */
+  businessKind?: string | null;
 }
 
 export type AdminActionKind =
@@ -121,7 +127,12 @@ export const ADMIN_ACTION_LABEL: Record<AdminActionKind, string> = {
 /** ساخت شیء درخواست کاربر دمو از استور onboarding (mock مشترک) */
 export function buildDemoRequest(
   status: SellerStatus,
-  application: SellerApplication | null
+  application: SellerApplication | null,
+  profile: {
+    sellerType: "individual" | "business" | null;
+    sellChannels: string[];
+    businessKind: string | null;
+  }
 ): AdminSellerRequest | null {
   if (!application || status === "none") return null;
   if (status === "pending" || status === "approved" || status === "rejected" || status === "suspended") {
@@ -139,6 +150,10 @@ export function buildDemoRequest(
       rejectionReason: application.rejectionReason,
       suspendedReason: application.suspendedReason,
       isDemoUser: true,
+      // v2.0.5 — ویژگی‌های فروش از draft استور (مرحلهٔ ۳ و ۴)
+      sellerType: profile.sellerType === "business" ? "BUSINESS" : "INDIVIDUAL",
+      sellChannels: profile.sellChannels,
+      businessKind: profile.businessKind,
     };
   }
   return null;
@@ -172,6 +187,9 @@ const SEED_REQUESTS: AdminSellerRequest[] = [
     submittedAtMs: NOW_BASE - 1 * DAY,
     status: "pending",
     isDemoUser: false,
+    // v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۴) — نمونهٔ حقیقی
+    sellerType: "INDIVIDUAL",
+    sellChannels: ["social", "physical_store"],
   },
   {
     id: "req-a2",
@@ -198,6 +216,9 @@ const SEED_REQUESTS: AdminSellerRequest[] = [
     submittedAtMs: NOW_BASE - 4 * DAY,
     status: "approved",
     isDemoUser: false,
+    // v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۴) — نمونهٔ حقیقی
+    sellerType: "INDIVIDUAL",
+    sellChannels: ["website", "social"],
   },
   {
     id: "req-a4",
@@ -225,6 +246,10 @@ const SEED_REQUESTS: AdminSellerRequest[] = [
     submittedAtMs: NOW_BASE - 6 * DAY,
     status: "pending",
     isDemoUser: false,
+    // v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۴) — نمونهٔ حقوقی (نام فروشگاه شرکت‌نما)
+    sellerType: "BUSINESS",
+    businessKind: "RESELLER",
+    sellChannels: ["social", "other_platforms"],
   },
   {
     id: "req-a6",

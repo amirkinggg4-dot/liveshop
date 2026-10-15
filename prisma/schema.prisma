@@ -35,6 +35,16 @@ enum SellerType {
   BUSINESS
 }
 
+// v2.0.5 — onboarding step 4 (business variant): what kind of business
+// the seller runs. Optional — only meaningful for BUSINESS sellers.
+enum BusinessKind {
+  RESELLER
+  LIQUIDATOR
+  BRAND
+  RETAILER
+  CONSIGNMENT
+}
+
 model User {
   id             String         @id @default(cuid())
   phone          String         @unique // login by SMS OTP
@@ -116,6 +126,12 @@ model SellerProfile {
   companyNationalId String? // BUSINESS: 11-digit national ID of the company (KYC — encrypted at rest, see note above)
   economicCode     String? // BUSINESS: economic code, digits, flexible length (KYC — encrypted at rest)
   registrationNumber String? // BUSINESS: company registration number, digits (mask in UI)
+  // v2.0.5 — onboarding step 4: where the seller currently sells
+  // (individual variant, multi-select; allowed values mirror
+  // SELL_CHANNEL_IDS in src/lib/seller-profile-pick.ts) and the
+  // business kind (business variant, single-select enum).
+  sellChannels   String[]      @default([])
+  businessKind   BusinessKind?
   nationalIdHash String? // KYC data: store minimal, encrypted at rest
   iban           String? // sheba, for payouts
   ratingAvg      Float        @default(0)

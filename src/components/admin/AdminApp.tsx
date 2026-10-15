@@ -39,6 +39,11 @@ import {
 } from "@/store/admin-store";
 import { useSellerOnboardingStore } from "@/store/seller-onboarding-store";
 import { buildDemoRequest } from "@/store/admin-store";
+import { SELLER_TYPE_LABEL } from "@/lib/seller-identity";
+import {
+  BUSINESS_KIND_LABEL,
+  SELL_CHANNEL_LABEL,
+} from "@/lib/seller-profile-pick";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -422,9 +427,18 @@ export default function AdminApp() {
   /* mock مشترک — درخواست کاربر دمو از استور onboarding می‌آید */
   const soStatus = useSellerOnboardingStore((s) => s.status);
   const soApp = useSellerOnboardingStore((s) => s.application);
+  // v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۳ و ۴) از draft استور برای پنل جزئیات ادمین
+  const soType = useSellerOnboardingStore((s) => s.sellerTypeDraft);
+  const soChannels = useSellerOnboardingStore((s) => s.sellChannelsDraft);
+  const soKind = useSellerOnboardingStore((s) => s.businessKindDraft);
   const demoRequest = useMemo(
-    () => buildDemoRequest(soStatus, soApp),
-    [soStatus, soApp]
+    () =>
+      buildDemoRequest(soStatus, soApp, {
+        sellerType: soType,
+        sellChannels: soChannels,
+        businessKind: soKind,
+      }),
+    [soStatus, soApp, soType, soChannels, soKind]
   );
 
   const allRequests = useMemo(
@@ -464,6 +478,25 @@ export default function AdminApp() {
      بعد از تصمیم ادمین همان لحظه آپدیت شود */
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = allRequests.find((r) => r.id === selectedId) ?? null;
+
+  /* v2.0.5 — برچسب‌های ویژگی‌های فروش (مرحلهٔ ۴) برای پنل جزئیات —
+     undefined یعنی ردیف رندر نمی‌شود (سازگار با mockهای بدون این فیلدها) */
+  const sellerTypeLabel =
+    selected?.sellerType === "BUSINESS"
+      ? SELLER_TYPE_LABEL.business
+      : selected?.sellerType === "INDIVIDUAL"
+        ? SELLER_TYPE_LABEL.individual
+        : undefined;
+  const profilePickLabel = selected
+    ? selected.businessKind
+      ? (BUSINESS_KIND_LABEL as Record<string, string>)[selected.businessKind]
+      : (selected.sellChannels ?? []).length > 0
+        ? (selected.sellChannels ?? [])
+            .map((c) => (SELL_CHANNEL_LABEL as Record<string, string>)[c])
+            .filter(Boolean)
+            .join("، ")
+        : undefined
+    : undefined;
 
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
@@ -794,6 +827,18 @@ export default function AdminApp() {
                         <dt className="text-white/50">دستهٔ اصلی</dt>
                         <dd className="font-bold text-white/85">{selected.mainCategoryLabel}</dd>
                       </div>
+                      {sellerTypeLabel && (
+                        <div className="flex items-center justify-between gap-2">
+                          <dt className="text-white/50">نوع فروشنده</dt>
+                          <dd className="font-bold text-white/85">{sellerTypeLabel}</dd>
+                        </div>
+                      )}
+                      {profilePickLabel && (
+                        <div className="flex items-center justify-between gap-2">
+                          <dt className="text-white/50">ویژگی‌های فروش</dt>
+                          <dd className="font-bold text-white/85">{profilePickLabel}</dd>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between gap-2">
                         <dt className="text-white/50">تاریخ ثبت</dt>
                         <dd className="tabular-nums text-white/85">{selected.submittedAtLabel}</dd>

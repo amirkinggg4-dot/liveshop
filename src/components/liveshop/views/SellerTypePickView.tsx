@@ -24,6 +24,7 @@ import {
   identityChangeWarningMessage,
   type SellerType,
 } from "@/lib/seller-identity";
+import { profileChangeWarningMessage } from "@/lib/seller-profile-pick";
 import { SELLER_ONBOARDING_TOTAL_STEPS } from "@/lib/seller-onboarding-steps";
 import { useAppStore } from "@/store/app-store";
 import {
@@ -32,8 +33,8 @@ import {
 
 /* ─────────────────────────────────────────────────────────────
    v2.0.4 — مرحلهٔ ۳ ثبت‌نام فروشنده: انتخاب نوع فروشنده (تمام‌صفحه)
-   پس از «بعدی» مرحلهٔ زیرمجموعه می‌آید و با «بعدی» به فرم «شروع
-   فروش» می‌رود.
+   پس از «بعدی» مرحلهٔ زیرمجموعه می‌آید و با «بعدی» به مرحلهٔ ۴
+   (ویژگی‌های فروش) می‌رود.
    ─ انتخاب تک‌گزینه‌ای (radio) بین «شخص حقیقی» و «شخص حقوقی
      (کسب‌وکار ثبت‌شده)»؛ دایرهٔ انتخاب در سمت راست (RTL) — کارت
      انتخاب‌شده حاشیهٔ بنفش می‌گیرد و دایره‌اش توپُر می‌شود.
@@ -90,20 +91,29 @@ export default function SellerTypePickView() {
   const onSelect = (type: SellerType) => {
     setDraft(type);
     /* تغییر نوع بعد از پر شدن فیلدهای مرحلهٔ ۵ → پاک‌شدن فیلدهای
-       ناسازگار با هشدار (فهرست برچسب‌های پاک‌شده از استور می‌آید) */
+       ناسازگار + پاک‌شدن draft ویژگی‌های فروش نسخهٔ دیگر (v2.0.5) —
+       یک هشدار کوتاه فقط اگر داده‌ای پاک شده باشد */
     const r = setSellerTypeDraft(type);
+    const warnings: string[] = [];
     if (r.clearedFields.length > 0) {
-      toast.warning(identityChangeWarningMessage(r.clearedFields));
+      warnings.push(identityChangeWarningMessage(r.clearedFields));
+    }
+    if (r.clearedProfileLabels.length > 0) {
+      warnings.push(profileChangeWarningMessage(r.clearedProfileLabels));
+    }
+    if (warnings.length > 0) {
+      toast.warning(warnings.join(" — "));
     }
   };
 
-  /* «بعدی» — بدون انتخاب: علامت‌گذاری کارت‌ها (بدون رفتن)؛ با انتخاب: فرم */
+  /* «بعدی» — بدون انتخاب: علامت‌گذاری کارت‌ها (بدون رفتن)؛ با انتخاب:
+     مرحلهٔ ۴ «ویژگی‌های فروش» (v2.0.5) */
   const onNext = () => {
     if (draft === null) {
       setShowErrors(true);
       return;
     }
-    push("sellerOnboarding");
+    push("sellerProfilePick");
   };
 
   /* خروج با تأیید — پیشرفت در استور مانده است */
@@ -269,7 +279,7 @@ export default function SellerTypePickView() {
           aria-disabled={!selected}
           aria-label={
             selected
-              ? "بعدی — رفتن به فرم شروع فروش"
+              ? "بعدی — رفتن به ویژگی‌های فروش"
               : "بعدی — برای ادامه یک گزینه انتخاب کن"
           }
           className={cn(

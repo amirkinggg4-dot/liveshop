@@ -14,6 +14,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { PrismaClient } from "@prisma/client";
 import { CATEGORIES } from "@/lib/data/categories";
+import { BUSINESS_KIND_IDS, SELL_CHANNEL_IDS } from "@/lib/seller-profile-pick";
 
 const MIGRATION_SCHEMA = "liveshop_migration_test";
 const DEV_URL = "postgresql://liveshop:liveshop@localhost:5432/liveshop?schema=public";
@@ -99,6 +100,30 @@ describe("v1.6.3 migration chain on a seeded database", () => {
       for (const s of individuals) {
         expect(s.companyName).toBeNull();
         expect(s.companyNationalId).toBeNull();
+      }
+
+      // v2.0.5 — onboarding step 4 landed: every seeded seller carries its
+      // sellChannels array (exact values from the seed, all within the
+      // single-source SELL_CHANNEL_IDS) and businessKind is RESELLER only
+      // for the BUSINESS seed (گجت‌بازار), NULL for every INDIVIDUAL.
+      const expectedChannels: Record<string, string[]> = {
+        "کفش‌خانهٔ سینا": ["social", "physical_store"],
+        "گلخانهٔ مینا": ["social", "other_platforms"],
+        "کلکسیون‌یار تهران": ["other_platforms", "social"],
+        "گجت‌بازار": ["social", "other_platforms"],
+        "عطر و نگین": ["website", "social"],
+      };
+      expect(sellers.length).toBe(Object.keys(expectedChannels).length);
+      for (const s of sellers) {
+        expect(s.sellChannels).toEqual(expectedChannels[s.shopName]);
+        for (const c of s.sellChannels) {
+          expect((SELL_CHANNEL_IDS as readonly string[]).includes(c)).toBeTrue();
+        }
+      }
+      expect(business!.businessKind).toBe("RESELLER");
+      expect((BUSINESS_KIND_IDS as readonly string[]).includes(business!.businessKind!)).toBeTrue();
+      for (const s of individuals) {
+        expect(s.businessKind).toBeNull();
       }
 
       // pg_trgm GIN indexes exist (created by the migration)

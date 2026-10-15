@@ -49,6 +49,7 @@ import SellerCategoryPickView from "./views/SellerCategoryPickView";
 import SellerSubcategoryPickView from "./views/SellerSubcategoryPickView";
 // v2.0.4 — مرحلهٔ ۳ ثبت‌نام فروشنده: انتخاب نوع فروشنده
 import SellerTypePickView from "./views/SellerTypePickView";
+import SellerProfilePickView from "./views/SellerProfilePickView";
 import SellerLiveReportView from "./views/SellerLiveReportView";
 // v1.9.0 — حساب و ورود
 import ProfileEditView from "./views/ProfileEditView";
@@ -104,8 +105,10 @@ const VIEW_COMPONENTS: Record<ViewName, () => ReactNode> = {
   sellerCategoryPick: SellerCategoryPickView,
   // v2.0.3 — مرحلهٔ ۲ ثبت‌نام: انتخاب زیرمجموعه (بین دسته و مرحلهٔ نوع)
   sellerSubcategoryPick: SellerSubcategoryPickView,
-  // v2.0.4 — مرحلهٔ ۳ ثبت‌نام: نوع فروشنده (بین زیرمجموعه و فرم شروع فروش)
+  // v2.0.4 — مرحلهٔ ۳ ثبت‌نام: نوع فروشنده (بین زیرمجموعه و مرحلهٔ ویژگی‌ها)
   sellerTypePick: SellerTypePickView,
+  // v2.0.5 — مرحلهٔ ۴ ثبت‌نام: ویژگی‌های فروش (بین نوع فروشنده و فرم شروع فروش)
+  sellerProfilePick: SellerProfilePickView,
   sellerLiveReport: SellerLiveReportView,
   // v1.9.0 — حساب و ورود
   profileEdit: ProfileEditView,
