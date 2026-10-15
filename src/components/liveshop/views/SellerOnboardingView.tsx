@@ -11,6 +11,7 @@ import {
   useSellerOnboardingStore,
   type SellerApplication,
 } from "@/store/seller-onboarding-store";
+import { SELLER_TYPE_LABEL } from "@/lib/seller-identity";
 import {
   maskNationalId,
   maskSheba,
@@ -58,6 +59,8 @@ export default function SellerOnboardingView() {
   const categoryDraft = useSellerOnboardingStore((s) => s.categoryDraft);
   /* v2.0.3 — زیرمجموعه‌های انتخابی هر دسته ({categoryId: string[]}) */
   const subcategoryDraft = useSellerOnboardingStore((s) => s.subcategoryDraft);
+  /* v2.0.4 — نوع فروشندهٔ مرحلهٔ ۳ ("individual" | "business" | null) */
+  const sellerTypeDraft = useSellerOnboardingStore((s) => s.sellerTypeDraft);
   const push = useAppStore((s) => s.push);
   const draftPrimary =
     categoryDraft && categoryDraft.length > 0
@@ -366,6 +369,28 @@ export default function SellerOnboardingView() {
                 ))}
               </div>
             </div>
+            )}
+
+            {/* نوع فروشنده — v2.0.4: اگر از مرحلهٔ ۳ آمده، دوباره پرسیده نمی‌شود؛
+                کارت خلاصهٔ خواندنی با لمس برای ویرایش (به مرحلهٔ نوع می‌رود) */}
+            {sellerTypeDraft && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-bold text-white/70">نوع فروشنده</p>
+                <button
+                  type="button"
+                  onClick={() => push("sellerTypePick")}
+                  aria-label="ویرایش نوع فروشنده"
+                  className="w-full rounded-2xl border border-ls-purple/30 bg-ls-purple/10 p-3 text-right transition-colors hover:border-ls-purple/60 active:scale-[.99]"
+                >
+                  <span className="block text-xs font-black text-white/90">
+                    {SELLER_TYPE_LABEL[sellerTypeDraft]}
+                  </span>
+                  <span className="mt-2.5 flex items-center gap-1 text-[10px] font-bold text-ls-purple-soft">
+                    <Pencil className="h-3 w-3" aria-hidden />
+                    ویرایش نوع فروشنده
+                  </span>
+                </button>
+              </div>
             )}
 
             {/* کد ملی */}

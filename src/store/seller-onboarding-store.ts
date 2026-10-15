@@ -17,6 +17,15 @@ import {
   type SubcategoryDraft,
 } from "@/lib/seller-subcategory-pick";
 import {
+  sanitizeSellerTypeDraft,
+  type SellerTypeDraft,
+} from "@/lib/seller-type-pick";
+import {
+  clearIncompatibleIdentity,
+  sanitizeIdentityDraft,
+  type IdentityDraft,
+} from "@/lib/seller-identity";
+import {
   CATEGORY_IDS,
   SUBCATEGORY_IDS_BY_CATEGORY,
 } from "@/lib/data/categories";
@@ -96,6 +105,13 @@ export type CategoryDraft = string[] | null;
    null = هنوز وارد جریان زیرمجموعه نشده. */
 export type SellerSubcategoryDraftState = SubcategoryDraft | null;
 
+/* ── v2.0.4 — پیشرفت مرحلهٔ «نوع فروشنده» (SellerTypePickView) ──
+   انتخاب تک‌گزینه‌ای: "individual" (شخص حقیقی) یا "business"
+   (شخص حقوقی)؛ null = هنوز انتخاب نشده. با تغییر نوع، draft هویت
+   مرحلهٔ ۵ (identityDraft) به نوع جدید تبدیل و فیلدهای ناسازگار پاک
+   می‌شوند (فهرست پاک‌شده‌ها برای هشدار toast برمی‌گردد). */
+export type SellerTypeDraftState = SellerTypeDraft;
+
 /* ── v1.9.1 — پایداری نشست (sessionStorage) ──
    وضعیت فروشنده بین مسیر / و /admin مشترک است (mock مشترک ادمین/فروشنده).
    sessionStorage (نه localStorage): با بستن تب پاک می‌شود — هم‌فلسفهٔ
@@ -110,6 +126,10 @@ type PersistedSeller = {
   categoryDraft?: string[] | null;
   /** v2.0.3 — اختیاری برای سازگاری با نشست‌های قبلی */
   subcategoryDraft?: Record<string, string[]> | null;
+  /** v2.0.4 — اختیاری برای سازگاری با نشست‌های قبلی */
+  sellerTypeDraft?: SellerTypeDraft;
+  /** v2.0.4 — اختیاری برای سازگاری با نشست‌های قبلی (مرحلهٔ ۵ هنوز UI ندارد) */
+  identityDraft?: IdentityDraft | null;
 };
 
 function readSellerSession(): PersistedSeller | null {
@@ -134,11 +154,16 @@ function readSellerSession(): PersistedSeller | null {
             categoryDraft
           )
         : null;
+      /* v2.0.4 — نوع فروشنده و draft هویت (پاک‌سازی نرم: شکل خراب → null) */
+      const sellerTypeDraft = sanitizeSellerTypeDraft(p.sellerTypeDraft);
+      const identityDraft = sanitizeIdentityDraft(p.identityDraft);
       return {
         status: p.status,
         application: p.application ?? null,
         categoryDraft,
         subcategoryDraft,
+        sellerTypeDraft,
+        identityDraft,
       };
     }
     return null;
@@ -180,6 +205,18 @@ interface OnboardingState {
   /** v2.0.3 — پاک‌کردن انتخاب زیرمجموعه‌ها (هم‌قرارداد clearCategoryDraft) */
   clearSubcategoryDraft: () => void;
 
+  /** v2.0.4 — نوع فروشنده (مرحلهٔ ۳): "individual" | "business" | null */
+  sellerTypeDraft: SellerTypeDraftState;
+  /** v2.0.4 — ثبت نوع فروشنده؛ تغییر نوع، فیلدهای ناسازگار مرحلهٔ ۵ را پاک
+      می‌کند و برچسب فارسی آن‌ها را برای هشدار برمی‌گرداند (خالی = هشدار ندارد) */
+  setSellerTypeDraft: (type: SellerTypeDraft) => { clearedFields: string[] };
+  /** v2.0.4 — پاک‌کردن نوع فروشنده (هم‌قرارداد clearCategoryDraft) */
+  clearSellerTypeDraft: () => void;
+  /** v2.0.4 — draft هویت مرحلهٔ ۵ (فقط داده/اعتبارسنجی؛ UI مرحلهٔ ۵ بعداً) */
+  identityDraft: IdentityDraft | null;
+  /** v2.0.4 — ثبت مستقیم draft هویت (برای صفحهٔ مرحلهٔ ۵ در آینده) */
+  setIdentityDraft: (draft: IdentityDraft | null) => void;
+
   /** ثبت/ارسال دوبارهٔ درخواست — فقط از none یا rejected */
   submit: (app: SellerApplication) => ActionGuardResult;
   /** تأیید ادمین — فقط از pending (و رفع تعلیق از suspended با unsuspend) */
@@ -206,6 +243,8 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
   application: null,
   categoryDraft: null,
   subcategoryDraft: null,
+  sellerTypeDraft: null,
+  identityDraft: null,
 
   setCategoryDraft: (ids) => {
     const categoryDraft = sanitizeCategoryDraft(ids, CATEGORY_IDS);
@@ -242,6 +281,33 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
     const next = { ...get(), subcategoryDraft: null };
     writeSellerSession(next);
     set({ subcategoryDraft: null });
+  },
+
+  /* v2.0.4 — تغییر نوع فروشنده: draft هویتِ نوع قبلی پاک می‌شود (با
+     هشدار به فراخوان)؛ null = پاک‌کردن انتخاب (هویت هم پاک می‌شود و
+     هشدار ندارد). */
+  setSellerTypeDraft: (type) => {
+    const { identityDraft } = get();
+    const r =
+      type === null
+        ? { next: null, clearedFields: [] }
+        : clearIncompatibleIdentity(identityDraft, type);
+    const next = { ...get(), sellerTypeDraft: type, identityDraft: r.next };
+    writeSellerSession(next);
+    set({ sellerTypeDraft: type, identityDraft: r.next });
+    return { clearedFields: r.clearedFields };
+  },
+
+  clearSellerTypeDraft: () => {
+    const next = { ...get(), sellerTypeDraft: null, identityDraft: null };
+    writeSellerSession(next);
+    set({ sellerTypeDraft: null, identityDraft: null });
+  },
+
+  setIdentityDraft: (draft) => {
+    const next = { ...get(), identityDraft: draft };
+    writeSellerSession(next);
+    set({ identityDraft: draft });
   },
 
   submit: (app) => {
@@ -341,12 +407,15 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
 
   hardReset: () => {
     clearSellerSession();
-    /* v2.0.2/v2.0.3 — پیشرفت انتخاب دسته و زیرمجموعه هم به کاربر گره خورده است */
+    /* v2.0.2/v2.0.3/v2.0.4 — پیشرفت انتخاب دسته/زیرمجموعه/نوع و هویت هم
+       به کاربر گره خورده است */
     set({
       status: "none",
       application: null,
       categoryDraft: null,
       subcategoryDraft: null,
+      sellerTypeDraft: null,
+      identityDraft: null,
     });
   },
 
@@ -358,6 +427,8 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
       application: p.application,
       categoryDraft: p.categoryDraft ?? null,
       subcategoryDraft: p.subcategoryDraft ?? null,
+      sellerTypeDraft: p.sellerTypeDraft ?? null,
+      identityDraft: p.identityDraft ?? null,
     });
     return true;
   },

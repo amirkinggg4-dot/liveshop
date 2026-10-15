@@ -70,7 +70,21 @@ async function main() {
 
   // ───────── Sellers (mirrors src/lib/data/shows.ts) ─────────
   console.log("→ sellers & users …");
-  const sellerSeeds = [
+  const sellerSeeds: {
+    phone: string;
+    shopName: string;
+    slug: string;
+    avatarUrl: string;
+    bio: string;
+    ratingAvg: number;
+    ratingCount: number;
+    // v2.0.4 — اختیاری: فقط فروشندهٔ شخص حقوقی پر می‌کند
+    sellerType?: "INDIVIDUAL" | "BUSINESS";
+    companyName?: string;
+    companyNationalId?: string;
+    economicCode?: string;
+    registrationNumber?: string;
+  }[] = [
     {
       phone: "09120000001",
       shopName: "کفش‌خانهٔ سینا",
@@ -106,6 +120,12 @@ async function main() {
       bio: "گجت، هدفون و لوازم جانبی با قیمت ثابت کارخانه. ضمانت سلامت کالا.",
       ratingAvg: 4.7,
       ratingCount: 1204,
+      // v2.0.4 — نمونهٔ شخص حقوقی (مرحلهٔ ۳ ثبت‌نام) — مقادیر دمو
+      sellerType: "BUSINESS",
+      companyName: "شرکت گجت‌بازار پارس",
+      companyNationalId: "10101234567",
+      economicCode: "411123456789",
+      registrationNumber: "486215",
     },
     {
       phone: "09120000005",
@@ -135,6 +155,15 @@ async function main() {
         ratingCount: s.ratingCount,
         // v1.6.3 — ستون جستجو با همان normalizeFa مشترک UI/سرور پر می‌شود
         searchText: buildSearchText([s.shopName, s.slug]),
+        // v2.0.4 — نوع فروشنده (مرحلهٔ ۳ ثبت‌نام): گجت‌بازار به‌عنوان نمونهٔ
+        // شخص حقوقی با فیلدهای شرکت (nullable — بقیه INDIVIDUAL پیش‌فرض؛
+        // NOTE: companyNationalId/economicCode مقدار دموی ماسک‌ناپذیرند و
+        // وقتی رمزنگاری at-rest آمد فقط به‌صورت رمزنگاری‌شده نوشته می‌شوند)
+        sellerType: s.sellerType ?? "INDIVIDUAL",
+        companyName: s.companyName ?? null,
+        companyNationalId: s.companyNationalId ?? null,
+        economicCode: s.economicCode ?? null,
+        registrationNumber: s.registrationNumber ?? null,
       },
     });
     sellers.push({ sellerId: profile.id, slug: profile.slug });

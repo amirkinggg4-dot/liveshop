@@ -86,6 +86,21 @@ describe("v1.6.3 migration chain on a seeded database", () => {
       const sellers = await db.sellerProfile.findMany();
       for (const s of sellers) expect(s.searchText.length).toBeGreaterThan(0);
 
+      // v2.0.4 — seller type landed: default INDIVIDUAL everywhere except
+      // the one BUSINESS seed (گجت‌بازار) which carries its company fields.
+      const business = sellers.find((s) => s.sellerType === "BUSINESS");
+      expect(business).toBeDefined();
+      expect(business!.companyName!.length).toBeGreaterThan(0);
+      expect(business!.companyNationalId).toMatch(/^\d{11}$/);
+      expect(business!.economicCode).toMatch(/^\d+$/);
+      expect(business!.registrationNumber).toMatch(/^\d+$/);
+      const individuals = sellers.filter((s) => s.sellerType === "INDIVIDUAL");
+      expect(individuals.length).toBeGreaterThanOrEqual(4);
+      for (const s of individuals) {
+        expect(s.companyName).toBeNull();
+        expect(s.companyNationalId).toBeNull();
+      }
+
       // pg_trgm GIN indexes exist (created by the migration)
       const idx = (await db.$queryRawUnsafe(
         `SELECT indexname FROM pg_indexes WHERE schemaname = '${MIGRATION_SCHEMA}'

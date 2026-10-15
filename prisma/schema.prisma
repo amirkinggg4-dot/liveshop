@@ -27,6 +27,14 @@ enum SellerStatus {
   SUSPENDED
 }
 
+// v2.0.4 — onboarding step 3: seller type (INDIVIDUAL = شخص حقیقی,
+// BUSINESS = شخص حقوقی). Mirrors "individual" | "business" in
+// src/lib/seller-identity.ts.
+enum SellerType {
+  INDIVIDUAL
+  BUSINESS
+}
+
 model User {
   id             String         @id @default(cuid())
   phone          String         @unique // login by SMS OTP
@@ -94,6 +102,20 @@ model SellerProfile {
   bio            String?
   avatarUrl      String? // storefront/live card avatar (public media path or URL)
   status         SellerStatus @default(PENDING)
+  // v2.0.4 — onboarding step 3: seller type (default INDIVIDUAL — tolerant
+  // of empty/legacy rows). Design note for the BUSINESS fields below:
+  // companyNationalId / economicCode are KYC-grade secrets exactly like
+  // nationalIdHash — the plan (NOT implemented yet) is to store them
+  // encrypted at rest (same pattern as nationalIdHash) and render them
+  // masked in the admin panel (e.g. ۱۱-digit ID shows last 4 only), and
+  // never log or toast the full value. Until the encryption helper lands,
+  // these columns stay nullable and are only written by the (future)
+  // seller-apply server path.
+  sellerType       SellerType @default(INDIVIDUAL)
+  companyName      String? // BUSINESS: registered company name
+  companyNationalId String? // BUSINESS: 11-digit national ID of the company (KYC — encrypted at rest, see note above)
+  economicCode     String? // BUSINESS: economic code, digits, flexible length (KYC — encrypted at rest)
+  registrationNumber String? // BUSINESS: company registration number, digits (mask in UI)
   nationalIdHash String? // KYC data: store minimal, encrypted at rest
   iban           String? // sheba, for payouts
   ratingAvg      Float        @default(0)
