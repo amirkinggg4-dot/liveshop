@@ -26,8 +26,8 @@ async function main() {
     TRUNCATE TABLE
       "LedgerEntry", "Account", "Dispute", "Shipment", "OrderItem", "Order",
       "ChatMessage", "ShowItem", "Show", "Follow", "Variant", "Product",
-      "Category", "Address", "RefreshToken", "OtpCode", "SellerProfile",
-      "User", "Report"
+      "Category", "Address", "RefreshToken", "OtpCode", "SellerLink",
+      "SellerProfile", "User", "Report"
     RESTART IDENTITY CASCADE;
   `);
 
@@ -88,6 +88,10 @@ async function main() {
     // فروش برای حقیقی و نوع کسب‌وکار برای حقوقی
     sellChannels?: string[];
     businessKind?: string;
+    // v2.0.6 — اختیاری: حضور آنلاین (مرحلهٔ ۵ ثبت‌نام) — لینک‌های canonical
+    // (مطابق src/lib/seller-presence.ts) و آدرس فروشگاه فیزیکی
+    links?: { kind: "WEBSITE" | "SOCIAL" | "STORE" | "OTHER_PLATFORM"; platform?: string; value: string }[];
+    store?: { province: string; city: string; address: string; phone?: string };
   }[] = [
     {
       phone: "09120000001",
@@ -99,6 +103,17 @@ async function main() {
       ratingCount: 2341,
       // v2.0.5 — کانال‌های فروش فعلی (مرحلهٔ ۴)
       sellChannels: ["social", "physical_store"],
+      // v2.0.6 — حضور آنلاین (مرحلهٔ ۵): شبکه‌های اجتماعی + فروشگاه فیزیکی
+      links: [
+        { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/sina.kicks" },
+        { kind: "SOCIAL", platform: "telegram", value: "https://t.me/sinakicks" },
+      ],
+      store: {
+        province: "تهران",
+        city: "تهران",
+        address: "خیابان ولیعصر، پاساژ نگین، پلاک ۱۲، واحد ۳",
+        phone: "02188776655",
+      },
     },
     {
       phone: "09120000002",
@@ -109,6 +124,11 @@ async function main() {
       ratingAvg: 4.8,
       ratingCount: 1840,
       sellChannels: ["social", "other_platforms"],
+      // v2.0.6 — حضور آنلاین (مرحلهٔ ۵): اینستاگرام + دیجی‌کالا
+      links: [
+        { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/mina.garden" },
+        { kind: "OTHER_PLATFORM", platform: "digikala", value: "https://www.digikala.com/seller/mina-garden" },
+      ],
     },
     {
       phone: "09120000003",
@@ -119,6 +139,11 @@ async function main() {
       ratingAvg: 5.0,
       ratingCount: 968,
       sellChannels: ["other_platforms", "social"],
+      // v2.0.6 — حضور آنلاین (مرحلهٔ ۵): دیوار + اینستاگرام
+      links: [
+        { kind: "OTHER_PLATFORM", platform: "divar", value: "https://divar.ir/seller/collector-tehran" },
+        { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/collector.tehran" },
+      ],
     },
     {
       phone: "09120000004",
@@ -137,6 +162,11 @@ async function main() {
       // v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۴): نسخهٔ حقوقی → نوع کسب‌وکار
       sellChannels: ["social", "other_platforms"],
       businessKind: "RESELLER",
+      // v2.0.6 — حضور آنلاین (مرحلهٔ ۵): اینستاگرام + دیجی‌کالا
+      links: [
+        { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/gadget.bazaar" },
+        { kind: "OTHER_PLATFORM", platform: "digikala", value: "https://www.digikala.com/seller/gadgetbazaar" },
+      ],
     },
     {
       phone: "09120000005",
@@ -147,6 +177,11 @@ async function main() {
       ratingAvg: 4.6,
       ratingCount: 764,
       sellChannels: ["website", "social"],
+      // v2.0.6 — حضور آنلاین (مرحلهٔ ۵): وب‌سایت + اینستاگرام
+      links: [
+        { kind: "WEBSITE", value: "https://atr-negin.example.com" },
+        { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/atr.o.negin" },
+      ],
     },
   ];
 
@@ -180,6 +215,22 @@ async function main() {
         // (حقیقی — پیش‌فرض آرایهٔ خالی) و نوع کسب‌وکار (حقوقی — nullable)
         sellChannels: s.sellChannels ?? [],
         businessKind: (s.businessKind ?? null) as BusinessKind | null,
+        // v2.0.6 — حضور آنلاین (مرحلهٔ ۵ ثبت‌نام): آدرس فروشگاه فیزیکی
+        // (فقط سینا) + سوئیچ نمایش عمومی لینک‌ها (دمو — پیش‌فرض خاموش)
+        // + لینک‌های canonical به‌صورت ردیف‌های SellerLink (isPublic=false)
+        storeProvince: s.store?.province ?? null,
+        storeCity: s.store?.city ?? null,
+        storeAddress: s.store?.address ?? null,
+        storePhone: s.store?.phone ?? null,
+        linksPublic: false,
+        links: {
+          create: (s.links ?? []).map((l) => ({
+            kind: l.kind,
+            platform: l.platform ?? null,
+            value: l.value,
+            isPublic: false,
+          })),
+        },
       },
     });
     sellers.push({ sellerId: profile.id, slug: profile.slug });

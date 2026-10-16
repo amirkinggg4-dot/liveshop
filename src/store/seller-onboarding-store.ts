@@ -33,6 +33,11 @@ import {
   type SellChannelId,
 } from "@/lib/seller-profile-pick";
 import {
+  emptyPresenceDraft,
+  sanitizePresenceDraft,
+  type SellerPresenceDraft,
+} from "@/lib/seller-presence";
+import {
   CATEGORY_IDS,
   SUBCATEGORY_IDS_BY_CATEGORY,
 } from "@/lib/data/categories";
@@ -127,6 +132,12 @@ export type SellerTypeDraftState = SellerTypeDraft;
    با تغییر نوع در مرحلهٔ ۳، draft نسخهٔ دیگر پاک می‌شود (هشدار فقط
    اگر داده‌ای داشت — برچسب‌ها از setSellerTypeDraft برمی‌گردد). */
 
+/* ── v2.0.6 — پیشرفت مرحلهٔ «حضور آنلاین» (SellerPresencePickView) ──
+   فقط بخش‌های مربوط به انتخاب مرحلهٔ ۴ پر می‌شود (حقوقی: هر ۴ بخش،
+   همه اختیاری)؛ حذف یک کانال در مرحلهٔ ۴ دادهٔ همان کانال را هم پاک
+   می‌کند — هشدار کوتاه فقط اگر داده داشت (در SellerProfilePickView)؛
+   «هیچ‌جا؛ تازه شروع می‌کنم» ← کل این مرحله در جلو و عقب پرش می‌شود. */
+
 /* ── v1.9.1 — پایداری نشست (sessionStorage) ──
    وضعیت فروشنده بین مسیر / و /admin مشترک است (mock مشترک ادمین/فروشنده).
    sessionStorage (نه localStorage): با بستن تب پاک می‌شود — هم‌فلسفهٔ
@@ -149,6 +160,8 @@ type PersistedSeller = {
   sellChannelsDraft?: SellChannelId[];
   /** v2.0.5 — اختیاری برای سازگاری با نشست‌های قبلی (نسخهٔ حقوقی مرحلهٔ ۴) */
   businessKindDraft?: BusinessKindId | null;
+  /** v2.0.6 — اختیاری برای سازگاری با نشست‌های قبلی (مرحلهٔ ۵ حضور آنلاین) */
+  presenceDraft?: SellerPresenceDraft;
 };
 
 function readSellerSession(): PersistedSeller | null {
@@ -179,6 +192,8 @@ function readSellerSession(): PersistedSeller | null {
       /* v2.0.5 — draft ویژگی‌های فروش (پاک‌سازی نرم + انحصار «تازه شروع می‌کنم») */
       const sellChannelsDraft = sanitizeSellChannels(p.sellChannelsDraft);
       const businessKindDraft = sanitizeBusinessKind(p.businessKindDraft);
+      /* v2.0.6 — draft حضور آنلاین (پاک‌سازی نرم: شکل خراب → پیش‌فرض) */
+      const presenceDraft = sanitizePresenceDraft(p.presenceDraft);
       return {
         status: p.status,
         application: p.application ?? null,
@@ -188,6 +203,7 @@ function readSellerSession(): PersistedSeller | null {
         identityDraft,
         sellChannelsDraft,
         businessKindDraft,
+        presenceDraft,
       };
     }
     return null;
@@ -254,6 +270,11 @@ interface OnboardingState {
   /** v2.0.5 — ثبت نوع کسب‌وکار (null = پاک‌کردن انتخاب) */
   setBusinessKindDraft: (kind: string | null) => void;
 
+  /** v2.0.6 — draft حضور آنلاین (مرحلهٔ ۵): لینک‌ها + آدرس فیزیکی + سوئیچ نمایش عمومی */
+  presenceDraft: SellerPresenceDraft;
+  /** v2.0.6 — ثبت draft حضور آنلاین (sanitize داخل؛ با هر تغییر فیلد صدا زده می‌شود) */
+  setPresenceDraft: (draft: SellerPresenceDraft) => void;
+
   /** ثبت/ارسال دوبارهٔ درخواست — فقط از none یا rejected */
   submit: (app: SellerApplication) => ActionGuardResult;
   /** تأیید ادمین — فقط از pending (و رفع تعلیق از suspended با unsuspend) */
@@ -284,6 +305,7 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
   identityDraft: null,
   sellChannelsDraft: [],
   businessKindDraft: null,
+  presenceDraft: emptyPresenceDraft(),
 
   setCategoryDraft: (ids) => {
     const categoryDraft = sanitizeCategoryDraft(ids, CATEGORY_IDS);
@@ -394,6 +416,14 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
     set({ businessKindDraft });
   },
 
+  /* v2.0.6 — حضور آنلاین: هر تغییر فیلد همان لحظه sanitize و در نشست می‌ماند */
+  setPresenceDraft: (draft) => {
+    const presenceDraft = sanitizePresenceDraft(draft);
+    const next = { ...get(), presenceDraft };
+    writeSellerSession(next);
+    set({ presenceDraft });
+  },
+
   setIdentityDraft: (draft) => {
     const next = { ...get(), identityDraft: draft };
     writeSellerSession(next);
@@ -501,8 +531,8 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
 
   hardReset: () => {
     clearSellerSession();
-    /* v2.0.2…v2.0.5 — پیشرفت انتخاب دسته/زیرمجموعه/نوع/ویژگی‌های فروش
-       و هویت هم به کاربر گره خورده است */
+    /* v2.0.2…v2.0.6 — پیشرفت انتخاب دسته/زیرمجموعه/نوع/ویژگی‌های فروش/
+       حضور آنلاین و هویت هم به کاربر گره خورده است */
     set({
       status: "none",
       application: null,
@@ -512,6 +542,7 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
       identityDraft: null,
       sellChannelsDraft: [],
       businessKindDraft: null,
+      presenceDraft: emptyPresenceDraft(),
     });
   },
 
@@ -527,6 +558,7 @@ export const useSellerOnboardingStore = create<OnboardingState>((set, get) => ({
       identityDraft: p.identityDraft ?? null,
       sellChannelsDraft: p.sellChannelsDraft ?? [],
       businessKindDraft: p.businessKindDraft ?? null,
+      presenceDraft: p.presenceDraft ?? emptyPresenceDraft(),
     });
     return true;
   },

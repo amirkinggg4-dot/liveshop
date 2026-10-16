@@ -16,6 +16,8 @@ import {
   BUSINESS_KIND_LABEL,
   SELL_CHANNEL_LABEL,
 } from "@/lib/seller-profile-pick";
+import { presenceHasAnyData } from "@/lib/seller-presence";
+import { faNum } from "@/lib/format";
 import {
   maskNationalId,
   maskSheba,
@@ -68,6 +70,8 @@ export default function SellerOnboardingView() {
   /* v2.0.5 — ویژگی‌های فروش مرحلهٔ ۴ (دو نسخه بر اساس نوع) */
   const sellChannelsDraft = useSellerOnboardingStore((s) => s.sellChannelsDraft);
   const businessKindDraft = useSellerOnboardingStore((s) => s.businessKindDraft);
+  /* v2.0.6 — حضور آنلاین مرحلهٔ ۵ (کارت خلاصهٔ چهارم) */
+  const presenceDraft = useSellerOnboardingStore((s) => s.presenceDraft);
   const push = useAppStore((s) => s.push);
   const draftPrimary =
     categoryDraft && categoryDraft.length > 0
@@ -129,6 +133,24 @@ export default function SellerOnboardingView() {
     shebaCheck.ok &&
     idPhoto &&
     terms;
+
+  /* v2.0.6 — چیپ‌های خلاصهٔ حضور آنلاین (فقط بخش‌های دارای داده) */
+  const presenceChips: string[] = [];
+  if (presenceDraft.websiteUrl.trim()) presenceChips.push("وب‌سایت");
+  const socialCount = presenceDraft.social.filter((r) => r.handle.trim()).length;
+  if (socialCount > 0) presenceChips.push(`${faNum(socialCount)} شبکهٔ اجتماعی`);
+  if (
+    presenceDraft.store.province.trim() ||
+    presenceDraft.store.city.trim() ||
+    presenceDraft.store.address.trim() ||
+    presenceDraft.store.phone.trim()
+  ) {
+    presenceChips.push("فروشگاه فیزیکی");
+  }
+  const otherCount = presenceDraft.otherPlatforms.filter(
+    (r) => r.url.trim()
+  ).length;
+  if (otherCount > 0) presenceChips.push(`${faNum(otherCount)} بازار آنلاین`);
 
   const onSlugChange = (v: string) =>
     setSlug({
@@ -434,6 +456,40 @@ export default function SellerOnboardingView() {
                   <span className="mt-2.5 flex items-center gap-1 text-[10px] font-bold text-ls-purple-soft">
                     <Pencil className="h-3 w-3" aria-hidden />
                     ویرایش ویژگی‌های فروش
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {/* حضور آنلاین — v2.0.6: خلاصهٔ مرحلهٔ ۵ (فقط وقتی داده‌ای هست)؛
+                قابل ویرایش با لمس (به مرحلهٔ حضور آنلاین می‌رود) */}
+            {presenceChips.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-bold text-white/70">حضور آنلاین</p>
+                <button
+                  type="button"
+                  onClick={() => push("sellerPresencePick")}
+                  aria-label="ویرایش حضور آنلاین"
+                  className="w-full rounded-2xl border border-ls-purple/30 bg-ls-purple/10 p-3 text-right transition-colors hover:border-ls-purple/60 active:scale-[.99]"
+                >
+                  <span className="flex flex-wrap items-center gap-1">
+                    {presenceChips.map((chip) => (
+                      <span
+                        key={chip}
+                        className="rounded-full bg-ls-card-2 px-2 py-0.5 text-[10px] font-bold text-white/70"
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                    {presenceDraft.linksPublic && (
+                      <span className="rounded-full bg-ls-green/15 px-2 py-0.5 text-[10px] font-bold text-ls-green">
+                        نمایش عمومی روشن
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-2.5 flex items-center gap-1 text-[10px] font-bold text-ls-purple-soft">
+                    <Pencil className="h-3 w-3" aria-hidden />
+                    ویرایش حضور آنلاین
                   </span>
                 </button>
               </div>

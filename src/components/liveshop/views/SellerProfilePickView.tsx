@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowLeft, ChevronRight, Check, X } from "lucide-react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,11 @@ import {
   type SellChannelId,
 } from "@/lib/seller-profile-pick";
 import { SELLER_ONBOARDING_TOTAL_STEPS } from "@/lib/seller-onboarding-steps";
+import {
+  clearChannelPresence,
+  presenceChannelClearedMessage,
+  shouldSkipPresence,
+} from "@/lib/seller-presence";
 import type { SellerType } from "@/lib/seller-identity";
 import { useAppStore } from "@/store/app-store";
 import {
@@ -37,8 +43,12 @@ import {
 
 /* ─────────────────────────────────────────────────────────────
    v2.0.5 — مرحلهٔ ۴ ثبت‌نام فروشنده: «ویژگی‌های فروش» (تمام‌صفحه)
-   پس از «بعدی» مرحلهٔ نوع فروشنده می‌آید و با «بعدی» به فرم «شروع
-   فروش» می‌رود. دو نسخه بر اساس نوع انتخابی مرحلهٔ ۳:
+   پس از «بعدی» مرحلهٔ نوع فروشنده می‌آید و با «بعدی» به مرحلهٔ ۵
+   «حضور آنلاین» می‌رود — به‌جز انتخاب انحصاری «هیچ‌جا؛ تازه شروع
+   می‌کنم» که کل مرحلهٔ حضور آنلاین پرش می‌شود و مستقیم به فرم
+   «شروع فروش» می‌رود (v2.0.6). حذف یک کانال، دادهٔ حضور آنلاین
+   همان کانال را هم پاک می‌کند (هشدار کوتاه فقط اگر داده داشت).
+   دو نسخه بر اساس نوع انتخابی مرحلهٔ ۳:
    ─ حقیقی (individual): «امروز کالایت را کجا می‌فروشی یا معرفی
      می‌کنی؟» — چندانتخابی با چک‌باکس مربع در سمت راست (RTL) و
      گزینهٔ انحصاری «هیچ‌جا؛ تازه شروع می‌کنم» (انتخابش بقیه را پاک
@@ -103,12 +113,26 @@ export default function SellerProfilePickView() {
   const onToggleChannel = (id: string) => {
     /* از getState استفاده می‌کنیم نه state محلی — دو لمس سریع (حتی در
        یک دستهٔ به‌روزرسانی React) هرگز همدیگر را بازنویسی نمی‌کنند */
-    const next = toggleSellChannel(
-      useSellerOnboardingStore.getState().sellChannelsDraft,
-      id
-    );
+    const store = useSellerOnboardingStore.getState();
+    const next = toggleSellChannel(store.sellChannelsDraft, id);
+    /* v2.0.6 — کانال حذف‌شده ← دادهٔ حضور آنلاین همان کانال هم پاک
+       می‌شود؛ هشدار کوتاه فقط اگر واقعاً داده‌ای داشت */
+    const removed = store.sellChannelsDraft.filter((c) => !next.includes(c));
+    let presence = store.presenceDraft;
+    const clearedLabels: string[] = [];
+    for (const c of removed) {
+      const r = clearChannelPresence(presence, c);
+      if (r.hadData) {
+        clearedLabels.push(SELL_CHANNEL_LABEL[c]);
+        presence = r.next;
+      }
+    }
+    if (clearedLabels.length > 0) store.setPresenceDraft(presence);
     setChannels(next);
     setSellChannelsDraft(next);
+    if (clearedLabels.length > 0) {
+      toast(presenceChannelClearedMessage(clearedLabels));
+    }
   };
 
   const onPickKind = (id: BusinessKindId) => {
@@ -116,7 +140,8 @@ export default function SellerProfilePickView() {
     setBusinessKindDraft(id);
   };
 
-  /* «بعدی» — ناعتبر: علامت‌گذاری کارت‌ها (بدون رفتن)؛ معتبر: فرم */
+  /* «بعدی» — ناعتبر: علامت‌گذاری کارت‌ها (بدون رفتن)؛ معتبر: مرحلهٔ ۵
+     «حضور آنلاین» — به‌جز «تازه شروع می‌کنم» که مستقیم به فرم می‌رود */
   const onNext = () => {
     const v = validateSellerProfilePick({
       sellerType: variant,
@@ -127,7 +152,11 @@ export default function SellerProfilePickView() {
       setShowErrors(true);
       return;
     }
-    push("sellerOnboarding");
+    if (variant === "individual" && shouldSkipPresence(channels)) {
+      push("sellerOnboarding");
+      return;
+    }
+    push("sellerPresencePick");
   };
 
   /* خروج با تأیید — پیشرفت در استور مانده است */
@@ -206,11 +235,12 @@ export default function SellerProfilePickView() {
                         : "border-white/10 bg-ls-card/60 hover:border-white/25"
                   )}
                 >
-                  {/* چک‌باکس مربع — سمت راست (اولین فرزند در RTL) */}
+                  {/* چک‌باکس مربع — سمت راست (اولین فرزند در RTL) —
+                      v2.0.6: گوشهٔ تیزتر تا با radio حقوقی اشتباه نشود */}
                   <span
                     aria-hidden
                     className={cn(
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] border-2 transition-colors",
                       isSel
                         ? "border-ls-purple bg-ls-purple"
                         : "border-white/30 bg-transparent"
@@ -341,7 +371,7 @@ export default function SellerProfilePickView() {
           aria-disabled={!selected}
           aria-label={
             selected
-              ? "بعدی — رفتن به فرم شروع فروش"
+              ? "بعدی — رفتن به مرحلهٔ حضور آنلاین"
               : variant === "individual"
                 ? "بعدی — حداقل یک مورد انتخاب کن"
                 : "بعدی — برای ادامه یک گزینه انتخاب کن"

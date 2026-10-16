@@ -45,6 +45,14 @@ enum BusinessKind {
   CONSIGNMENT
 }
 
+// v2.0.6 — onboarding step 5 (online presence): link kinds stored per seller.
+enum SellerLinkKind {
+  WEBSITE
+  SOCIAL
+  STORE
+  OTHER_PLATFORM
+}
+
 model User {
   id             String         @id @default(cuid())
   phone          String         @unique // login by SMS OTP
@@ -132,6 +140,17 @@ model SellerProfile {
   // business kind (business variant, single-select enum).
   sellChannels   String[]      @default([])
   businessKind   BusinessKind?
+  // v2.0.6 — onboarding step 5 (online presence): physical store address
+  // as separate columns (storeAddress must satisfy 10..300 chars per
+  // src/lib/seller-presence.ts) and the profile-level
+  // «نمایش لینک‌ها در پروفایل فروشگاه» switch (default off — the public
+  // profile shows a link only when linksPublic AND SellerLink.isPublic).
+  storeProvince  String?
+  storeCity      String?
+  storeAddress   String?
+  storePhone     String?
+  linksPublic    Boolean       @default(false)
+  links          SellerLink[]
   nationalIdHash String? // KYC data: store minimal, encrypted at rest
   iban           String? // sheba, for payouts
   ratingAvg      Float        @default(0)
@@ -151,6 +170,21 @@ model Follow {
   seller     SellerProfile @relation("Followed", fields: [sellerId], references: [id])
 
   @@id([followerId, sellerId])
+}
+
+// v2.0.6 — one row per submitted link/address (canonical URL, http/https only —
+// see SECURITY.md: no server-side fetching of these values, ever).
+model SellerLink {
+  id              String         @id @default(cuid())
+  sellerProfileId String
+  sellerProfile   SellerProfile  @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  kind            SellerLinkKind
+  platform        String? // canonical platform key from src/lib/seller-presence.ts (instagram, telegram, divar, ...) — null for WEBSITE/STORE
+  value           String // canonical URL or full address text
+  isPublic        Boolean        @default(false) // public profile shows it only when SellerProfile.linksPublic is also true
+  createdAt       DateTime       @default(now())
+
+  @@index([sellerProfileId])
 }
 
 // ───────── Catalog ─────────

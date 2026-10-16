@@ -26,6 +26,8 @@ export type ViewName =
   | "sellerSubcategoryPick"
   | "sellerTypePick"
   | "sellerProfilePick"
+  // v2.0.6 — مرحلهٔ ۵ ثبت‌نام: حضور آنلاین (لینک‌ها و آدرس‌ها)
+  | "sellerPresencePick"
   | "sellerLiveReport"
   | "activity"
   | "rewards"

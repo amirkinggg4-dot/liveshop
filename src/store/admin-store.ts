@@ -8,6 +8,10 @@ import {
   type SellerApplication,
 } from "@/store/seller-onboarding-store";
 import { maskNationalId, maskSheba } from "@/lib/seller-validate";
+import {
+  canonicalPresenceLinks,
+  type SellerPresenceDraft,
+} from "@/lib/seller-presence";
 
 /* ─────────────────────────────────────────────────────────────
    v1.9.1 — پنل ادمین (ساختار UI با دادهٔ mock — مطابق api-spec §7)
@@ -72,6 +76,29 @@ export type AdminRequestStatus = Extract<
   "pending" | "approved" | "rejected" | "suspended"
 >;
 
+/* ── v2.0.6 — حضور آنلاین (مرحلهٔ ۵ ثبت‌نام) — لینک‌های canonical +
+   آدرس فروشگاه فیزیکی + سوئیچ نمایش عمومی — اختیاری و tolerant با mockهای قدیمی ── */
+
+/** یک لینک canonical — kind با enum SellerLinkKind دیتابیس هم‌خوان است */
+export interface AdminSellerLink {
+  kind: "WEBSITE" | "SOCIAL" | "STORE" | "OTHER_PLATFORM";
+  platform?: string | null;
+  value: string;
+  isPublic?: boolean;
+}
+
+/** حضور آنلاین فروشنده — لینک‌ها همیشه canonical (src/lib/seller-presence.ts) */
+export interface AdminSellerPresence {
+  links: AdminSellerLink[];
+  storeAddress?: {
+    province?: string;
+    city?: string;
+    address?: string;
+    phone?: string;
+  } | null;
+  linksPublic?: boolean;
+}
+
 export interface AdminSellerRequest {
   id: string;
   userId: string;
@@ -94,6 +121,8 @@ export interface AdminSellerRequest {
   sellChannels?: string[];
   /** v2.0.5 — نوع کسب‌وکار (مرحلهٔ ۴، حقوقی) */
   businessKind?: string | null;
+  /** v2.0.6 — حضور آنلاین (مرحلهٔ ۵) — اختیاری برای سازگاری با mockهای قدیمی */
+  presence?: AdminSellerPresence;
 }
 
 export type AdminActionKind =
@@ -124,6 +153,22 @@ export const ADMIN_ACTION_LABEL: Record<AdminActionKind, string> = {
   reveal: "نمایش دادهٔ حساس",
 };
 
+/** draft مرحلهٔ ۵ استور onboarding → ساختار ادمین (لینک‌های canonical) */
+export function buildAdminPresence(
+  draft: SellerPresenceDraft
+): AdminSellerPresence {
+  return {
+    links: canonicalPresenceLinks(draft).map((l) => ({
+      kind: l.kind,
+      platform: l.platform,
+      value: l.value,
+      isPublic: draft.linksPublic,
+    })),
+    storeAddress: draft.store,
+    linksPublic: draft.linksPublic,
+  };
+}
+
 /** ساخت شیء درخواست کاربر دمو از استور onboarding (mock مشترک) */
 export function buildDemoRequest(
   status: SellerStatus,
@@ -132,7 +177,8 @@ export function buildDemoRequest(
     sellerType: "individual" | "business" | null;
     sellChannels: string[];
     businessKind: string | null;
-  }
+  },
+  presence: AdminSellerPresence
 ): AdminSellerRequest | null {
   if (!application || status === "none") return null;
   if (status === "pending" || status === "approved" || status === "rejected" || status === "suspended") {
@@ -154,6 +200,11 @@ export function buildDemoRequest(
       sellerType: profile.sellerType === "business" ? "BUSINESS" : "INDIVIDUAL",
       sellChannels: profile.sellChannels,
       businessKind: profile.businessKind,
+      // v2.0.6 — حضور آنلاین (مرحلهٔ ۵) — فقط وقتی داده‌ای دارد
+      presence:
+        presence.links.length > 0 || presence.linksPublic
+          ? presence
+          : undefined,
     };
   }
   return null;
@@ -190,6 +241,19 @@ const SEED_REQUESTS: AdminSellerRequest[] = [
     // v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۴) — نمونهٔ حقیقی
     sellerType: "INDIVIDUAL",
     sellChannels: ["social", "physical_store"],
+    // v2.0.6 — حضور آنلاین (مرحلهٔ ۵) — لینک‌های canonical
+    presence: {
+      links: [
+        { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/mina.garden", isPublic: false },
+        {
+          kind: "OTHER_PLATFORM",
+          platform: "digikala",
+          value: "https://www.digikala.com/seller/mina-garden",
+          isPublic: false,
+        },
+      ],
+      linksPublic: false,
+    },
   },
   {
     id: "req-a2",
@@ -219,6 +283,14 @@ const SEED_REQUESTS: AdminSellerRequest[] = [
     // v2.0.5 — ویژگی‌های فروش (مرحلهٔ ۴) — نمونهٔ حقیقی
     sellerType: "INDIVIDUAL",
     sellChannels: ["website", "social"],
+    // v2.0.6 — حضور آنلاین (مرحلهٔ ۵) — لینک‌های canonical
+    presence: {
+      links: [
+        { kind: "WEBSITE", value: "https://atr-negin.example.com", isPublic: false },
+        { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/atr.o.negin", isPublic: false },
+      ],
+      linksPublic: false,
+    },
   },
   {
     id: "req-a4",
@@ -250,6 +322,19 @@ const SEED_REQUESTS: AdminSellerRequest[] = [
     sellerType: "BUSINESS",
     businessKind: "RESELLER",
     sellChannels: ["social", "other_platforms"],
+    // v2.0.6 — حضور آنلاین (مرحلهٔ ۵) — لینک‌های canonical (بدون STORE)
+    presence: {
+      links: [
+        { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/gadgetland", isPublic: false },
+        {
+          kind: "OTHER_PLATFORM",
+          platform: "digikala",
+          value: "https://www.digikala.com/seller/gadgetland",
+          isPublic: false,
+        },
+      ],
+      linksPublic: false,
+    },
   },
   {
     id: "req-a6",

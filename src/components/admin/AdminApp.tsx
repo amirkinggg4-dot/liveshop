@@ -29,12 +29,14 @@ import {
   ADMIN_ACTION_LABEL,
   ADMIN_ACTOR,
   DEMO_SELLER_REQUEST_ID,
+  buildAdminPresence,
   maskedNidOf,
   maskedShebaOf,
   useAdminRole,
   useAdminStore,
   type AdminActionKind,
   type AdminRequestStatus,
+  type AdminSellerPresence,
   type AdminSellerRequest,
 } from "@/store/admin-store";
 import { useSellerOnboardingStore } from "@/store/seller-onboarding-store";
@@ -44,6 +46,13 @@ import {
   BUSINESS_KIND_LABEL,
   SELL_CHANNEL_LABEL,
 } from "@/lib/seller-profile-pick";
+// v2.0.6 — برچسب‌ها و displayDomain از منبع واحد (src/lib/seller-presence.ts)
+import {
+  displayDomain,
+  OTHER_PLATFORM_LABEL,
+  PRESENCE_KIND_LABEL,
+  SOCIAL_PLATFORM_LABEL,
+} from "@/lib/seller-presence";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +63,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
 
 /* ─────────────────────────────────────────────────────────────
    v1.9.1 — پنل ادمین (UI با دادهٔ mock — ساختار مطابق api-spec §7)
@@ -200,6 +210,195 @@ function SecretField({
           ? "نمایش در گزارش فعالیت ادمین ثبت شد"
           : "فقط ماسک‌شده — با «نمایش» ثبت در لاگ انجام می‌شود"}
       </p>
+    </div>
+  );
+}
+
+/* ── v2.0.6 — بخش «حضور آنلاین» در جزئیات درخواست (مرحلهٔ ۵ ثبت‌نام) ──
+   لینک‌ها همیشه canonical اند (src/lib/seller-presence.ts). متنِ کاربر
+   فقط به‌صورت text node رندر می‌شود (هرگز HTML خام)؛ «باز کردن» پیش از
+   خروج از برنامه، دامنهٔ مقصد را در دیالوگ تأیید نشان می‌دهد و لنگر
+   بیرونی همیشه target=_blank + rel="noopener noreferrer nofollow ugc" دارد. */
+function PresenceSection({ presence }: { presence: AdminSellerPresence }) {
+  const [confirmValue, setConfirmValue] = useState<string | null>(null);
+  const confirmDomain = confirmValue ? displayDomain(confirmValue) : "";
+
+  const store = presence.storeAddress;
+  const hasStore =
+    !!store &&
+    [store.province, store.city, store.address, store.phone].some(
+      (v) => !!v && v.trim().length > 0
+    );
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-bold text-white/70">حضور آنلاین</p>
+        <span
+          className={cn(
+            "rounded-full border px-2 py-0.5 text-[10px] font-bold",
+            presence.linksPublic
+              ? "border-ls-green/40 bg-ls-green/10 text-ls-green"
+              : "border-white/10 bg-white/5 text-white/50"
+          )}
+          aria-label={
+            presence.linksPublic
+              ? "نمایش عمومی لینک‌ها: روشن"
+              : "نمایش عمومی لینک‌ها: خاموش"
+          }
+        >
+          {presence.linksPublic ? "نمایش عمومی: روشن" : "نمایش عمومی: خاموش"}
+        </span>
+      </div>
+
+      <ul className="mt-2 space-y-2">
+        {presence.links.map((l, i) => {
+          // cast محلی Record<string,string> — id ناشناخته row را خاموش
+          // نشان می‌دهد نه crash (هم‌الگوی کد v2.0.5)
+          const kindLabel =
+            (PRESENCE_KIND_LABEL as Record<string, string>)[l.kind] ?? l.kind;
+          const platformLabel = l.platform
+            ? (SOCIAL_PLATFORM_LABEL as Record<string, string>)[l.platform] ??
+              (OTHER_PLATFORM_LABEL as Record<string, string>)[l.platform] ??
+              l.platform
+            : undefined;
+          const domain = displayDomain(l.value);
+          return (
+            <li
+              key={`${l.kind}-${l.platform ?? "none"}-${l.value}-${i}`}
+              className="rounded-lg border border-white/10 bg-white/[0.02] p-2.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-bold text-white/55">
+                  {kindLabel}
+                  {platformLabel ? ` — ${platformLabel}` : ""}
+                </p>
+                <span
+                  className="shrink-0 rounded-full bg-ls-purple/15 px-2 py-0.5 text-[9px] font-bold text-ls-purple-soft"
+                  dir="ltr"
+                >
+                  {domain}
+                </span>
+              </div>
+              <p
+                dir="ltr"
+                className="mt-1 truncate text-left text-[11px] text-white/80"
+              >
+                {l.value}
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard
+                      .writeText(l.value)
+                      .then(() => toast.success("لینک کپی شد"))
+                      .catch(() => toast.error("کپی انجام نشد"));
+                  }}
+                  aria-label={`کپی لینک ${domain}`}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-white/10 px-3 text-[11px] font-bold text-white/70 hover:bg-white/5 transition-colors"
+                >
+                  کپی
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmValue(l.value)}
+                  aria-label={`باز کردن لینک ${domain} در سایت بیرونی`}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-ls-purple/40 bg-ls-purple/10 px-3 text-[11px] font-bold text-ls-purple-soft hover:bg-ls-purple/20 transition-colors"
+                >
+                  باز کردن
+                </button>
+              </div>
+            </li>
+          );
+        })}
+        {presence.links.length === 0 && (
+          <li className="text-[10px] text-white/40">لینکی ثبت نشده است.</li>
+        )}
+      </ul>
+
+      {hasStore && store && (
+        <div className="mt-2 space-y-1.5 rounded-lg border border-white/10 bg-white/[0.02] p-2.5 text-xs">
+          <p className="text-[10px] font-bold text-white/55">
+            فروشگاه فیزیکی
+          </p>
+          {(store.province?.trim() || store.city?.trim()) && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-white/50">استان/شهر</span>
+              <span className="font-bold text-white/85">
+                {[store.province?.trim(), store.city?.trim()]
+                  .filter(Boolean)
+                  .join("، ")}
+              </span>
+            </div>
+          )}
+          {!!store.address?.trim() && (
+            <div className="flex items-start justify-between gap-2">
+              <span className="shrink-0 text-white/50">نشانی</span>
+              <span className="text-left font-bold leading-5 text-white/85">
+                {store.address}
+              </span>
+            </div>
+          )}
+          {!!store.phone?.trim() && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-white/50">تلفن</span>
+              <span className="tabular-nums text-white/85" dir="ltr">
+                {store.phone}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* دیالوگ تأیید خروج به سایت بیرونی — دامنهٔ مقصد نشان داده می‌شود */}
+      <AlertDialog
+        open={confirmValue !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmValue(null);
+        }}
+      >
+        <AlertDialogContent
+          dir="rtl"
+          className="max-w-[440px] rounded-2xl border-white/10 bg-[#14121f]"
+        >
+          <AlertDialogHeader className="text-right">
+            <AlertDialogTitle className="text-base">
+              در حال رفتن به سایت بیرونی
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs leading-6 text-white/60">
+              مقصد این لینک دامنهٔ{" "}
+              <span dir="ltr" className="font-bold text-white/85">
+                {confirmDomain}
+              </span>{" "}
+              است — سایتی بیرون از LiveShop و خارج از کنترل ما. محتوای آن را
+              بررسی نکرده‌ایم؛ قبل از ادامه مطمئن شو به آن اعتماد داری.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel
+              onClick={() => setConfirmValue(null)}
+              className="rounded-xl border-white/10 bg-transparent text-white/80 hover:bg-white/5"
+            >
+              انصراف
+            </AlertDialogCancel>
+            {/* لنگر بیرونی با استایل AlertDialogAction — مقدار href فقط
+                canonical خودِ لینک است و متنش text node می‌ماند */}
+            <a
+              href={confirmValue ?? "#"}
+              target="_blank"
+              rel="noopener noreferrer nofollow ugc"
+              onClick={() => setConfirmValue(null)}
+              className={cn(
+                buttonVariants(),
+                "min-h-11 rounded-xl bg-ls-purple text-white hover:bg-ls-purple-deep"
+              )}
+            >
+              باز کردن لینک
+            </a>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -431,14 +630,22 @@ export default function AdminApp() {
   const soType = useSellerOnboardingStore((s) => s.sellerTypeDraft);
   const soChannels = useSellerOnboardingStore((s) => s.sellChannelsDraft);
   const soKind = useSellerOnboardingStore((s) => s.businessKindDraft);
+  // v2.0.6 — حضور آنلاین (مرحلهٔ ۵) از draft استور → ساختار ادمین
+  const soPresence = useSellerOnboardingStore((s) => s.presenceDraft);
+  const demoPresence = useMemo(() => buildAdminPresence(soPresence), [soPresence]);
   const demoRequest = useMemo(
     () =>
-      buildDemoRequest(soStatus, soApp, {
-        sellerType: soType,
-        sellChannels: soChannels,
-        businessKind: soKind,
-      }),
-    [soStatus, soApp, soType, soChannels, soKind]
+      buildDemoRequest(
+        soStatus,
+        soApp,
+        {
+          sellerType: soType,
+          sellChannels: soChannels,
+          businessKind: soKind,
+        },
+        demoPresence
+      ),
+    [soStatus, soApp, soType, soChannels, soKind, demoPresence]
   );
 
   const allRequests = useMemo(
@@ -899,6 +1106,11 @@ export default function AdminApp() {
                         placeholder — پیوست واقعی پس از اتصال API
                       </p>
                     </div>
+
+                    {/* v2.0.6 — حضور آنلاین (مرحلهٔ ۵) — فقط وقتی داده دارد */}
+                    {selected.presence && (
+                      <PresenceSection presence={selected.presence} />
+                    )}
 
                     {/* عملیات */}
                     <div className="space-y-2 border-t border-white/10 pt-3.5">

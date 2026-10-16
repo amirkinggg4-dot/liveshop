@@ -12,9 +12,14 @@
  * touched.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, SellerLinkKind } from "@prisma/client";
 import { CATEGORIES } from "@/lib/data/categories";
 import { BUSINESS_KIND_IDS, SELL_CHANNEL_IDS } from "@/lib/seller-profile-pick";
+import {
+  OTHER_PLATFORM_IDS,
+  PRESENCE_KIND_LABEL,
+  SOCIAL_PLATFORM_IDS,
+} from "@/lib/seller-presence";
 
 const MIGRATION_SCHEMA = "liveshop_migration_test";
 const DEV_URL = "postgresql://liveshop:liveshop@localhost:5432/liveshop?schema=public";
@@ -125,6 +130,80 @@ describe("v1.6.3 migration chain on a seeded database", () => {
       for (const s of individuals) {
         expect(s.businessKind).toBeNull();
       }
+
+      // v2.0.6 — onboarding step 5 (online presence) landed: every seeded
+      // seller carries its exact link multiset (kind + platform + value —
+      // 2 links each), all rows are private (isPublic === false) and
+      // linksPublic is false profile-wide; platform keys stay within the
+      // single-source SOCIAL_PLATFORM_IDS/OTHER_PLATFORM_IDS and every
+      // value is an http(s) URL. The physical store columns are set ONLY
+      // for کفش‌خانهٔ سینا (the physical_store seller).
+      const expectedLinks: Record<
+        string,
+        { kind: SellerLinkKind; platform: string | null; value: string }[]
+      > = {
+        "کفش‌خانهٔ سینا": [
+          { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/sina.kicks" },
+          { kind: "SOCIAL", platform: "telegram", value: "https://t.me/sinakicks" },
+        ],
+        "گلخانهٔ مینا": [
+          { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/mina.garden" },
+          { kind: "OTHER_PLATFORM", platform: "digikala", value: "https://www.digikala.com/seller/mina-garden" },
+        ],
+        "کلکسیون‌یار تهران": [
+          { kind: "OTHER_PLATFORM", platform: "divar", value: "https://divar.ir/seller/collector-tehran" },
+          { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/collector.tehran" },
+        ],
+        "گجت‌بازار": [
+          { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/gadget.bazaar" },
+          { kind: "OTHER_PLATFORM", platform: "digikala", value: "https://www.digikala.com/seller/gadgetbazaar" },
+        ],
+        "عطر و نگین": [
+          { kind: "WEBSITE", platform: null, value: "https://atr-negin.example.com" },
+          { kind: "SOCIAL", platform: "instagram", value: "https://instagram.com/atr.o.negin" },
+        ],
+      };
+      const byValue = (
+        a: { kind: SellerLinkKind; platform: string | null; value: string },
+        b: { kind: SellerLinkKind; platform: string | null; value: string }
+      ) => a.value.localeCompare(b.value);
+      for (const s of sellers) {
+        const links = await db.sellerLink.findMany({
+          where: { sellerProfileId: s.id },
+        });
+        expect(links.map((l) => ({ kind: l.kind, platform: l.platform, value: l.value })).sort(byValue))
+          .toEqual([...expectedLinks[s.shopName]].sort(byValue));
+        for (const l of links) {
+          expect(l.isPublic).toBeFalse();
+          // kind stays within the SellerLinkKind enum values (single source)
+          expect(Object.keys(PRESENCE_KIND_LABEL)).toContain(l.kind);
+          // platform key stays within the social/other platform id sets
+          if (l.platform) {
+            expect(
+              (SOCIAL_PLATFORM_IDS as readonly string[]).includes(l.platform) ||
+                (OTHER_PLATFORM_IDS as readonly string[]).includes(l.platform),
+            ).toBeTrue();
+          }
+          // canonical URL — http/https only (SECURITY.md: never fetched)
+          expect(l.value.startsWith("https://") || l.value.startsWith("http://")).toBeTrue();
+        }
+        // profile-level «نمایش لینک‌ها در پروفایل فروشگاه» stays off in seed
+        expect(s.linksPublic).toBeFalse();
+        // store address columns: only the physical_store seller has them
+        if (s.shopName === "کفش‌خانهٔ سینا") {
+          expect(s.storeProvince).toBe("تهران");
+          expect(s.storeCity).toBe("تهران");
+          expect(s.storeAddress!.length).toBeGreaterThanOrEqual(10);
+          expect(s.storeAddress!.length).toBeLessThanOrEqual(300);
+          expect(s.storePhone).toMatch(/^0\d{10}$/);
+        } else {
+          expect(s.storeProvince).toBeNull();
+          expect(s.storeCity).toBeNull();
+          expect(s.storeAddress).toBeNull();
+          expect(s.storePhone).toBeNull();
+        }
+      }
+      expect(await db.sellerLink.count()).toBe(10);
 
       // pg_trgm GIN indexes exist (created by the migration)
       const idx = (await db.$queryRawUnsafe(
